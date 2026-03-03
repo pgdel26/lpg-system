@@ -170,11 +170,14 @@ export default function ProductsPage({
 
   const handleCreateAndActivate = async () => {
     if (!newName.trim()) return;
-    const id = await onCreatePricebook(newName.trim(), newEffectiveDate, newPrices);
-    if (id) {
-      await onActivatePricebook(id);
+    try {
+      const id = await onCreatePricebook(newName.trim(), newEffectiveDate, newPrices);
+      if (id) {
+        await onActivatePricebook(id);
+      }
+    } finally {
+      setCreating(false);
     }
-    setCreating(false);
   };
 
   const handleDraftPriceChange = (productKey, field, value) => {

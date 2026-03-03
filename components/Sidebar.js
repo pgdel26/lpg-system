@@ -3,12 +3,11 @@ import { DollarIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon
 
 export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
   const navItems = [
-    { id: "sales", label: "Sales", icon: <DollarIcon /> },
-    { id: "transactions", label: "Transactions", icon: <ListIcon /> },
+    { id: "transactions", label: "Sales", icon: <ListIcon /> },
     { id: "purchases", label: "Purchases", icon: <CartIcon /> },
     { id: "inventory", label: "Inventory", icon: <PackageIcon /> },
     { id: "audit", label: "Audit", icon: <ClipboardCheckIcon /> },
-    { id: "products", label: "Products", icon: <TagIcon /> },
+    { id: "products", label: "Pricing", icon: <TagIcon /> },
     { id: "customers", label: "Customers", icon: <UsersIcon /> },
   ];
 

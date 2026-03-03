@@ -15,18 +15,23 @@ function GoogleIcon() {
 }
 
 export default function LoginPage({ denied, deniedEmail, onRetry }) {
-  const [tab, setTab] = useState("email"); // "google" | "email"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleGoogleSignIn = async () => {
+    setEmailError("");
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
-        console.error("Sign-in error:", err);
+        const msgs = {
+          "auth/operation-not-allowed": "Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method.",
+          "auth/popup-blocked": "Popup was blocked by your browser. Allow popups for this site and try again.",
+          "auth/unauthorized-domain": "This domain is not authorized in Firebase Console → Authentication → Settings → Authorized domains.",
+        };
+        setEmailError(msgs[err.code] || `Google sign-in failed: ${err.message}`);
       }
     }
   };
@@ -50,20 +55,6 @@ export default function LoginPage({ denied, deniedEmail, onRetry }) {
       setSubmitting(false);
     }
   };
-
-  const tabStyle = (active) => ({
-    flex: 1,
-    padding: "8px",
-    borderRadius: "8px",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "12px",
-    fontWeight: 600,
-    fontFamily: "inherit",
-    transition: "all 0.15s",
-    background: active ? "rgba(255,255,255,0.12)" : "transparent",
-    color: active ? "#fff" : "rgba(255,255,255,0.4)",
-  });
 
   const inputStyle = {
     width: "100%", padding: "11px 14px", borderRadius: "10px",
@@ -91,19 +82,8 @@ export default function LoginPage({ denied, deniedEmail, onRetry }) {
         boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
       }}>
         {/* Logo / Brand */}
-        <div style={{
-          width: "56px", height: "56px", borderRadius: "14px",
-          background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 20px",
-          fontSize: "24px",
-          boxShadow: "0 8px 24px rgba(37,99,235,0.4)",
-        }}>
-          🔥
-        </div>
-
         <h1 style={{ fontSize: "22px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>
-          Pili Gasul Inventory
+          LPG Sales and Inventory Tracker
         </h1>
         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", marginBottom: "36px" }}>
           Sign in to access the dashboard
@@ -141,84 +121,79 @@ export default function LoginPage({ denied, deniedEmail, onRetry }) {
           </>
         ) : (
           <>
-            {/* Tab switcher */}
-            <div style={{
-              display: "flex", gap: "4px", marginBottom: "24px",
-              background: "rgba(255,255,255,0.06)", borderRadius: "10px", padding: "4px",
-            }}>
-              <button style={tabStyle(tab === "email")} onClick={() => { setTab("email"); setEmailError(""); }}>
-                Email & Password
-              </button>
-              <button style={tabStyle(tab === "google")} onClick={() => setTab("google")}>
-                Google
-              </button>
-            </div>
-
-            {tab === "google" ? (
-              /* Google sign-in */
+            {/* Email / password sign-in */}
+            <form onSubmit={handleEmailSignIn} style={{ textAlign: "left" }}>
+              <div style={{ marginBottom: "12px" }}>
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ marginBottom: "16px" }}>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              {emailError && (
+                <div style={{
+                  marginBottom: "14px", padding: "10px 12px", borderRadius: "8px",
+                  background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)",
+                  fontSize: "12px", color: "#f87171",
+                }}>
+                  {emailError}
+                </div>
+              )}
               <button
-                onClick={handleGoogleSignIn}
+                type="submit"
+                disabled={submitting}
                 style={{
                   width: "100%", padding: "12px 16px", borderRadius: "10px",
-                  border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer",
-                  background: "rgba(255,255,255,0.07)", color: "#fff",
+                  border: "none", cursor: submitting ? "not-allowed" : "pointer",
+                  background: submitting ? "rgba(37,99,235,0.4)" : "rgba(37,99,235,0.8)", color: "#fff",
                   fontSize: "14px", fontWeight: 600, fontFamily: "inherit",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
                   transition: "all 0.15s",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
               >
-                <GoogleIcon />
-                Sign in with Google
+                {submitting ? "Signing in…" : "Sign In"}
               </button>
-            ) : (
-              /* Email / password sign-in */
-              <form onSubmit={handleEmailSignIn} style={{ textAlign: "left" }}>
-                <div style={{ marginBottom: "12px" }}>
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ marginBottom: "16px" }}>
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    style={inputStyle}
-                  />
-                </div>
-                {emailError && (
-                  <div style={{
-                    marginBottom: "14px", padding: "10px 12px", borderRadius: "8px",
-                    background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)",
-                    fontSize: "12px", color: "#f87171",
-                  }}>
-                    {emailError}
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  style={{
-                    width: "100%", padding: "12px 16px", borderRadius: "10px",
-                    border: "none", cursor: submitting ? "not-allowed" : "pointer",
-                    background: submitting ? "rgba(37,99,235,0.4)" : "rgba(37,99,235,0.8)", color: "#fff",
-                    fontSize: "14px", fontWeight: 600, fontFamily: "inherit",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {submitting ? "Signing in…" : "Sign In"}
-                </button>
-              </form>
-            )}
+            </form>
+
+            {/* Divider */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: "12px",
+              margin: "20px 0",
+            }}>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }} />
+              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: 500 }}>or</span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }} />
+            </div>
+
+            {/* Google sign-in */}
+            <button
+              onClick={handleGoogleSignIn}
+              style={{
+                width: "100%", padding: "11px 16px", borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer",
+                background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.8)",
+                fontSize: "13px", fontWeight: 600, fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
+            >
+              <GoogleIcon />
+              Sign in with Google
+            </button>
           </>
         )}
       </div>

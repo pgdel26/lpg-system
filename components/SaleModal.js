@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
-import { fmt, getPricebookSrp } from "../lib/utils";
+import { fmt, getPricebookSrp, today } from "../lib/utils";
 import { SALES_SECTIONS } from "../lib/constants";
 import CustomerSearch from "./CustomerSearch";
 
@@ -18,7 +18,7 @@ export default function SaleModal({
   newPhone, setNewPhone,
   payment, setPayment,
   error,
-  customers, activePricebook,
+  customers, activePricebook, inventoryDate,
   onClose, onSubmit,
 }) {
   const defaultSection = SALES_SECTIONS[0].key;
@@ -27,6 +27,7 @@ export default function SaleModal({
   const [items, setItems] = useState([
     { section: defaultSection, product: defaultProduct, qty: "1" },
   ]);
+  const [saleDate, setSaleDate] = useState(inventoryDate || today());
   const [discount, setDiscount] = useState("");
 
   const updateItem = (index, field, value) => {
@@ -70,7 +71,7 @@ export default function SaleModal({
   const grandTotal = Math.max(0, subtotal - discountNum);
 
   const handleSubmit = () => {
-    onSubmit(items, discountNum);
+    onSubmit(items, discountNum, saleDate);
   };
 
   return (
@@ -101,7 +102,25 @@ export default function SaleModal({
           </button>
         </div>
 
-        {/* 1. Invoice Number */}
+        {/* 1. Date */}
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Date
+          </label>
+          <input
+            type="date"
+            value={saleDate}
+            onChange={(e) => setSaleDate(e.target.value)}
+            style={{
+              width: "100%", padding: "8px 12px", borderRadius: "8px",
+              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+              fontFamily: "var(--font-mono)",
+            }}
+          />
+        </div>
+
+        {/* 2. Invoice Number */}
         <div style={{ marginBottom: "14px" }}>
           <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Invoice Number

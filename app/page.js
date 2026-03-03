@@ -16,7 +16,6 @@ import LoginPage from "../components/LoginPage";
 import { isEmailAllowed } from "../lib/allowedEmails";
 import Sidebar from "../components/Sidebar";
 import Toast from "../components/Toast";
-import SalesPage from "../views/SalesPage";
 import TransactionsPage from "../views/TransactionsPage";
 import InventoryPage from "../views/InventoryPage";
 import ProductsPage from "../views/ProductsPage";
@@ -37,7 +36,7 @@ export default function GasulTracker() {
   const [authLoading, setAuthLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
-  const [activePage, setActivePage] = useState("sales");
+  const [activePage, setActivePage] = useState("transactions");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -244,6 +243,11 @@ export default function GasulTracker() {
   // ---- Activate a draft pricebook (makes it immutable) ----
   const handleActivatePricebook = async (pricebookId) => {
     try {
+      // Deactivate any currently active pricebooks first
+      const currentlyActive = pricebooks.filter((pb) => pb.status === "active" && pb.id !== pricebookId);
+      for (const pb of currentlyActive) {
+        await updateDoc(doc(db, "pricebooks", pb.id), { status: "inactive" });
+      }
       await updateDoc(doc(db, "pricebooks", pricebookId), {
         status: "active",
         activatedAt: Timestamp.now(),
@@ -459,7 +463,7 @@ export default function GasulTracker() {
   };
 
   // ---- Record Sale (multi-item) ----
-  const handleRecordSale = async (items, globalDiscount) => {
+  const handleRecordSale = async (items, globalDiscount, saleDate) => {
     setSaleModalError("");
     if (!items || items.length === 0) { setSaleModalError("Please add at least one item."); return; }
     if (!saleModalCustomer && !saleModalNewCustomer) { setSaleModalError("Please select or add a customer."); return; }
@@ -519,7 +523,7 @@ export default function GasulTracker() {
           customerId,
           customerName,
           paymentType: saleModalPayment,
-          date: inventoryDate,
+          date: saleDate || inventoryDate,
           createdAt: now,
         });
       }
@@ -867,7 +871,7 @@ export default function GasulTracker() {
               <MenuIcon />
             </button>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
-              {activePage === "sales" ? "Daily Sales" : activePage === "transactions" ? "Transactions" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricebooks"}
+              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -902,26 +906,16 @@ export default function GasulTracker() {
 
         {/* Content */}
         <main style={{ padding: "20px 24px" }}>
-          {activePage === "sales" && (
-            <SalesPage
-              inventoryDate={inventoryDate}
-              setInventoryDate={setInventoryDate}
-              saleTransactions={saleTransactions}
-              activePricebook={activePricebook}
-              swaps={swaps}
-              refunds={refunds}
-              onOpenSaleModal={handleOpenSaleModal}
-              onOpenSwapModal={handleOpenSwapModal}
-              onOpenRefundModal={handleOpenRefundModal}
-            />
-          )}
-
           {activePage === "transactions" && (
             <TransactionsPage
               inventoryDate={inventoryDate}
               setInventoryDate={setInventoryDate}
               saleTransactions={saleTransactions}
               swaps={swaps}
+              refunds={refunds}
+              onOpenSaleModal={handleOpenSaleModal}
+              onOpenSwapModal={handleOpenSwapModal}
+              onOpenRefundModal={handleOpenRefundModal}
             />
           )}
 
@@ -1021,6 +1015,7 @@ export default function GasulTracker() {
           error={saleModalError}
           customers={customers}
           activePricebook={activePricebook}
+          inventoryDate={inventoryDate}
           onClose={() => setSaleModalOpen(false)}
           onSubmit={handleRecordSale}
         />

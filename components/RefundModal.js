@@ -24,7 +24,7 @@ export default function RefundModal({
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState([
-    { section: defaultSection, product: defaultProduct, qty: "1" },
+    { section: defaultSection, product: defaultProduct, qty: "1", defective: false },
   ]);
   const [reason, setReason] = useState("");
 
@@ -92,6 +92,7 @@ export default function RefundModal({
         section: g.section,
         product: g.product,
         qty: String(g.qty),
+        defective: false,
       }))
     );
   };
@@ -111,7 +112,7 @@ export default function RefundModal({
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { section: defaultSection, product: defaultProduct, qty: "1" },
+      { section: defaultSection, product: defaultProduct, qty: "1", defective: false },
     ]);
   };
 
@@ -330,21 +331,34 @@ export default function RefundModal({
                   )}
                 </div>
 
-                {/* Row 2: Qty */}
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Qty</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.qty}
-                    onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                    style={{
-                      width: "52px", padding: "4px 6px", borderRadius: "6px",
-                      background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
-                      color: "var(--text-secondary)", fontSize: "11px", outline: "none",
-                      fontFamily: "var(--font-mono)", textAlign: "center",
-                    }}
-                  />
+                {/* Row 2: Qty + Defective */}
+                <div style={{ display: "flex", gap: "10px", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Qty</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.qty}
+                      onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                      style={{
+                        width: "52px", padding: "4px 6px", borderRadius: "6px",
+                        background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
+                        color: "var(--text-secondary)", fontSize: "11px", outline: "none",
+                        fontFamily: "var(--font-mono)", textAlign: "center",
+                      }}
+                    />
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={item.defective || false}
+                      onChange={(e) => updateItem(idx, "defective", e.target.checked)}
+                      style={{ width: "13px", height: "13px", cursor: "pointer", accentColor: "#ef4444" }}
+                    />
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: item.defective ? "#f87171" : "var(--text-dim)" }}>
+                      Defective
+                    </span>
+                  </label>
                 </div>
               </div>
             );
