@@ -1,9 +1,10 @@
 import React from "react";
-import { DollarIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ListIcon, CartIcon, ClipboardCheckIcon } from "./Icons";
+import { DollarIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ListIcon, CartIcon, ClipboardCheckIcon, HistoryIcon } from "./Icons";
 
 export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
   const navItems = [
     { id: "transactions", label: "Sales", icon: <ListIcon /> },
+    { id: "refunds", label: "Refunds/Returns", icon: <HistoryIcon /> },
     { id: "purchases", label: "Purchases", icon: <CartIcon /> },
     { id: "inventory", label: "Inventory", icon: <PackageIcon /> },
     { id: "audit", label: "Audit", icon: <ClipboardCheckIcon /> },

@@ -1,16 +1,23 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt } from "../lib/utils";
-import { SALES_SECTIONS } from "../lib/constants";
+import { FULL_CYLINDER_PRODUCTS, ALL_ACCESSORIES } from "../lib/constants";
+import CustomerSearch from "./CustomerSearch";
+
+const REFUND_SECTIONS = [
+  { key: "emptyCylinder", label: "Empty Cylinder", products: FULL_CYLINDER_PRODUCTS },
+  { key: "fullCylinder", label: "Full Cylinder", products: FULL_CYLINDER_PRODUCTS },
+  { key: "accessories", label: "Accessories", products: ALL_ACCESSORIES },
+];
 
 function getProductsForSection(sectionKey) {
-  const sec = SALES_SECTIONS.find((s) => s.key === sectionKey);
-  if (!sec) return [];
-  return sec.subgroups ? sec.subgroups.flatMap((sg) => sg.products) : (sec.products || []);
+  const sec = REFUND_SECTIONS.find((s) => s.key === sectionKey);
+  return sec ? sec.products : [];
 }
 
 export default function RefundModal({
   saleTransactions,
+  customers,
   error,
   onClose, onSubmit,
 }) {
@@ -20,11 +27,11 @@ export default function RefundModal({
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState("");
 
-  const defaultSection = SALES_SECTIONS[0].key;
+  const defaultSection = REFUND_SECTIONS[0].key;
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState([
-    { section: defaultSection, product: defaultProduct, qty: "1", defective: false },
+    { section: defaultSection, product: defaultProduct, qty: "1", value: "", defective: false },
   ]);
   const [reason, setReason] = useState("");
 
@@ -70,6 +77,12 @@ export default function RefundModal({
     );
   }, [uniqueInvoices, invoiceSearch]);
 
+  // Map sale sections to refund sections
+  const mapSaleToRefund = (saleSection) => {
+    if (saleSection === "accessories") return "accessories";
+    return "fullCylinder"; // cylinderWithRefill or refill → full cylinder by default
+  };
+
   // When user selects an invoice, auto-fill everything
   const handleSelectInvoice = (inv) => {
     setInvoice(inv.invoice);
@@ -78,20 +91,23 @@ export default function RefundModal({
     setCustomerName(inv.customerName);
     setCustomerId(inv.customerId);
 
-    // Group items by section+product, sum quantities
+    // Group items by section+product, sum quantities, get unit price
     const grouped = {};
     inv.items.forEach((t) => {
-      const key = `${t.saleSection}_${t.product}`;
+      const refundSection = mapSaleToRefund(t.saleSection);
+      const key = `${refundSection}_${t.product}`;
       if (!grouped[key]) {
-        grouped[key] = { section: t.saleSection, product: t.product, qty: 0 };
+        grouped[key] = { section: refundSection, product: t.product, qty: 0, totalAmount: 0 };
       }
       grouped[key].qty += (t.quantity || 1);
+      grouped[key].totalAmount += (t.totalAmount || t.finalPrice || 0);
     });
     setItems(
       Object.values(grouped).map((g) => ({
         section: g.section,
         product: g.product,
         qty: String(g.qty),
+        value: String(g.totalAmount || ""),
         defective: false,
       }))
     );
@@ -112,7 +128,7 @@ export default function RefundModal({
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { section: defaultSection, product: defaultProduct, qty: "1", defective: false },
+      { section: defaultSection, product: defaultProduct, qty: "1", value: "", defective: false },
     ]);
   };
 
@@ -120,39 +136,8 @@ export default function RefundModal({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Calculate total refund from original sale transactions for selected invoice
-  const totalRefund = useMemo(() => {
-    if (!invoice) return 0;
-    const inv = uniqueInvoices.find((i) => i.invoice === invoice);
-    if (!inv) return 0;
-
-    // Match selected items against original transaction amounts
-    let total = 0;
-    items.forEach((item) => {
-      const matchingTx = inv.items.filter(
-        (t) => t.saleSection === item.section && t.product === item.product
-      );
-      if (matchingTx.length > 0) {
-        // Get per-unit price from original transaction
-        const origTx = matchingTx[0];
-        const origUnitPrice = origTx.quantity > 0
-          ? (origTx.totalAmount || origTx.finalPrice || 0) / origTx.quantity
-          : (origTx.totalAmount || origTx.finalPrice || 0);
-        const qty = parseInt(item.qty) || 0;
-        total += origUnitPrice * qty;
-      }
-    });
-    return total;
-  }, [invoice, items, uniqueInvoices]);
-
-  // Manual override for total
-  const [manualTotal, setManualTotal] = useState("");
-  const effectiveTotal = manualTotal !== "" ? (parseFloat(manualTotal) || 0) : totalRefund;
-
-  // Reset manual total when invoice changes
-  useEffect(() => {
-    setManualTotal("");
-  }, [invoice]);
+  // Total refund = sum of all item values
+  const totalRefund = items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
 
   const handleSubmit = () => {
     onSubmit({
@@ -160,7 +145,7 @@ export default function RefundModal({
       customerName,
       customerId,
       items,
-      totalRefund: effectiveTotal,
+      totalRefund,
       reason,
     });
   };
@@ -204,7 +189,6 @@ export default function RefundModal({
             onChange={(e) => {
               setInvoiceSearch(e.target.value);
               setInvoiceOpen(true);
-              // If they clear or change, reset auto-fill
               if (e.target.value !== invoice) {
                 setInvoice("");
               }
@@ -258,16 +242,13 @@ export default function RefundModal({
           <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Customer
           </label>
-          <input
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Customer name"
-            style={{
-              width: "100%", padding: "8px 12px", borderRadius: "8px",
-              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
-              fontFamily: "inherit",
+          <CustomerSearch
+            customers={customers || []}
+            value={customerId}
+            onChange={(id) => {
+              setCustomerId(id);
+              const c = (customers || []).find((c) => c.id === id);
+              setCustomerName(c ? c.name : "");
             }}
           />
         </div>
@@ -299,7 +280,7 @@ export default function RefundModal({
                       fontFamily: "inherit",
                     }}
                   >
-                    {SALES_SECTIONS.map((s) => (
+                    {REFUND_SECTIONS.map((s) => (
                       <option key={s.key} value={s.key}>{s.label}</option>
                     ))}
                   </select>
@@ -331,22 +312,60 @@ export default function RefundModal({
                   )}
                 </div>
 
-                {/* Row 2: Qty + Defective */}
+                {/* Row 2: Qty + Value + Defective */}
                 <div style={{ display: "flex", gap: "10px", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Qty</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.qty}
-                      onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                      style={{
-                        width: "52px", padding: "4px 6px", borderRadius: "6px",
-                        background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
-                        color: "var(--text-secondary)", fontSize: "11px", outline: "none",
-                        fontFamily: "var(--font-mono)", textAlign: "center",
-                      }}
-                    />
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Qty</span>
+                      <button
+                        type="button"
+                        onClick={() => updateItem(idx, "qty", Math.max(1, (parseInt(item.qty) || 1) - 1))}
+                        style={{
+                          width: "24px", height: "24px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                          background: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex",
+                          alignItems: "center", justifyContent: "center", fontSize: "14px", color: "var(--text-secondary)",
+                          fontFamily: "var(--font-mono)", padding: 0, lineHeight: 1,
+                        }}
+                      >−</button>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.qty}
+                        onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                        style={{
+                          width: "44px", padding: "4px 6px", borderRadius: "6px",
+                          background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
+                          color: "var(--text-secondary)", fontSize: "11px", outline: "none",
+                          fontFamily: "var(--font-mono)", textAlign: "center",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateItem(idx, "qty", (parseInt(item.qty) || 1) + 1)}
+                        style={{
+                          width: "24px", height: "24px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                          background: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex",
+                          alignItems: "center", justifyContent: "center", fontSize: "14px", color: "var(--text-secondary)",
+                          fontFamily: "var(--font-mono)", padding: 0, lineHeight: 1,
+                        }}
+                      >+</button>
+                    </div>
+                    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>₱</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={item.value}
+                        onChange={(e) => updateItem(idx, "value", e.target.value)}
+                        placeholder="0"
+                        style={{
+                          width: "80px", padding: "4px 6px", borderRadius: "6px",
+                          background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
+                          color: "var(--text-secondary)", fontSize: "11px", outline: "none",
+                          fontFamily: "var(--font-mono)", textAlign: "right",
+                        }}
+                      />
+                    </div>
                   </div>
                   <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer" }}>
                     <input
@@ -406,21 +425,9 @@ export default function RefundModal({
             <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               Total Refund
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span style={{ fontSize: "13px", color: "var(--text-dim)" }}>₱</span>
-              <input
-                type="number"
-                value={manualTotal !== "" ? manualTotal : (totalRefund > 0 ? String(totalRefund) : "")}
-                onChange={(e) => setManualTotal(e.target.value)}
-                placeholder="0"
-                style={{
-                  width: "100px", padding: "4px 8px", borderRadius: "6px",
-                  background: "rgba(255,255,255,0.8)", border: "1px solid var(--border-light)",
-                  color: "#f87171", fontSize: "14px", fontWeight: 700, outline: "none",
-                  fontFamily: "var(--font-mono)", textAlign: "right",
-                }}
-              />
-            </div>
+            <span style={{ fontSize: "16px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalRefund > 0 ? "#f87171" : "var(--text-dim)" }}>
+              {totalRefund > 0 ? fmt(totalRefund) : "₱0.00"}
+            </span>
           </div>
         </div>
 

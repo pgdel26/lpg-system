@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { db, auth, googleProvider } from "../lib/firebase";
 import {
   collection, addDoc, getDocs, query, orderBy, Timestamp,
-  doc, updateDoc, onSnapshot, where, setDoc, limit,
+  doc, updateDoc, deleteDoc, onSnapshot, where, setDoc, limit,
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { fmt, today, getPricebookSrp } from "../lib/utils";
@@ -25,6 +25,7 @@ import SwapModal from "../components/SwapModal";
 import PurchasesPage from "../views/PurchasesPage";
 import PurchaseModal from "../components/PurchaseModal";
 import RefundModal from "../components/RefundModal";
+import RefundsPage from "../views/RefundsPage";
 import AuditPage from "../views/AuditPage";
 
 // ============================================================
@@ -89,7 +90,7 @@ export default function GasulTracker() {
   const [purchaseModalError, setPurchaseModalError] = useState("");
 
   // Refunds
-  const [refunds, setRefunds] = useState([]);
+  const [allRefunds, setAllRefunds] = useState([]);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundModalError, setRefundModalError] = useState("");
 
@@ -319,18 +320,25 @@ export default function GasulTracker() {
     return () => unsub();
   }, [inventoryDate]);
 
-  // ---- FIREBASE: Refunds listener (by date) ----
+  // Refunds for the current date (derived from allRefunds)
+  const refunds = useMemo(() =>
+    allRefunds.filter((r) => r.date === inventoryDate),
+    [allRefunds, inventoryDate]
+  );
+
+  // ---- FIREBASE: All refunds listener (for Refunds tab) ----
   useEffect(() => {
     const unsub = onSnapshot(
-      query(collection(db, "refunds"), where("date", "==", inventoryDate), orderBy("createdAt", "desc")),
+      collection(db, "refunds"),
       (snapshot) => {
         const list = [];
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
-        setRefunds(list);
+        list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setAllRefunds(list);
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, []);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((sectionKey, product, field, value) => {
@@ -787,6 +795,9 @@ export default function GasulTracker() {
           section: item.section,
           product: item.product,
           qty: parseInt(item.qty) || 1,
+          value: parseFloat(item.value) || 0,
+          defective: item.defective || false,
+          defectStatus: item.defective ? "Pending" : "",
         })),
         totalRefund: data.totalRefund,
         reason: data.reason || "",
@@ -800,6 +811,89 @@ export default function GasulTracker() {
     } catch (error) {
       console.error("Refund error:", error);
       setRefundModalError("Failed to record refund.");
+    }
+  };
+
+  const handleUpdateRefund = async (refundId, data) => {
+    try {
+      await updateDoc(doc(db, "refunds", refundId), {
+        invoice: data.invoice || "",
+        customerName: data.customerName || "",
+        reason: data.reason || "",
+        totalRefund: data.totalRefund,
+        items: data.items.map((item) => ({
+          section: item.section,
+          product: item.product,
+          qty: parseInt(item.qty) || 1,
+          value: parseFloat(item.value) || 0,
+          defective: item.defective || false,
+          defectStatus: item.defectStatus || "",
+        })),
+      });
+      setToast({ type: "success", message: "Refund updated." });
+    } catch (error) {
+      console.error("Update refund error:", error);
+      setToast({ type: "error", message: "Failed to update refund." });
+    }
+  };
+
+  const handleUpdateSale = async (saleId, data) => {
+    try {
+      await updateDoc(doc(db, "saleTransactions", saleId), {
+        invoice: data.invoice ?? "",
+        customerName: data.customerName ?? "",
+        discount: parseFloat(data.discount) || 0,
+        totalAmount: parseFloat(data.totalAmount) || 0,
+        paymentType: data.paymentType || "cash",
+      });
+      setToast({ type: "success", message: "Sale updated." });
+    } catch (error) {
+      console.error("Update sale error:", error);
+      setToast({ type: "error", message: "Failed to update sale." });
+    }
+  };
+
+  const handleUpdateSwap = async (swapId, data) => {
+    try {
+      await updateDoc(doc(db, "swaps", swapId), {
+        productFrom: data.productFrom || "",
+        productTo: data.productTo || "",
+        price: parseFloat(data.price) || 0,
+      });
+      setToast({ type: "success", message: "Swap updated." });
+    } catch (error) {
+      console.error("Update swap error:", error);
+      setToast({ type: "error", message: "Failed to update swap." });
+    }
+  };
+
+  const handleDeleteSale = async (saleId) => {
+    try {
+      await deleteDoc(doc(db, "saleTransactions", saleId));
+      setToast({ type: "success", message: "Sale deleted." });
+    } catch (error) {
+      console.error("Delete sale error:", error);
+      setToast({ type: "error", message: "Failed to delete sale." });
+    }
+  };
+
+  const handleDeleteSwap = async (swapId) => {
+    try {
+      await deleteDoc(doc(db, "swaps", swapId));
+      setToast({ type: "success", message: "Swap deleted." });
+    } catch (error) {
+      console.error("Delete swap error:", error);
+      setToast({ type: "error", message: "Failed to delete swap." });
+    }
+  };
+
+  const handleDeleteRefund = async (refundId) => {
+    try {
+      await deleteDoc(doc(db, "refunds", refundId));
+      setToast({ type: "success", message: "Refund deleted." });
+    } catch (error) {
+      console.error("Delete refund error:", error);
+      setToast({ type: "error", message: "Failed to delete refund." });
     }
   };
 
@@ -871,7 +965,7 @@ export default function GasulTracker() {
               <MenuIcon />
             </button>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
-              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
+              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "refunds" ? "Refunds / Returns" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -916,6 +1010,12 @@ export default function GasulTracker() {
               onOpenSaleModal={handleOpenSaleModal}
               onOpenSwapModal={handleOpenSwapModal}
               onOpenRefundModal={handleOpenRefundModal}
+              onUpdateSale={handleUpdateSale}
+              onUpdateSwap={handleUpdateSwap}
+              onUpdateRefund={handleUpdateRefund}
+              onDeleteSale={handleDeleteSale}
+              onDeleteSwap={handleDeleteSwap}
+              onDeleteRefund={handleDeleteRefund}
             />
           )}
 
@@ -924,6 +1024,10 @@ export default function GasulTracker() {
               purchaseTransactions={purchaseTransactions}
               onOpenPurchaseModal={handleOpenPurchaseModal}
             />
+          )}
+
+          {activePage === "refunds" && (
+            <RefundsPage allRefunds={allRefunds} onUpdateRefund={handleUpdateRefund} onDeleteRefund={handleDeleteRefund} />
           )}
 
           {activePage === "inventory" && (
@@ -1034,6 +1138,7 @@ export default function GasulTracker() {
       {refundModalOpen && (
         <RefundModal
           saleTransactions={saleTransactions}
+          customers={customers}
           error={refundModalError}
           onClose={() => setRefundModalOpen(false)}
           onSubmit={handleRecordRefund}

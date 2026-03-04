@@ -83,7 +83,7 @@ export default function LoginPage({ denied, deniedEmail, onRetry }) {
       }}>
         {/* Logo / Brand */}
         <h1 style={{ fontSize: "22px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>
-          LPG Sales and Inventory Tracker
+          LPG Sales Tracker
         </h1>
         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", marginBottom: "36px" }}>
           Sign in to access the dashboard

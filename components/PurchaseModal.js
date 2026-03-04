@@ -165,6 +165,16 @@ export default function PurchaseModal({
                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                     <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>Qty</span>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(idx, "qty", Math.max(1, (parseInt(item.qty) || 1) - 1))}
+                      style={{
+                        width: "24px", height: "24px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                        background: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex",
+                        alignItems: "center", justifyContent: "center", fontSize: "14px", color: "var(--text-secondary)",
+                        fontFamily: "var(--font-mono)", padding: 0, lineHeight: 1,
+                      }}
+                    >−</button>
                     <input
                       type="number"
                       min="1"
@@ -177,6 +187,16 @@ export default function PurchaseModal({
                         fontFamily: "var(--font-mono)", textAlign: "center",
                       }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => updateItem(idx, "qty", (parseInt(item.qty) || 1) + 1)}
+                      style={{
+                        width: "24px", height: "24px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                        background: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex",
+                        alignItems: "center", justifyContent: "center", fontSize: "14px", color: "var(--text-secondary)",
+                        fontFamily: "var(--font-mono)", padding: 0, lineHeight: 1,
+                      }}
+                    >+</button>
                   </div>
                   <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>×</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
