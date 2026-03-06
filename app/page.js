@@ -27,6 +27,7 @@ import PurchaseModal from "../components/PurchaseModal";
 import RefundModal from "../components/RefundModal";
 import RefundsPage from "../views/RefundsPage";
 import AuditPage from "../views/AuditPage";
+import DashboardPage from "../views/DashboardPage";
 
 // ============================================================
 // MAIN APP
@@ -37,7 +38,7 @@ export default function GasulTracker() {
   const [authLoading, setAuthLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
-  const [activePage, setActivePage] = useState("transactions");
+  const [activePage, setActivePage] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -207,6 +208,44 @@ export default function GasulTracker() {
     );
     setActivePricebook(applicable || null);
   }, [pricebooks, inventoryDate]);
+
+  // ---- Add / Delete products ----
+  const handleAddProduct = async (category, name) => {
+    try {
+      const key = `${category}_${name}`;
+      const sortOrder = Object.keys(products).length;
+      await setDoc(doc(db, "products", key), {
+        category, name, srp: 0, srpRefill: category === "full" ? 0 : null,
+        sortOrder, createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+      });
+      setToast({ type: "success", message: `Product "${name}" added.` });
+    } catch (error) {
+      console.error("Add product error:", error);
+      setToast({ type: "error", message: "Failed to add product." });
+    }
+  };
+
+  const handleUpdateProduct = async (productKey, updates) => {
+    try {
+      await updateDoc(doc(db, "products", productKey), {
+        ...updates, updatedAt: Timestamp.now(),
+      });
+      setToast({ type: "success", message: "Product updated." });
+    } catch (error) {
+      console.error("Update product error:", error);
+      setToast({ type: "error", message: "Failed to update product." });
+    }
+  };
+
+  const handleDeleteProduct = async (productKey) => {
+    try {
+      await deleteDoc(doc(db, "products", productKey));
+      setToast({ type: "success", message: "Product deleted." });
+    } catch (error) {
+      console.error("Delete product error:", error);
+      setToast({ type: "error", message: "Failed to delete product." });
+    }
+  };
 
   // ---- Create new pricebook (as draft) ----
   const handleCreatePricebook = async (name, effectiveDate, prices) => {
@@ -471,7 +510,7 @@ export default function GasulTracker() {
   };
 
   // ---- Record Sale (multi-item) ----
-  const handleRecordSale = async (items, globalDiscount, saleDate) => {
+  const handleRecordSale = async (items, globalDiscount, saleDate, deliveryCharge = 0) => {
     setSaleModalError("");
     if (!items || items.length === 0) { setSaleModalError("Please add at least one item."); return; }
     if (!saleModalCustomer && !saleModalNewCustomer) { setSaleModalError("Please select or add a customer."); return; }
@@ -516,7 +555,9 @@ export default function GasulTracker() {
           }
         }
 
-        const totalAmount = Math.max(0, lineSubtotal - lineDiscount);
+        // Add delivery charge to the first item only
+        const lineDelivery = i === 0 ? (deliveryCharge || 0) : 0;
+        const totalAmount = Math.max(0, lineSubtotal - lineDiscount + lineDelivery);
 
         await addDoc(collection(db, "saleTransactions"), {
           saleSection: item.section,
@@ -524,6 +565,7 @@ export default function GasulTracker() {
           productCategory: saleSec.productCategory,
           srp,
           discount: lineDiscount,
+          deliveryCharge: lineDelivery,
           finalPrice: srp,
           quantity: qty,
           totalAmount,
@@ -965,7 +1007,7 @@ export default function GasulTracker() {
               <MenuIcon />
             </button>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
-              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "refunds" ? "Refunds / Returns" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
+              {activePage === "dashboard" ? "Dashboard" : activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "refunds" ? "Refunds / Returns" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -1000,6 +1042,19 @@ export default function GasulTracker() {
 
         {/* Content */}
         <main style={{ padding: "20px 24px" }}>
+          {activePage === "dashboard" && (
+            <DashboardPage
+              inventoryDate={inventoryDate}
+              saleTransactions={saleTransactions}
+              swaps={swaps}
+              refunds={allRefunds}
+              purchaseTransactions={purchaseTransactions}
+              inventory={inventory}
+              activePricebook={activePricebook}
+              products={products}
+            />
+          )}
+
           {activePage === "transactions" && (
             <TransactionsPage
               inventoryDate={inventoryDate}
@@ -1060,6 +1115,9 @@ export default function GasulTracker() {
               onCreatePricebook={handleCreatePricebook}
               onUpdatePricebook={handleUpdatePricebook}
               onActivatePricebook={handleActivatePricebook}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
             />
           )}
 

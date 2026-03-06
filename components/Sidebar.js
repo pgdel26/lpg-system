@@ -1,14 +1,15 @@
 import React from "react";
-import { DollarIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ListIcon, CartIcon, ClipboardCheckIcon, HistoryIcon } from "./Icons";
+import { DashboardIcon, DollarIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ListIcon, CartIcon, ClipboardCheckIcon, HistoryIcon } from "./Icons";
 
 export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
   const navItems = [
+    { id: "dashboard", label: "Dashboard", icon: <DashboardIcon /> },
     { id: "transactions", label: "Sales", icon: <ListIcon /> },
     { id: "refunds", label: "Refunds/Returns", icon: <HistoryIcon /> },
     { id: "purchases", label: "Purchases", icon: <CartIcon /> },
     { id: "inventory", label: "Inventory", icon: <PackageIcon /> },
     { id: "audit", label: "Audit", icon: <ClipboardCheckIcon /> },
-    { id: "products", label: "Pricing", icon: <TagIcon /> },
+    { id: "products", label: "Products & Pricing", icon: <TagIcon /> },
     { id: "customers", label: "Customers", icon: <UsersIcon /> },
   ];
 
@@ -22,13 +23,19 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
       display: "flex", flexDirection: "column",
       transition: "width 0.25s ease",
     }}>
-      {/* Logo */}
-      <div style={{
-        padding: collapsed ? "16px 10px" : "16px 18px",
-        borderBottom: "1px solid rgba(255,255,255,0.12)",
-        display: "flex", alignItems: "center", gap: "10px",
-        minHeight: "64px",
-      }}>
+      {/* Logo — clicks to Dashboard */}
+      <button
+        onClick={() => onNavigate("dashboard")}
+        style={{
+          padding: collapsed ? "16px 10px" : "16px 18px",
+          borderBottom: "1px solid rgba(255,255,255,0.12)",
+          display: "flex", alignItems: "center", gap: "10px",
+          minHeight: "64px",
+          background: "none", border: "none", cursor: "pointer",
+          width: "100%", textAlign: "left",
+        }}
+        title="Dashboard"
+      >
         <div style={{
           width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
           background: "rgba(255,255,255,0.2)",
@@ -47,7 +54,7 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
             </p>
           </div>
         )}
-      </div>
+      </button>
 
       {/* Nav */}
       <nav style={{ padding: "12px 8px", flex: 1 }}>

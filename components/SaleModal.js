@@ -29,6 +29,7 @@ export default function SaleModal({
   ]);
   const [saleDate, setSaleDate] = useState(inventoryDate || today());
   const [discount, setDiscount] = useState("");
+  const [deliveryCharge, setDeliveryCharge] = useState("");
 
   const updateItem = (index, field, value) => {
     setItems((prev) => {
@@ -68,10 +69,11 @@ export default function SaleModal({
 
   const subtotal = items.reduce((sum, item) => sum + getLineTotal(item), 0);
   const discountNum = parseFloat(discount) || 0;
-  const grandTotal = Math.max(0, subtotal - discountNum);
+  const deliveryNum = parseFloat(deliveryCharge) || 0;
+  const grandTotal = Math.max(0, subtotal - discountNum + deliveryNum);
 
   const handleSubmit = () => {
-    onSubmit(items, discountNum, saleDate);
+    onSubmit(items, discountNum, saleDate, deliveryNum);
   };
 
   return (
@@ -376,16 +378,51 @@ export default function SaleModal({
           />
         </div>
 
-        {/* 6. Total Amount */}
+        {/* 6. Delivery Charge */}
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Delivery Charge (₱)
+          </label>
+          <input
+            type="number"
+            value={deliveryCharge}
+            onChange={(e) => setDeliveryCharge(e.target.value)}
+            placeholder="0"
+            style={{
+              width: "100%", padding: "8px 12px", borderRadius: "8px",
+              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+              fontFamily: "var(--font-mono)",
+            }}
+          />
+        </div>
+
+        {/* 7. Total Amount */}
         <div style={{
           padding: "10px 14px", borderRadius: "8px", marginBottom: "14px",
           background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.12)",
         }}>
-          {discountNum > 0 && (
+          {(discountNum > 0 || deliveryNum > 0) && (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Subtotal</span>
               <span style={{ fontSize: "13px", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
                 {fmt(subtotal)}
+              </span>
+            </div>
+          )}
+          {discountNum > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Discount</span>
+              <span style={{ fontSize: "13px", fontFamily: "var(--font-mono)", color: "#ef4444" }}>
+                −{fmt(discountNum)}
+              </span>
+            </div>
+          )}
+          {deliveryNum > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Delivery</span>
+              <span style={{ fontSize: "13px", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                +{fmt(deliveryNum)}
               </span>
             </div>
           )}
