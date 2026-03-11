@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { fmt, today } from "../lib/utils";
 import { PlusIcon, XIcon, EditIcon, TrashIcon } from "../components/Icons";
+import ConfirmModal from "../components/ConfirmModal";
 
 const inputStyle = {
   width: "90px", padding: "4px 8px", borderRadius: "6px",
@@ -127,6 +128,8 @@ export default function ProductsPage({
   const [editProductName, setEditProductName] = useState("");
   const [editProductCategory, setEditProductCategory] = useState("");
   const [editCustomCategory, setEditCustomCategory] = useState("");
+  const [pendingDeleteProduct, setPendingDeleteProduct] = useState(null);
+  const [pendingReactivate, setPendingReactivate] = useState(null);
 
   // Draft pricebook editing state
   const [draftSyncId, setDraftSyncId] = useState(null);
@@ -537,11 +540,7 @@ export default function ProductsPage({
                               <EditIcon />
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm(`Delete "${prod.name}"? This cannot be undone.`)) {
-                                  onDeleteProduct(prod.key);
-                                }
-                              }}
+                              onClick={() => setPendingDeleteProduct(prod)}
                               style={{
                                 background: "none", border: "none", cursor: "pointer",
                                 color: "var(--text-dim)", display: "flex", padding: "4px 6px", borderRadius: "6px",
@@ -960,7 +959,7 @@ export default function ProductsPage({
               <AccessoryPriceTable products={dynamicAccessoryProducts} prices={viewingPb.prices} />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
                 onClick={() => setViewingPb(null)}
                 style={{
@@ -971,9 +970,45 @@ export default function ProductsPage({
               >
                 Close
               </button>
+              <button
+                onClick={() => setPendingReactivate(viewingPb)}
+                style={{
+                  padding: "8px 16px", borderRadius: "8px", border: "none",
+                  cursor: "pointer", fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
+                  background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff",
+                }}
+              >
+                Reactivate
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {pendingDeleteProduct && (
+        <ConfirmModal
+          title="Delete Product"
+          message={`Delete "${pendingDeleteProduct.name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => { onDeleteProduct(pendingDeleteProduct.key); setPendingDeleteProduct(null); }}
+          onCancel={() => setPendingDeleteProduct(null)}
+        />
+      )}
+
+      {pendingReactivate && (
+        <ConfirmModal
+          title="Reactivate Pricebook"
+          message={`Reactivate "${pendingReactivate.name}"? This will deactivate the current active pricebook and set this one as active.`}
+          confirmLabel="Reactivate"
+          confirmColor="linear-gradient(135deg, #3b82f6, #2563eb)"
+          onConfirm={async () => {
+            await onActivatePricebook(pendingReactivate.id);
+            setPendingReactivate(null);
+            setViewingPb(null);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          onCancel={() => setPendingReactivate(null)}
+        />
       )}
     </div>
   );

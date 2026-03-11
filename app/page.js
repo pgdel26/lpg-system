@@ -201,13 +201,11 @@ export default function GasulTracker() {
     return () => unsub();
   }, []);
 
-  // ---- Derive active pricebook for current date ----
+  // ---- Derive active pricebook ----
   useEffect(() => {
-    const applicable = pricebooks.find(
-      (pb) => pb.status === "active" && pb.effectiveDate <= inventoryDate
-    );
+    const applicable = pricebooks.find((pb) => pb.status === "active");
     setActivePricebook(applicable || null);
-  }, [pricebooks, inventoryDate]);
+  }, [pricebooks]);
 
   // ---- Add / Delete products ----
   const handleAddProduct = async (category, name) => {
@@ -432,6 +430,76 @@ export default function GasulTracker() {
     }
   };
 
+  // ---- Update Customer ----
+  const handleUpdateCustomer = async (customerId, data) => {
+    try {
+      await updateDoc(doc(db, "customers", customerId), {
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+      });
+      setToast({ type: "success", message: "Customer updated." });
+    } catch (error) {
+      console.error("Update customer error:", error);
+      setToast({ type: "error", message: "Failed to update customer." });
+    }
+  };
+
+  // ---- Delete Customer and related transactions ----
+  const handleDeleteCustomer = async (customerId) => {
+    try {
+      // Delete related sale transactions
+      const salesSnap = await getDocs(
+        query(collection(db, "saleTransactions"), where("customerId", "==", customerId))
+      );
+      for (const d of salesSnap.docs) {
+        await deleteDoc(doc(db, "saleTransactions", d.id));
+      }
+
+      // Delete related swaps
+      const swapsSnap = await getDocs(
+        query(collection(db, "swaps"), where("customerId", "==", customerId))
+      );
+      for (const d of swapsSnap.docs) {
+        await deleteDoc(doc(db, "swaps", d.id));
+      }
+
+      // Delete related refunds
+      const refundsSnap = await getDocs(
+        query(collection(db, "refunds"), where("customerId", "==", customerId))
+      );
+      for (const d of refundsSnap.docs) {
+        await deleteDoc(doc(db, "refunds", d.id));
+      }
+
+      // Delete the customer
+      await deleteDoc(doc(db, "customers", customerId));
+      setToast({ type: "success", message: "Customer and related transactions deleted." });
+    } catch (error) {
+      console.error("Delete customer error:", error);
+      setToast({ type: "error", message: "Failed to delete customer." });
+    }
+  };
+
+  // ---- Fetch all transactions for a customer ----
+  const fetchCustomerTransactions = async (customerId) => {
+    try {
+      const [salesSnap, swapsSnap, refundsSnap] = await Promise.all([
+        getDocs(query(collection(db, "saleTransactions"), where("customerId", "==", customerId))),
+        getDocs(query(collection(db, "swaps"), where("customerId", "==", customerId))),
+        getDocs(query(collection(db, "refunds"), where("customerId", "==", customerId))),
+      ]);
+      const sales = salesSnap.docs.map((d) => ({ id: d.id, type: "sale", ...d.data() }));
+      const swapsList = swapsSnap.docs.map((d) => ({ id: d.id, type: "swap", ...d.data() }));
+      const refundsList = refundsSnap.docs.map((d) => ({ id: d.id, type: "refund", ...d.data() }));
+      const all = [...sales, ...swapsList, ...refundsList];
+      all.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      return all;
+    } catch (error) {
+      console.error("Fetch customer transactions error:", error);
+      return [];
+    }
+  };
+
   // ---- Helper: find or create customer ----
   // If "new customer" mode and phone matches an existing customer, reuse them
   const findOrCreateCustomer = async (isNew, selectedId, newName, newPhone) => {
@@ -573,6 +641,7 @@ export default function GasulTracker() {
           customerId,
           customerName,
           paymentType: saleModalPayment,
+          pricebookId: activePricebook?.id || null,
           date: saleDate || inventoryDate,
           createdAt: now,
         });
@@ -1129,6 +1198,9 @@ export default function GasulTracker() {
               formPhone={customerFormPhone}
               setFormPhone={setCustomerFormPhone}
               onAddCustomer={handleAddCustomer}
+              onUpdateCustomer={handleUpdateCustomer}
+              onDeleteCustomer={handleDeleteCustomer}
+              onFetchCustomerTransactions={fetchCustomerTransactions}
             />
           )}
         </main>

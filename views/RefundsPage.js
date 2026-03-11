@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { fmt } from "../lib/utils";
 import { EditIcon, TrashIcon } from "../components/Icons";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund }) {
   const [filterFrom, setFilterFrom] = useState("");
@@ -8,6 +9,7 @@ export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund
   const [defectiveOnly, setDefectiveOnly] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   // Filter by date range + defective, sort most recent first
   const filtered = useMemo(() => {
@@ -361,7 +363,7 @@ export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund
                         <EditIcon />
                       </button>
                       <button
-                        onClick={() => { if (confirm("Delete this refund?")) onDeleteRefund(r.id); }}
+                        onClick={() => setPendingDelete(r)}
                         style={{
                           background: "none", border: "none", cursor: "pointer", padding: "2px",
                           color: "var(--text-dim)", display: "flex", alignItems: "center",
@@ -385,6 +387,16 @@ export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund
         }}>
           No refunds recorded{filterFrom || filterTo ? " for the selected date range" : ""}.
         </div>
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete Refund"
+          message="Are you sure you want to delete this refund? This cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={() => { onDeleteRefund(pendingDelete.id); setPendingDelete(null); }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

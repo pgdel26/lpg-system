@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { fmt, today } from "../lib/utils";
 import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon } from "../components/Icons";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function TransactionsPage({
   inventoryDate, setInventoryDate,
@@ -11,6 +12,7 @@ export default function TransactionsPage({
 }) {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const saleTypeLabel = (section) => {
     if (section === "cylinderWithRefill") return "Full Cylinder";
@@ -273,7 +275,7 @@ export default function TransactionsPage({
                   }} title="Edit">
                     <EditIcon />
                   </button>
-                  <button onClick={() => { if (confirm("Delete this sale?")) onDeleteSale(t.id); }} style={{
+                  <button onClick={() => setPendingDelete({ type: "sale", id: t.id })} style={{
                     background: "none", border: "none", cursor: "pointer", padding: "2px",
                     color: "var(--text-dim)", display: "flex", alignItems: "center",
                   }} title="Delete">
@@ -399,7 +401,7 @@ export default function TransactionsPage({
                     }} title="Edit">
                       <EditIcon />
                     </button>
-                    <button onClick={() => { if (confirm("Delete this swap?")) onDeleteSwap(s.id); }} style={{
+                    <button onClick={() => setPendingDelete({ type: "swap", id: s.id })} style={{
                       background: "none", border: "none", cursor: "pointer", padding: "2px",
                       color: "var(--text-dim)", display: "flex", alignItems: "center",
                     }} title="Delete">
@@ -565,7 +567,7 @@ export default function TransactionsPage({
                     }} title="Edit">
                       <EditIcon />
                     </button>
-                    <button onClick={() => { if (confirm("Delete this refund?")) onDeleteRefund(r.id); }} style={{
+                    <button onClick={() => setPendingDelete({ type: "refund", id: r.id })} style={{
                       background: "none", border: "none", cursor: "pointer", padding: "2px",
                       color: "var(--text-dim)", display: "flex", alignItems: "center",
                     }} title="Delete">
@@ -597,6 +599,21 @@ export default function TransactionsPage({
 
       </div>{/* end side panel */}
       </div>{/* end flex row */}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title={`Delete ${pendingDelete.type}`}
+          message={`Are you sure you want to delete this ${pendingDelete.type}? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            if (pendingDelete.type === "sale") onDeleteSale(pendingDelete.id);
+            else if (pendingDelete.type === "swap") onDeleteSwap(pendingDelete.id);
+            else if (pendingDelete.type === "refund") onDeleteRefund(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }
