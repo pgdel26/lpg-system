@@ -673,6 +673,24 @@ export default function GasulTracker() {
       purchaseCounts[t.purchaseSection][t.product] = (purchaseCounts[t.purchaseSection][t.product] || 0) + (t.quantity || 0);
     });
 
+    // Aggregate refund quantities by section+product: { [refundSection]: { [product]: qty } }
+    // Also track non-defective counts separately
+    const refundCounts = {};
+    const refundNonDefectiveCounts = {};
+    refunds.forEach((r) => {
+      (r.items || []).forEach((item) => {
+        const sec = item.section;
+        const prod = item.product;
+        const qty = parseInt(item.qty) || 1;
+        if (!refundCounts[sec]) refundCounts[sec] = {};
+        refundCounts[sec][prod] = (refundCounts[sec][prod] || 0) + qty;
+        if (!item.defective) {
+          if (!refundNonDefectiveCounts[sec]) refundNonDefectiveCounts[sec] = {};
+          refundNonDefectiveCounts[sec][prod] = (refundNonDefectiveCounts[sec][prod] || 0) + qty;
+        }
+      });
+    });
+
     // Aggregate swap counts by productTo and productFrom
     const swapToCounts = {};   // full cylinders going out
     const swapFromCounts = {}; // empty cylinders coming in
@@ -694,13 +712,19 @@ export default function GasulTracker() {
             row[col.field] = (sales[col.salesSource] || {})[product] || 0;
           }
           if (col.purchaseSource) {
-            row[col.field] = (purchaseCounts[col.purchaseSource] || {})[product] || 0;
+            const sources = Array.isArray(col.purchaseSource) ? col.purchaseSource : [col.purchaseSource];
+            row[col.field] = sources.reduce((sum, src) => sum + ((purchaseCounts[src] || {})[product] || 0), 0);
           }
           if (col.swapSource === "to") {
             row[col.field] = swapToCounts[product] || 0;
           }
           if (col.swapSource === "from") {
             row[col.field] = swapFromCounts[product] || 0;
+          }
+          if (col.refundSource) {
+            const src = col.refundSource;
+            const counts = src.defective === false ? refundNonDefectiveCounts : refundCounts;
+            row[col.field] = (counts[src.section] || {})[product] || 0;
           }
         }
         resolved[section.key][product] = row;
@@ -718,7 +742,7 @@ export default function GasulTracker() {
       }
     }
     return resolved;
-  }, [inventory, sales, purchaseTransactions, swaps, inventoryDate]);
+  }, [inventory, sales, purchaseTransactions, swaps, refunds, inventoryDate]);
 
   // ---- Initialize today from previous day's data ----
   const initFromPreviousDay = async () => {

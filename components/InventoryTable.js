@@ -20,6 +20,9 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
       if (col.swapSource) {
         row[col.field] = data[product]?.[col.field] || 0;
       }
+      if (col.refundSource) {
+        row[col.field] = data[product]?.[col.field] || 0;
+      }
     }
     return row;
   };
@@ -129,6 +132,14 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
                 </td>
               );
             }
+            if (col.refundSource) {
+              const refundVal = mergedRow[col.field] || 0;
+              return (
+                <td key={col.field} style={sourcedCellStyle} title={`From Refunds`}>
+                  {refundVal || "—"}
+                </td>
+              );
+            }
             if (col.auditSource) {
               const audVal = mergedRow[col.field];
               return (
@@ -173,7 +184,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
               <th key={col.field} style={{
                 padding: "8px 4px", textAlign: "center", fontSize: "10px",
                 fontWeight: 600,
-                color: col.calc ? "var(--accent-orange)" : col.auditSource ? "#22c55e" : (col.source || col.salesSource || col.purchaseSource || col.swapSource) ? "var(--accent-blue)" : "var(--text-muted)",
+                color: col.calc ? "var(--accent-orange)" : col.auditSource ? "#22c55e" : (col.source || col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) ? "var(--accent-blue)" : "var(--text-muted)",
                 textTransform: "uppercase", letterSpacing: "0.5px",
                 whiteSpace: "nowrap", minWidth: "70px",
               }}>

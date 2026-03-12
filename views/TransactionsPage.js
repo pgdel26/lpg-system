@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import * as XLSX from "xlsx";
 import { fmt, today } from "../lib/utils";
-import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon } from "../components/Icons";
+import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 
 export default function TransactionsPage({
@@ -34,6 +35,24 @@ export default function TransactionsPage({
   const swapTotal = swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const refundTotal = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const grandTotal = totalRevenue + swapTotal - refundTotal;
+
+  const exportSales = () => {
+    const rows = sorted.map((t) => ({
+      "Invoice": t.invoice || "",
+      "Customer": t.customerName || "",
+      "Product": t.product || "",
+      "Type": saleTypeLabel(t.saleSection),
+      "Qty": t.quantity || 1,
+      "SRP": t.srp || 0,
+      "Discount": t.discount || 0,
+      "Total": t.totalAmount || t.finalPrice || 0,
+      "Payment": t.paymentType === "cash" ? "Cash" : "AR",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sales");
+    XLSX.writeFile(wb, `Sales_${inventoryDate}.xlsx`);
+  };
 
   const startEdit = (type, item) => {
     setEditingId(`${type}_${item.id}`);
@@ -121,19 +140,35 @@ export default function TransactionsPage({
             Go to Today
           </button>
         )}
-        <button
-          onClick={() => onOpenSaleModal()}
-          style={{
-            marginLeft: "auto",
-            padding: "10px 20px", borderRadius: "10px", border: "none",
-            cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
-            background: "var(--accent-blue)", color: "#fff",
-            fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
-            boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
-          }}
-        >
-          <PlusIcon /> Add Sale
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+          <button
+            onClick={exportSales}
+            disabled={sorted.length === 0}
+            style={{
+              padding: "10px 16px", borderRadius: "10px",
+              border: "1px solid var(--border-light)", background: "transparent",
+              cursor: sorted.length === 0 ? "default" : "pointer",
+              display: "flex", alignItems: "center", gap: "6px",
+              color: sorted.length === 0 ? "var(--text-dim)" : "var(--text-muted)",
+              fontSize: "13px", fontWeight: 600, fontFamily: "inherit",
+              opacity: sorted.length === 0 ? 0.5 : 1,
+            }}
+          >
+            <DownloadIcon /> Export
+          </button>
+          <button
+            onClick={() => onOpenSaleModal()}
+            style={{
+              padding: "10px 20px", borderRadius: "10px", border: "none",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+              background: "var(--accent-blue)", color: "#fff",
+              fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
+              boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+            }}
+          >
+            <PlusIcon /> Add Sale
+          </button>
+        </div>
       </div>
 
       {/* Grand total card */}
