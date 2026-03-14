@@ -8,8 +8,7 @@ import {
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { fmt, today, getPricebookSrp } from "../lib/utils";
 import {
-  FULL_CYLINDER_PRODUCTS,
-  INVENTORY_SECTIONS, SALES_SECTIONS, PURCHASE_SECTIONS, PRODUCT_SEED_DATA,
+  buildInventorySections, buildSalesSections, buildPurchaseSections, PRODUCT_SEED_DATA,
 } from "../lib/constants";
 import { LoadingIcon, MenuIcon } from "../components/Icons";
 import LoginPage from "../components/LoginPage";
@@ -17,7 +16,6 @@ import { isEmailAllowed } from "../lib/allowedEmails";
 import Sidebar from "../components/Sidebar";
 import Toast from "../components/Toast";
 import TransactionsPage from "../views/TransactionsPage";
-import InventoryPage from "../views/InventoryPage";
 import ProductsPage from "../views/ProductsPage";
 import CustomersPage from "../views/CustomersPage";
 import SaleModal from "../components/SaleModal";
@@ -26,8 +24,9 @@ import PurchasesPage from "../views/PurchasesPage";
 import PurchaseModal from "../components/PurchaseModal";
 import RefundModal from "../components/RefundModal";
 import RefundsPage from "../views/RefundsPage";
-import AuditPage from "../views/AuditPage";
-import DashboardPage from "../views/DashboardPage";
+import InventoryTabPage from "../views/InventoryTabPage";
+import StaffPage from "../views/StaffPage";
+import ReceivablesPage from "../views/ReceivablesPage";
 
 // ============================================================
 // MAIN APP
@@ -38,13 +37,51 @@ export default function GasulTracker() {
   const [authLoading, setAuthLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
-  const [activePage, setActivePage] = useState("dashboard");
+  const [activePage, setActivePage] = useState("transactions");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
   // Products
   const [products, setProducts] = useState({});
+
+  // Dynamic product lists derived from Firestore products
+  const cylinderProducts = useMemo(() =>
+    Object.entries(products)
+      .filter(([, p]) => p.category === "cylinder")
+      .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
+      .map(([, p]) => p.name),
+    [products]);
+
+  const accessoryGroups = useMemo(() => {
+    const accessories = Object.entries(products)
+      .filter(([, p]) => p.category === "accessories")
+      .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
+      .map(([, p]) => p.name);
+    const regulators = accessories.filter((n) => n.includes("REGULATOR"));
+    const others = accessories.filter((n) => !n.includes("REGULATOR"));
+    return [
+      { label: "REGULATOR", products: regulators },
+      { label: "OTHERS", products: others },
+    ];
+  }, [products]);
+
+  const allAccessoryProducts = useMemo(() =>
+    accessoryGroups.flatMap((g) => g.products),
+    [accessoryGroups]);
+
+  // Dynamic section definitions
+  const inventorySections = useMemo(() =>
+    buildInventorySections(cylinderProducts, accessoryGroups),
+    [cylinderProducts, accessoryGroups]);
+
+  const salesSections = useMemo(() =>
+    buildSalesSections(cylinderProducts, accessoryGroups),
+    [cylinderProducts, accessoryGroups]);
+
+  const purchaseSections = useMemo(() =>
+    buildPurchaseSections(cylinderProducts, accessoryGroups),
+    [cylinderProducts, accessoryGroups]);
 
   // Pricebooks
   const [pricebooks, setPricebooks] = useState([]);
@@ -90,10 +127,20 @@ export default function GasulTracker() {
   const [purchaseModalDate, setPurchaseModalDate] = useState(today());
   const [purchaseModalError, setPurchaseModalError] = useState("");
 
+  // Expenses
+  const [expenses, setExpenses] = useState([]);
+
+  // Staff
+  const [staff, setStaff] = useState([]);
+  const [dailyReport, setDailyStaff] = useState({ cashier: null, staff: [] });
+
   // Refunds
   const [allRefunds, setAllRefunds] = useState([]);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundModalError, setRefundModalError] = useState("");
+
+  // Accounts Receivable (all AR sale transactions)
+  const [arTransactions, setArTransactions] = useState([]);
 
   // Customer form
   const [customerFormName, setCustomerFormName] = useState("");
@@ -160,19 +207,21 @@ export default function GasulTracker() {
   }, [products]);
 
   // ---- FIREBASE: Daily inventory listener ----
+  // Section keys are stable ("full", "empty", "accessories") regardless of product list
   useEffect(() => {
-    const unsubscribers = INVENTORY_SECTIONS.map((section) => {
-      const docId = `${inventoryDate}_${section.key}`;
+    const sectionKeys = ["full", "empty", "accessories"];
+    const unsubscribers = sectionKeys.map((sectionKey) => {
+      const docId = `${inventoryDate}_${sectionKey}`;
       return onSnapshot(doc(db, "dailyInventory", docId), (snapshot) => {
         if (snapshot.exists()) {
           setInventory((prev) => ({
             ...prev,
-            [section.key]: snapshot.data().items || {},
+            [sectionKey]: snapshot.data().items || {},
           }));
         } else {
           setInventory((prev) => ({
             ...prev,
-            [section.key]: prev[section.key] || {},
+            [sectionKey]: prev[sectionKey] || {},
           }));
         }
       });
@@ -213,7 +262,7 @@ export default function GasulTracker() {
       const key = `${category}_${name}`;
       const sortOrder = Object.keys(products).length;
       await setDoc(doc(db, "products", key), {
-        category, name, srp: 0, srpRefill: category === "full" ? 0 : null,
+        category, name, srp: 0, srpRefill: category === "cylinder" ? 0 : null,
         sortOrder, createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
       });
       setToast({ type: "success", message: `Product "${name}" added.` });
@@ -376,6 +425,62 @@ export default function GasulTracker() {
     );
     return () => unsub();
   }, []);
+
+  // ---- FIREBASE: AR transactions listener (all AR sales) ----
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "saleTransactions"), where("paymentType", "==", "ar")),
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setArTransactions(list);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // ---- FIREBASE: Expenses listener (by date) ----
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "expenses"), where("date", "==", inventoryDate)),
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setExpenses(list);
+      }
+    );
+    return () => unsub();
+  }, [inventoryDate]);
+
+  // ---- FIREBASE: Staff listener ----
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "staff"), orderBy("name", "asc")),
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        setStaff(list);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // ---- FIREBASE: Daily staff assignment listener (by date) ----
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "dailyReport", inventoryDate),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setDailyStaff(snapshot.data());
+        } else {
+          setDailyStaff({ cashier: null, staff: [] });
+        }
+      }
+    );
+    return () => unsub();
+  }, [inventoryDate]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((sectionKey, product, field, value) => {
@@ -578,7 +683,7 @@ export default function GasulTracker() {
   };
 
   // ---- Record Sale (multi-item) ----
-  const handleRecordSale = async (items, globalDiscount, saleDate, deliveryCharge = 0) => {
+  const handleRecordSale = async (items, globalDiscount, saleDate, deliveryCharge = 0, checkData = null) => {
     setSaleModalError("");
     if (!items || items.length === 0) { setSaleModalError("Please add at least one item."); return; }
     if (!saleModalCustomer && !saleModalNewCustomer) { setSaleModalError("Please select or add a customer."); return; }
@@ -594,7 +699,7 @@ export default function GasulTracker() {
 
       // Calculate subtotal to distribute discount proportionally
       const subtotal = items.reduce((sum, item) => {
-        const saleSec = SALES_SECTIONS.find((s) => s.key === item.section);
+        const saleSec = salesSections.find((s) => s.key === item.section);
         if (!saleSec) return sum;
         const prodKey = `${saleSec.productCategory}_${item.product}`;
         const srp = getPricebookSrp(item.section, prodKey, activePricebook?.prices);
@@ -605,7 +710,7 @@ export default function GasulTracker() {
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const saleSec = SALES_SECTIONS.find((s) => s.key === item.section);
+        const saleSec = salesSections.find((s) => s.key === item.section);
         if (!saleSec) continue;
         const prodKey = `${saleSec.productCategory}_${item.product}`;
         const srp = getPricebookSrp(item.section, prodKey, activePricebook?.prices);
@@ -644,6 +749,7 @@ export default function GasulTracker() {
           pricebookId: activePricebook?.id || null,
           date: saleDate || inventoryDate,
           createdAt: now,
+          ...(checkData ? { checkDate: checkData.checkDate, checkAmount: checkData.checkAmount } : {}),
         });
       }
 
@@ -697,13 +803,13 @@ export default function GasulTracker() {
     swaps.forEach((s) => {
       swapToCounts[s.productTo] = (swapToCounts[s.productTo] || 0) + 1;
       // Only count "from" if it's a known product (not a custom/other brand name)
-      if (FULL_CYLINDER_PRODUCTS.includes(s.productFrom)) {
+      if (cylinderProducts.includes(s.productFrom)) {
         swapFromCounts[s.productFrom] = (swapFromCounts[s.productFrom] || 0) + 1;
       }
     });
 
     // Pass 1: resolve salesSource, purchaseSource, and swapSource values into each section
-    for (const section of INVENTORY_SECTIONS) {
+    for (const section of inventorySections) {
       resolved[section.key] = {};
       for (const product of section.products) {
         const row = { ...(inventory[section.key]?.[product] || {}) };
@@ -731,7 +837,7 @@ export default function GasulTracker() {
       }
     }
     // Pass 2: resolve cross-section sources
-    for (const section of INVENTORY_SECTIONS) {
+    for (const section of inventorySections) {
       for (const product of section.products) {
         for (const col of section.columns) {
           if (col.source) {
@@ -742,13 +848,13 @@ export default function GasulTracker() {
       }
     }
     return resolved;
-  }, [inventory, sales, purchaseTransactions, swaps, refunds, inventoryDate]);
+  }, [inventory, sales, purchaseTransactions, swaps, refunds, inventoryDate, inventorySections]);
 
   // ---- Initialize today from previous day's data ----
   const initFromPreviousDay = async () => {
     try {
       const prevAllItems = {};
-      for (const section of INVENTORY_SECTIONS) {
+      for (const section of inventorySections) {
         const q2 = query(
           collection(db, "dailyInventory"),
           where("section", "==", section.key),
@@ -769,7 +875,7 @@ export default function GasulTracker() {
       const prevSalesSnap = await getDocs(prevSalesQ);
       const prevSales = prevSalesSnap.empty ? {} : (prevSalesSnap.docs[0].data().items || {});
 
-      for (const section of INVENTORY_SECTIONS) {
+      for (const section of inventorySections) {
         for (const product of section.products) {
           if (!prevAllItems[section.key][product]) prevAllItems[section.key][product] = {};
           for (const col of section.columns) {
@@ -780,7 +886,7 @@ export default function GasulTracker() {
         }
       }
 
-      for (const section of INVENTORY_SECTIONS) {
+      for (const section of inventorySections) {
         const prevItems = prevAllItems[section.key] || {};
         const newItems = {};
 
@@ -815,10 +921,10 @@ export default function GasulTracker() {
 
   // ---- Total Cylinder computed view ----
   const totalCylinderData = useMemo(() => {
-    const fullSection = INVENTORY_SECTIONS.find((s) => s.key === "full");
-    const emptySection = INVENTORY_SECTIONS.find((s) => s.key === "empty");
+    const fullSection = inventorySections.find((s) => s.key === "full");
+    const emptySection = inventorySections.find((s) => s.key === "empty");
 
-    return FULL_CYLINDER_PRODUCTS.map((product) => {
+    return cylinderProducts.map((product) => {
       const fullRow = resolvedInventory.full?.[product] || {};
       const emptyRow = resolvedInventory.empty?.[product] || {};
 
@@ -836,7 +942,7 @@ export default function GasulTracker() {
 
       return { product, beg, end, aud, var: variance };
     });
-  }, [resolvedInventory]);
+  }, [resolvedInventory, inventorySections, cylinderProducts]);
 
   // ---- Callback handlers for SalesPage ----
   const handleOpenSaleModal = () => {
@@ -853,8 +959,8 @@ export default function GasulTracker() {
   const handleOpenSwapModal = () => {
     setSwapModalOpen(true);
     setSwapModalError("");
-    setSwapProductFrom(FULL_CYLINDER_PRODUCTS[0]);
-    setSwapProductTo(FULL_CYLINDER_PRODUCTS[1]);
+    setSwapProductFrom(cylinderProducts[0] || "");
+    setSwapProductTo(cylinderProducts[1] || "");
     setSwapPrice("");
     setSwapCustomFrom("");
     setSwapCustomer("");
@@ -886,14 +992,14 @@ export default function GasulTracker() {
       let totalItems = 0;
 
       for (const item of items) {
-        const sec = PURCHASE_SECTIONS.find((s) => s.key === item.section);
+        const sec = purchaseSections.find((s) => s.key === item.section);
         const qty = parseInt(item.qty) || 1;
         const unitCost = parseFloat(item.price) || 0;
 
         await addDoc(collection(db, "purchases"), {
           purchaseSection: item.section,
           product: item.product,
-          productCategory: sec?.productCategory || "full",
+          productCategory: sec?.productCategory || "cylinder",
           quantity: qty,
           unitCost,
           totalCost: qty * unitCost,
@@ -1032,6 +1138,104 @@ export default function GasulTracker() {
     }
   };
 
+  // ---- Expense handlers ----
+  const handleAddExpense = async (description, amount) => {
+    try {
+      await addDoc(collection(db, "expenses"), {
+        date: inventoryDate,
+        description: description.trim(),
+        amount: parseFloat(amount) || 0,
+        createdAt: Timestamp.now(),
+      });
+      setToast({ type: "success", message: "Expense added." });
+    } catch (error) {
+      console.error("Add expense error:", error);
+      setToast({ type: "error", message: "Failed to add expense." });
+    }
+  };
+
+  const handleUpdateExpense = async (expenseId, data) => {
+    try {
+      await updateDoc(doc(db, "expenses", expenseId), {
+        description: data.description,
+        amount: parseFloat(data.amount) || 0,
+      });
+      setToast({ type: "success", message: "Expense updated." });
+    } catch (error) {
+      console.error("Update expense error:", error);
+      setToast({ type: "error", message: "Failed to update expense." });
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId) => {
+    try {
+      await deleteDoc(doc(db, "expenses", expenseId));
+      setToast({ type: "success", message: "Expense deleted." });
+    } catch (error) {
+      console.error("Delete expense error:", error);
+      setToast({ type: "error", message: "Failed to delete expense." });
+    }
+  };
+
+  // ---- Staff handlers ----
+  const handleAddStaff = async (name, role, phone) => {
+    try {
+      await addDoc(collection(db, "staff"), {
+        name,
+        role,
+        phone,
+        createdAt: Timestamp.now(),
+      });
+      setToast({ type: "success", message: `Added staff: ${name}` });
+    } catch (error) {
+      console.error("Add staff error:", error);
+      setToast({ type: "error", message: "Failed to add staff." });
+    }
+  };
+
+  const handleUpdateStaff = async (staffId, data) => {
+    try {
+      await updateDoc(doc(db, "staff", staffId), {
+        name: data.name,
+        role: data.role,
+        phone: data.phone,
+      });
+      setToast({ type: "success", message: "Staff updated." });
+    } catch (error) {
+      console.error("Update staff error:", error);
+      setToast({ type: "error", message: "Failed to update staff." });
+    }
+  };
+
+  const handleDeleteStaff = async (staffId) => {
+    try {
+      await deleteDoc(doc(db, "staff", staffId));
+      setToast({ type: "success", message: "Staff deleted." });
+    } catch (error) {
+      console.error("Delete staff error:", error);
+      setToast({ type: "error", message: "Failed to delete staff." });
+    }
+  };
+
+  const handleMarkArCollected = async (saleId) => {
+    try {
+      await updateDoc(doc(db, "saleTransactions", saleId), { arCollected: true });
+      setToast({ type: "success", message: "Marked as collected." });
+    } catch (error) {
+      console.error("Mark AR collected error:", error);
+      setToast({ type: "error", message: "Failed to mark as collected." });
+    }
+  };
+
+  const handleUpdateDailyStaff = async (data) => {
+    try {
+      await setDoc(doc(db, "dailyReport", inventoryDate), data);
+    } catch (error) {
+      console.error("Update daily staff error:", error);
+      setToast({ type: "error", message: "Failed to update daily staff." });
+    }
+  };
+
   // ---- RENDER ----
 
   // Auth loading
@@ -1064,7 +1268,7 @@ export default function GasulTracker() {
     );
   }
 
-  const sidebarWidth = sidebarCollapsed ? 60 : 220;
+  const sidebarWidth = sidebarCollapsed ? 60 : 250;
 
   return (
     <div style={{ minHeight: "100vh", position: "relative" }}>
@@ -1100,7 +1304,7 @@ export default function GasulTracker() {
               <MenuIcon />
             </button>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
-              {activePage === "dashboard" ? "Dashboard" : activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "refunds" ? "Refunds / Returns" : activePage === "inventory" ? "Daily Inventory" : activePage === "audit" ? "Audit" : activePage === "customers" ? "Customers" : "Pricing"}
+              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Inventory" : activePage === "customers" ? "Customers" : activePage === "staff" ? "Staff" : activePage === "receivables" ? "Accounts Receivable" : "Pricing"}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -1135,19 +1339,6 @@ export default function GasulTracker() {
 
         {/* Content */}
         <main style={{ padding: "20px 24px" }}>
-          {activePage === "dashboard" && (
-            <DashboardPage
-              inventoryDate={inventoryDate}
-              saleTransactions={saleTransactions}
-              swaps={swaps}
-              refunds={allRefunds}
-              purchaseTransactions={purchaseTransactions}
-              inventory={inventory}
-              activePricebook={activePricebook}
-              products={products}
-            />
-          )}
-
           {activePage === "transactions" && (
             <TransactionsPage
               inventoryDate={inventoryDate}
@@ -1155,6 +1346,11 @@ export default function GasulTracker() {
               saleTransactions={saleTransactions}
               swaps={swaps}
               refunds={refunds}
+              expenses={expenses}
+              staff={staff}
+              dailyReport={dailyReport}
+              onUpdateDailyStaff={handleUpdateDailyStaff}
+              allRefunds={allRefunds}
               onOpenSaleModal={handleOpenSaleModal}
               onOpenSwapModal={handleOpenSwapModal}
               onOpenRefundModal={handleOpenRefundModal}
@@ -1164,6 +1360,9 @@ export default function GasulTracker() {
               onDeleteSale={handleDeleteSale}
               onDeleteSwap={handleDeleteSwap}
               onDeleteRefund={handleDeleteRefund}
+              onAddExpense={handleAddExpense}
+              onUpdateExpense={handleUpdateExpense}
+              onDeleteExpense={handleDeleteExpense}
             />
           )}
 
@@ -1174,29 +1373,17 @@ export default function GasulTracker() {
             />
           )}
 
-          {activePage === "refunds" && (
-            <RefundsPage allRefunds={allRefunds} onUpdateRefund={handleUpdateRefund} onDeleteRefund={handleDeleteRefund} />
-          )}
-
           {activePage === "inventory" && (
-            <InventoryPage
+            <InventoryTabPage
               inventoryDate={inventoryDate}
               setInventoryDate={setInventoryDate}
               resolvedInventory={resolvedInventory}
               totalCylinderData={totalCylinderData}
+              inventorySections={inventorySections}
               onInventoryChange={handleInventoryChange}
               onSaveSection={saveSection}
               onInitFromPreviousDay={initFromPreviousDay}
-            />
-          )}
-
-          {activePage === "audit" && (
-            <AuditPage
-              inventoryDate={inventoryDate}
-              setInventoryDate={setInventoryDate}
               inventory={inventory}
-              onInventoryChange={handleInventoryChange}
-              onSaveSection={saveSection}
             />
           )}
 
@@ -1227,6 +1414,22 @@ export default function GasulTracker() {
               onFetchCustomerTransactions={fetchCustomerTransactions}
             />
           )}
+
+          {activePage === "receivables" && (
+            <ReceivablesPage
+              arTransactions={arTransactions}
+              onMarkCollected={handleMarkArCollected}
+            />
+          )}
+
+          {activePage === "staff" && (
+            <StaffPage
+              staff={staff}
+              onAddStaff={handleAddStaff}
+              onUpdateStaff={handleUpdateStaff}
+              onDeleteStaff={handleDeleteStaff}
+            />
+          )}
         </main>
       </div>
 
@@ -1250,6 +1453,7 @@ export default function GasulTracker() {
           newPhone={swapNewPhone}
           setNewPhone={setSwapNewPhone}
           customers={customers}
+          cylinderProducts={cylinderProducts}
           error={swapModalError}
           onClose={() => setSwapModalOpen(false)}
           onSubmit={handleRecordSwap}
@@ -1274,6 +1478,7 @@ export default function GasulTracker() {
           customers={customers}
           activePricebook={activePricebook}
           inventoryDate={inventoryDate}
+          salesSections={salesSections}
           onClose={() => setSaleModalOpen(false)}
           onSubmit={handleRecordSale}
         />
@@ -1284,6 +1489,7 @@ export default function GasulTracker() {
           date={purchaseModalDate}
           setDate={setPurchaseModalDate}
           error={purchaseModalError}
+          purchaseSections={purchaseSections}
           onClose={() => setPurchaseModalOpen(false)}
           onSubmit={handleRecordPurchase}
         />
@@ -1293,6 +1499,8 @@ export default function GasulTracker() {
         <RefundModal
           saleTransactions={saleTransactions}
           customers={customers}
+          cylinderProducts={cylinderProducts}
+          allAccessoryProducts={allAccessoryProducts}
           error={refundModalError}
           onClose={() => setRefundModalOpen(false)}
           onSubmit={handleRecordRefund}

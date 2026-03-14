@@ -194,28 +194,24 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
           </tr>
         </thead>
         <tbody>
-          {subgroups ? (
-            subgroups.map((sg, idx) => {
-              const nextIdx = idx + 1 < subgroups.length ? subgroups[idx + 1].startIndex : products.length;
-              const groupProducts = products.slice(sg.startIndex, nextIdx);
-              return (
-                <React.Fragment key={sg.label}>
-                  <tr>
-                    <td
-                      colSpan={columns.length + 1}
-                      style={{
-                        padding: "6px 12px", fontSize: "10px", fontWeight: 700,
-                        color: "var(--text-dim)", textTransform: "uppercase",
-                        letterSpacing: "1px", background: "rgba(241,245,249,0.5)",
-                      }}
-                    >
-                      {sg.label}
-                    </td>
-                  </tr>
-                  {renderProducts(groupProducts)}
-                </React.Fragment>
-              );
-            })
+          {subgroups && subgroups.length > 0 ? (
+            subgroups.map((sg) => (
+              <React.Fragment key={sg.label}>
+                <tr>
+                  <td
+                    colSpan={columns.length + 1}
+                    style={{
+                      padding: "6px 12px", fontSize: "10px", fontWeight: 700,
+                      color: "var(--text-dim)", textTransform: "uppercase",
+                      letterSpacing: "1px", background: "rgba(241,245,249,0.5)",
+                    }}
+                  >
+                    {sg.label}
+                  </td>
+                </tr>
+                {renderProducts(sg.products)}
+              </React.Fragment>
+            ))
           ) : (
             renderProducts(products)
           )}

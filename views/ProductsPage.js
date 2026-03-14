@@ -27,11 +27,11 @@ function CylinderPriceTable({ products: cylinderProducts, prices, editable, onCh
         ...labelStyle,
       }}>
         <span>Product</span>
-        <span style={{ textAlign: "right" }}>Cylinder</span>
+        <span style={{ textAlign: "right" }}>Full Cylinder</span>
         <span style={{ textAlign: "right" }}>Refill</span>
       </div>
       {cylinderProducts.map((product) => {
-        const key = `full_${product}`;
+        const key = `cylinder_${product}`;
         const cylinder = prices?.[key]?.cylinder || 0;
         const refill = prices?.[key]?.refill || 0;
         return (
@@ -122,7 +122,7 @@ export default function ProductsPage({
   // Products sub-tab state
   const [addingProduct, setAddingProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
-  const [newProductCategory, setNewProductCategory] = useState("full");
+  const [newProductCategory, setNewProductCategory] = useState("cylinder");
   const [newCustomCategory, setNewCustomCategory] = useState("");
   const [editingProductKey, setEditingProductKey] = useState(null);
   const [editProductName, setEditProductName] = useState("");
@@ -151,7 +151,7 @@ export default function ProductsPage({
   const buildDefaultPrices = () => {
     const prices = {};
     for (const [key, prod] of Object.entries(products)) {
-      if (prod.category === "full") {
+      if (prod.category === "cylinder") {
         prices[key] = {
           cylinder: (prod.srp || 0) - (prod.srpRefill || 0),
           refill: prod.srpRefill || 0,
@@ -236,7 +236,7 @@ export default function ProductsPage({
   // Dynamic product name lists from Firestore products (for pricebook tables)
   const hiddenCategories = ["borrowed"];
   const dynamicFullProducts = Object.entries(products)
-    .filter(([, p]) => p.category === "full")
+    .filter(([, p]) => p.category === "cylinder")
     .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
     .map(([, p]) => p.name);
   const dynamicAccessoryProducts = Object.entries(products)
@@ -253,14 +253,14 @@ export default function ProductsPage({
     return acc;
   }, {});
 
-  const defaultCategories = { full: "Full Cylinder", empty: "Empty Cylinder", accessories: "Accessories" };
+  const defaultCategories = { cylinder: "Cylinder", accessories: "Accessories" };
   // Build dynamic category list from existing products + defaults
   const allCategories = Object.keys({ ...defaultCategories, ...productsByCategory });
   const categoryLabels = { ...defaultCategories };
   allCategories.forEach((cat) => {
     if (!categoryLabels[cat]) categoryLabels[cat] = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
-  const categoryColorDefaults = { full: "#f59e42", empty: "#3b82f6", accessories: "#22c55e" };
+  const categoryColorDefaults = { cylinder: "#f59e42", accessories: "#22c55e" };
   const extraColors = ["#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#06b6d4", "#84cc16"];
   const categoryColors = { ...categoryColorDefaults };
   let colorIdx = 0;
@@ -280,7 +280,7 @@ export default function ProductsPage({
     await onAddProduct(category, newProductName.trim().toUpperCase());
     setNewProductName("");
     setNewCustomCategory("");
-    setNewProductCategory("full");
+    setNewProductCategory("cylinder");
     setAddingProduct(false);
   };
 
@@ -308,25 +308,37 @@ export default function ProductsPage({
     <div className="animate-fade">
 
       {/* Sub-tabs */}
-      <div style={{ display: "flex", gap: "0", borderBottom: "2px solid var(--border)", marginBottom: "20px" }}>
-        {[{ key: "pricing", label: "Pricing" }, { key: "products", label: "Products" }].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setSubTab(tab.key)}
-            style={{
-              padding: "10px 20px", border: "none", cursor: "pointer",
-              fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
-              background: "transparent",
-              color: subTab === tab.key ? "var(--accent-blue)" : "var(--text-muted)",
-              borderBottom: subTab === tab.key ? "2px solid var(--accent-blue)" : "2px solid transparent",
-              marginBottom: "-2px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: "0", marginBottom: "0" }}>
+        {[{ key: "pricing", label: "Pricing" }, { key: "products", label: "Products" }].map((tab) => {
+          const isActive = subTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setSubTab(tab.key)}
+              style={{
+                padding: "10px 24px", cursor: "pointer",
+                fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
+                borderRadius: "0",
+                border: "1px solid rgba(200,210,220,0.5)",
+                borderBottom: isActive ? "1px solid var(--bg-card)" : "1px solid rgba(200,210,220,0.5)",
+                background: isActive ? "var(--bg-card)" : "transparent",
+                color: isActive ? "var(--accent-blue)" : "var(--text-dim)",
+                position: "relative",
+                zIndex: isActive ? 1 : 0,
+                marginBottom: "-1px",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
+
+      <div style={{
+        background: "var(--bg-card)", borderRadius: "0 0 0 0",
+        border: "1px solid var(--border)", padding: "24px",
+      }}>
 
       {/* ===== PRODUCTS SUB-TAB ===== */}
       {subTab === "products" && (
@@ -704,6 +716,8 @@ export default function ProductsPage({
       )}
 
       </>}
+
+      </div>{/* end card */}
 
       {/* Create Pricebook Modal */}
       {creating && (

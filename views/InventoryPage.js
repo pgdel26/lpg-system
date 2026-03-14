@@ -1,12 +1,12 @@
 import React from "react";
 import { fmt, today } from "../lib/utils";
-import { INVENTORY_SECTIONS, FULL_CYLINDER_PRODUCTS } from "../lib/constants";
 import { CopyIcon } from "../components/Icons";
 import InventoryTable from "../components/InventoryTable";
 
 export default function InventoryPage({
   inventoryDate, setInventoryDate,
   resolvedInventory, totalCylinderData,
+  inventorySections,
   onInventoryChange, onSaveSection, onInitFromPreviousDay,
 }) {
   return (
@@ -52,7 +52,7 @@ export default function InventoryPage({
       </div>
 
       {/* Inventory sections */}
-      {INVENTORY_SECTIONS.map((section) => (
+      {inventorySections.map((section) => (
         <div key={section.key} style={{ marginBottom: "28px" }}>
           <div style={{
             display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px",

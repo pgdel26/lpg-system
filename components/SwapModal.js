@@ -1,6 +1,5 @@
 import React from "react";
 import { XIcon, SwapIcon } from "./Icons";
-import { FULL_CYLINDER_PRODUCTS } from "../lib/constants";
 import CustomerSearch from "./CustomerSearch";
 
 const selectStyle = {
@@ -27,6 +26,7 @@ export default function SwapModal({
   newName, setNewName,
   newPhone, setNewPhone,
   customers,
+  cylinderProducts,
   error,
   onClose, onSubmit,
 }) {
@@ -125,7 +125,7 @@ export default function SwapModal({
               onChange={(e) => { setProductFrom(e.target.value); if (e.target.value !== "Other") setCustomFrom(""); }}
               style={selectStyle}
             >
-              {FULL_CYLINDER_PRODUCTS.map((p) => (
+              {cylinderProducts.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
               <option value="Other">Other</option>
@@ -160,7 +160,7 @@ export default function SwapModal({
               onChange={(e) => setProductTo(e.target.value)}
               style={selectStyle}
             >
-              {FULL_CYLINDER_PRODUCTS.map((p) => (
+              {cylinderProducts.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>

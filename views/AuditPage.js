@@ -1,10 +1,9 @@
 import React from "react";
 import { today } from "../lib/utils";
-import { INVENTORY_SECTIONS } from "../lib/constants";
 
 export default function AuditPage({
   inventoryDate, setInventoryDate,
-  inventory,
+  inventory, inventorySections,
   onInventoryChange, onSaveSection,
 }) {
   const inputStyle = {
@@ -20,7 +19,7 @@ export default function AuditPage({
     onInventoryChange(sectionKey, product, "aud", numVal);
   };
 
-  const auditSections = INVENTORY_SECTIONS;
+  const auditSections = inventorySections;
 
   // Count how many products have audit values entered
   const auditedCount = auditSections.reduce((total, section) => {
@@ -156,28 +155,24 @@ export default function AuditPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {section.subgroups ? (
-                    section.subgroups.map((sg, idx) => {
-                      const nextIdx = idx + 1 < section.subgroups.length ? section.subgroups[idx + 1].startIndex : section.products.length;
-                      const groupProducts = section.products.slice(sg.startIndex, nextIdx);
-                      return (
-                        <React.Fragment key={sg.label}>
-                          <tr>
-                            <td
-                              colSpan={2}
-                              style={{
-                                padding: "6px 12px", fontSize: "10px", fontWeight: 700,
-                                color: "var(--text-dim)", textTransform: "uppercase",
-                                letterSpacing: "1px", background: "rgba(241,245,249,0.5)",
-                              }}
-                            >
-                              {sg.label}
-                            </td>
-                          </tr>
-                          {renderRows(groupProducts)}
-                        </React.Fragment>
-                      );
-                    })
+                  {section.subgroups && section.subgroups.length > 0 ? (
+                    section.subgroups.map((sg) => (
+                      <React.Fragment key={sg.label}>
+                        <tr>
+                          <td
+                            colSpan={2}
+                            style={{
+                              padding: "6px 12px", fontSize: "10px", fontWeight: 700,
+                              color: "var(--text-dim)", textTransform: "uppercase",
+                              letterSpacing: "1px", background: "rgba(241,245,249,0.5)",
+                            }}
+                          >
+                            {sg.label}
+                          </td>
+                        </tr>
+                        {renderRows(sg.products)}
+                      </React.Fragment>
+                    ))
                   ) : (
                     renderRows(section.products)
                   )}

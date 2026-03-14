@@ -1,13 +1,6 @@
 import React, { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt } from "../lib/utils";
-import { PURCHASE_SECTIONS } from "../lib/constants";
-
-function getProductsForSection(sectionKey) {
-  const sec = PURCHASE_SECTIONS.find((s) => s.key === sectionKey);
-  if (!sec) return [];
-  return sec.subgroups ? sec.subgroups.flatMap((sg) => sg.products) : (sec.products || []);
-}
 
 const fieldStyle = {
   padding: "6px 8px", borderRadius: "6px",
@@ -19,9 +12,16 @@ const fieldStyle = {
 export default function PurchaseModal({
   date, setDate,
   error,
+  purchaseSections,
   onClose, onSubmit,
 }) {
-  const defaultSection = PURCHASE_SECTIONS[0].key;
+  const getProductsForSection = (sectionKey) => {
+    const sec = purchaseSections.find((s) => s.key === sectionKey);
+    if (!sec) return [];
+    return sec.subgroups ? sec.subgroups.flatMap((sg) => sg.products) : (sec.products || []);
+  };
+
+  const defaultSection = purchaseSections[0].key;
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState([
@@ -134,7 +134,7 @@ export default function PurchaseModal({
                     onChange={(e) => updateItem(idx, "section", e.target.value)}
                     style={{ ...fieldStyle, flex: 1 }}
                   >
-                    {PURCHASE_SECTIONS.map((s) => (
+                    {purchaseSections.map((s) => (
                       <option key={s.key} value={s.key}>{s.label}</option>
                     ))}
                   </select>

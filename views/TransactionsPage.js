@@ -1,19 +1,28 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { fmt, today } from "../lib/utils";
-import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon } from "../components/Icons";
+import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon, XIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
+import ExpenseModal from "../components/ExpenseModal";
+import RefundsPage from "./RefundsPage";
 
 export default function TransactionsPage({
   inventoryDate, setInventoryDate,
   saleTransactions, swaps, refunds,
+  expenses,
+  staff, dailyReport, onUpdateDailyStaff,
+  allRefunds,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
+  onAddExpense, onUpdateExpense, onDeleteExpense,
 }) {
+  const [subTab, setSubTab] = useState("report");
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [showAddStaffDropdown, setShowAddStaffDropdown] = useState(false);
 
   const saleTypeLabel = (section) => {
     if (section === "cylinderWithRefill") return "Full Cylinder";
@@ -112,8 +121,505 @@ export default function TransactionsPage({
     fontFamily: "inherit",
   };
 
+  const subTabs = [
+    { key: "report", label: "Sales Report" },
+    { key: "sales", label: "Daily Sales" },
+    { key: "refunds", label: "Refunds / Returns" },
+  ];
+
   return (
     <div className="animate-fade">
+
+      {/* Sub-tabs */}
+      <div style={{ display: "flex", gap: "0", marginBottom: "0" }}>
+        {subTabs.map((tab) => {
+          const isActive = subTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setSubTab(tab.key)}
+              style={{
+                padding: "10px 24px", cursor: "pointer",
+                fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
+                borderRadius: "0",
+                border: "1px solid rgba(200,210,220,0.5)",
+                borderBottom: isActive ? "1px solid var(--bg-card)" : "1px solid rgba(200,210,220,0.5)",
+                background: isActive ? "var(--bg-card)" : "transparent",
+                color: isActive ? "var(--accent-blue)" : "var(--text-dim)",
+                position: "relative",
+                zIndex: isActive ? 1 : 0,
+                marginBottom: "-1px",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{
+        background: "var(--bg-card)", borderRadius: "0 0 0 0",
+        border: "1px solid var(--border)", padding: "24px",
+      }}>
+
+      {/* ===== SALES REPORT SUB-TAB ===== */}
+      {subTab === "report" && (() => {
+        const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
+          + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
+        const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
+        const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+        const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
+        const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
+        const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+        const expectedCashRemit = netSales - totalAR;
+
+        return (
+          <div>
+            {/* Date selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+              <input
+                type="date"
+                value={inventoryDate}
+                onChange={(e) => setInventoryDate(e.target.value)}
+                style={{
+                  padding: "8px 12px", borderRadius: "8px",
+                  background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                  color: "var(--text-secondary)", fontSize: "13px",
+                  fontFamily: "var(--font-mono)", outline: "none",
+                }}
+              />
+              {inventoryDate !== today() && (
+                <button
+                  onClick={() => setInventoryDate(today())}
+                  style={{
+                    padding: "8px 14px", borderRadius: "8px", border: "none",
+                    cursor: "pointer", background: "rgba(37,99,235,0.1)",
+                    color: "var(--accent-blue)", fontSize: "12px", fontWeight: 600,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Go to Today
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
+              {/* Left: Report summary */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Breakdown table */}
+                <div style={{
+                  background: "var(--bg-card)", borderRadius: "12px",
+                  border: "1px solid var(--border)", overflow: "hidden",
+                }}>
+                  <div style={{
+                    padding: "12px 20px", borderBottom: "1px solid var(--border)",
+                    fontSize: "12px", fontWeight: 700, color: "var(--text-muted)",
+                    textTransform: "uppercase", letterSpacing: "0.5px",
+                  }}>
+                    Daily Breakdown
+                  </div>
+
+                  {/* Gross Sales row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Gross Sales</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {saleTransactions.length} sale{saleTransactions.length !== 1 ? "s" : ""} + {swaps.length} swap{swaps.length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--accent-green)" }}>
+                      {fmt(grossSales)}
+                    </span>
+                  </div>
+
+                  {/* Discount row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Discounts</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {saleTransactions.filter((t) => t.discount > 0).length} discounted sale{saleTransactions.filter((t) => t.discount > 0).length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalDiscount > 0 ? "var(--accent-red)" : "var(--text-dim)" }}>
+                      {totalDiscount > 0 ? `- ${fmt(totalDiscount)}` : fmt(0)}
+                    </span>
+                  </div>
+
+                  {/* Expenses row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Expenses</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {(expenses || []).length} expense{(expenses || []).length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalExpenses > 0 ? "var(--accent-red)" : "var(--text-dim)" }}>
+                      {totalExpenses > 0 ? `- ${fmt(totalExpenses)}` : fmt(0)}
+                    </span>
+                  </div>
+
+                  {/* Refunds row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Refunds</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {(refunds || []).length} refund{(refunds || []).length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalRefunds > 0 ? "var(--accent-red)" : "var(--text-dim)" }}>
+                      {totalRefunds > 0 ? `- ${fmt(totalRefunds)}` : fmt(0)}
+                    </span>
+                  </div>
+
+                  {/* Net Sales total */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "14px 20px",
+                    background: "rgba(241,245,249,0.5)", borderTop: "1px solid var(--border)",
+                  }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Net Sales
+                    </span>
+                    <span style={{ fontSize: "18px", fontWeight: 700, fontFamily: "var(--font-mono)", color: netSales >= 0 ? "var(--accent-gold)" : "var(--accent-red)" }}>
+                      {fmt(netSales)}
+                    </span>
+                  </div>
+
+                  {/* Accounts Receivable row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderTop: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Accounts Receivable</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {saleTransactions.filter((t) => t.paymentType === "ar").length} AR sale{saleTransactions.filter((t) => t.paymentType === "ar").length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalAR > 0 ? "var(--accent-orange)" : "var(--text-dim)" }}>
+                      {totalAR > 0 ? `- ${fmt(totalAR)}` : fmt(0)}
+                    </span>
+                  </div>
+
+                  {/* Expected Cash Remit */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "14px 20px",
+                    background: "rgba(34,197,94,0.06)", borderTop: "1px solid var(--border)",
+                  }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Expected Cash Remit
+                    </span>
+                    <span style={{ fontSize: "18px", fontWeight: 700, fontFamily: "var(--font-mono)", color: expectedCashRemit >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+                      {fmt(expectedCashRemit)}
+                    </span>
+                  </div>
+
+                  {/* Actual Cash Remit */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderTop: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                      Actual Cash Remit
+                    </span>
+                    <input
+                      type="number"
+                      value={dailyReport?.actualCashRemit ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        onUpdateDailyStaff({ ...dailyReport, actualCashRemit: val === "" ? null : parseFloat(val) });
+                      }}
+                      placeholder="0"
+                      style={{
+                        width: "140px", padding: "6px 10px", borderRadius: "6px",
+                        background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                        color: "var(--text-secondary)", fontSize: "14px", outline: "none",
+                        fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700,
+                      }}
+                    />
+                  </div>
+
+                  {/* Short / Over */}
+                  {(() => {
+                    const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
+                    const diff = actual - expectedCashRemit;
+                    const isOver = diff > 0;
+                    const isShort = diff < 0;
+                    return (
+                      <div style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "14px 20px",
+                        background: isShort ? "rgba(239,68,68,0.06)" : isOver ? "rgba(34,197,94,0.06)" : "rgba(241,245,249,0.5)",
+                        borderTop: "1px solid var(--border)",
+                      }}>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          {isShort ? "Short" : isOver ? "Over" : "Short / Over"}
+                        </span>
+                        <span style={{
+                          fontSize: "18px", fontWeight: 700, fontFamily: "var(--font-mono)",
+                          color: isShort ? "var(--accent-red)" : isOver ? "var(--accent-green)" : "var(--text-dim)",
+                        }}>
+                          {isShort ? `- ${fmt(Math.abs(diff))}` : isOver ? `+ ${fmt(diff)}` : fmt(0)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Right: Staff + Expenses panels */}
+              <div style={{ width: "340px", flexShrink: 0 }}>
+
+                {/* Staff on Duty */}
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                    <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#3b82f6" }} />
+                    <h3 style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Staff on Duty
+                    </h3>
+                  </div>
+
+                  <div style={{
+                    background: "var(--bg-card)", borderRadius: "12px",
+                    border: "1px solid var(--border)", padding: "12px 14px",
+                  }}>
+                    {/* Cashier */}
+                    <div style={{ marginBottom: "10px" }}>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Cashier
+                      </span>
+                      <select
+                        value={dailyReport?.cashier || ""}
+                        onChange={(e) => onUpdateDailyStaff({ ...dailyReport, cashier: e.target.value || null })}
+                        style={{
+                          width: "100%", padding: "6px 8px", borderRadius: "6px", marginTop: "4px",
+                          background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                          color: "var(--text-secondary)", fontSize: "12px", outline: "none",
+                          fontFamily: "inherit", cursor: "pointer",
+                        }}
+                      >
+                        <option value="">-- Select cashier --</option>
+                        {(staff || []).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Staff */}
+                    <div>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Staff
+                      </span>
+                      {/* Assigned staff list */}
+                      <div style={{ marginTop: "4px" }}>
+                        {(dailyReport?.staff || []).map((id) => {
+                          const s = (staff || []).find((st) => st.id === id);
+                          if (!s) return null;
+                          return (
+                            <div key={s.id} style={{
+                              display: "flex", alignItems: "center", justifyContent: "space-between",
+                              padding: "4px 0",
+                            }}>
+                              <div>
+                                <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 600 }}>
+                                  {s.name}
+                                </span>
+                                {s.role && (
+                                  <span style={{ fontSize: "10px", color: "var(--text-dim)", marginLeft: "6px" }}>({s.role})</span>
+                                )}
+                              </div>
+                              <button onClick={() => {
+                                const updated = (dailyReport?.staff || []).filter((sid) => sid !== s.id);
+                                onUpdateDailyStaff({ ...dailyReport, staff: updated });
+                              }} style={{
+                                background: "none", border: "none", cursor: "pointer", padding: "2px",
+                                color: "var(--text-dim)", display: "flex", alignItems: "center",
+                                fontSize: "11px",
+                              }} title="Remove">
+                                <XIcon />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {(dailyReport?.staff || []).length === 0 && (
+                          <div style={{ fontSize: "11px", color: "var(--text-dim)", padding: "4px 0" }}>
+                            No staff assigned.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Add staff dropdown */}
+                      {(() => {
+                        const assignedIds = dailyReport?.staff || [];
+                        const available = (staff || []).filter((s) => !assignedIds.includes(s.id));
+                        return (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              onUpdateDailyStaff({ ...dailyReport, staff: [...assignedIds, e.target.value] });
+                            }}
+                            disabled={available.length === 0}
+                            style={{
+                              width: "100%", padding: "6px 8px", borderRadius: "6px", marginTop: "6px",
+                              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                              color: "var(--text-secondary)", fontSize: "12px", outline: "none",
+                              fontFamily: "inherit", cursor: available.length === 0 ? "default" : "pointer",
+                              opacity: available.length === 0 ? 0.5 : 1,
+                            }}
+                          >
+                            <option value="">{available.length === 0 ? "All staff assigned" : "+ Add staff..."}</option>
+                            {available.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expenses */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e42" }} />
+                      <h3 style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Expenses
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setExpenseModalOpen(true)}
+                      style={{
+                        padding: "5px 10px", borderRadius: "6px", border: "none",
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
+                        background: "rgba(245,158,66,0.12)", color: "#f59e42",
+                        fontSize: "11px", fontWeight: 700, fontFamily: "inherit",
+                      }}
+                    >
+                      New
+                    </button>
+                  </div>
+
+                  <div style={{
+                    background: "var(--bg-card)", borderRadius: "12px",
+                    border: "1px solid var(--border)", overflow: "hidden",
+                  }}>
+                    {(expenses || []).length > 0 ? (expenses || []).map((e) => {
+                      const isEditing = editingId === `expense_${e.id}`;
+
+                      if (isEditing && editData) {
+                        return (
+                          <div key={e.id} style={{
+                            padding: "10px 14px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                            background: "rgba(245,158,66,0.03)",
+                          }}>
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Description</span>
+                                <input value={editData.description} onChange={(ev) => setEditData((p) => ({ ...p, description: ev.target.value }))}
+                                  style={{ ...editInputStyle, width: "100%", display: "block" }} />
+                              </div>
+                              <div>
+                                <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Amount</span>
+                                <input type="number" value={editData.amount} onChange={(ev) => setEditData((p) => ({ ...p, amount: ev.target.value }))}
+                                  style={{ ...editInputStyle, width: "80px", display: "block", fontFamily: "var(--font-mono)" }} />
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px" }}>
+                              <button onClick={cancelEdit} style={{
+                                padding: "4px 12px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                                background: "transparent", cursor: "pointer", fontSize: "11px",
+                                color: "var(--text-muted)", fontWeight: 600, fontFamily: "inherit",
+                              }}>Cancel</button>
+                              <button onClick={() => { onUpdateExpense(editData.id, editData); cancelEdit(); }} style={{
+                                padding: "4px 12px", borderRadius: "6px", border: "none",
+                                background: "var(--accent-blue)", cursor: "pointer", fontSize: "11px",
+                                color: "#fff", fontWeight: 600, fontFamily: "inherit",
+                              }}>Save</button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={e.id} style={{
+                          padding: "8px 14px", borderBottom: "1px solid rgba(15,23,42,0.04)",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 600 }}>
+                              {e.description}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--accent-orange)" }}>
+                                {fmt(e.amount)}
+                              </span>
+                              <button onClick={() => { setEditingId(`expense_${e.id}`); setEditData({ type: "expense", id: e.id, description: e.description, amount: e.amount }); }} style={{
+                                background: "none", border: "none", cursor: "pointer", padding: "2px",
+                                color: "var(--text-dim)", display: "flex", alignItems: "center",
+                              }} title="Edit">
+                                <EditIcon />
+                              </button>
+                              <button onClick={() => setPendingDelete({ type: "expense", id: e.id })} style={{
+                                background: "none", border: "none", cursor: "pointer", padding: "2px",
+                                color: "var(--text-dim)", display: "flex", alignItems: "center",
+                              }} title="Delete">
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div style={{ padding: "12px 14px", textAlign: "center", fontSize: "11px", color: "var(--text-dim)" }}>
+                        No expenses recorded today.
+                      </div>
+                    )}
+                    {(expenses || []).length > 0 && (
+                      <div style={{
+                        padding: "8px 14px", borderTop: "1px solid var(--border)",
+                        background: "rgba(241,245,249,0.5)",
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                      }}>
+                        <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase" }}>Total</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--accent-orange)", fontSize: "12px" }}>
+                          {fmt(totalExpenses)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {expenseModalOpen && (
+              <ExpenseModal
+                onSubmit={onAddExpense}
+                onClose={() => setExpenseModalOpen(false)}
+              />
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ===== SALES SUB-TAB ===== */}
+      {subTab === "sales" && (
+      <div>
       {/* Date selector + Record Sale button */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
         <input
@@ -635,6 +1141,20 @@ export default function TransactionsPage({
       </div>{/* end side panel */}
       </div>{/* end flex row */}
 
+      </div>
+      )}
+
+      {/* ===== REFUNDS SUB-TAB ===== */}
+      {subTab === "refunds" && (
+        <RefundsPage
+          allRefunds={allRefunds}
+          onUpdateRefund={onUpdateRefund}
+          onDeleteRefund={onDeleteRefund}
+        />
+      )}
+
+      </div>{/* end tab content container */}
+
       {pendingDelete && (
         <ConfirmModal
           title={`Delete ${pendingDelete.type}`}
@@ -644,6 +1164,7 @@ export default function TransactionsPage({
             if (pendingDelete.type === "sale") onDeleteSale(pendingDelete.id);
             else if (pendingDelete.type === "swap") onDeleteSwap(pendingDelete.id);
             else if (pendingDelete.type === "refund") onDeleteRefund(pendingDelete.id);
+            else if (pendingDelete.type === "expense") onDeleteExpense(pendingDelete.id);
             setPendingDelete(null);
           }}
           onCancel={() => setPendingDelete(null)}

@@ -1,14 +1,7 @@
 import React, { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt, getPricebookSrp, today } from "../lib/utils";
-import { SALES_SECTIONS } from "../lib/constants";
 import CustomerSearch from "./CustomerSearch";
-
-function getProductsForSection(sectionKey) {
-  const sec = SALES_SECTIONS.find((s) => s.key === sectionKey);
-  if (!sec) return [];
-  return sec.subgroups ? sec.subgroups.flatMap((sg) => sg.products) : (sec.products || []);
-}
 
 export default function SaleModal({
   invoice, setInvoice,
@@ -19,9 +12,16 @@ export default function SaleModal({
   payment, setPayment,
   error,
   customers, activePricebook, inventoryDate,
+  salesSections,
   onClose, onSubmit,
 }) {
-  const defaultSection = SALES_SECTIONS[0].key;
+  const getProductsForSection = (sectionKey) => {
+    const sec = salesSections.find((s) => s.key === sectionKey);
+    if (!sec) return [];
+    return sec.subgroups ? sec.subgroups.flatMap((sg) => sg.products) : (sec.products || []);
+  };
+
+  const defaultSection = salesSections[0].key;
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState([
@@ -30,6 +30,8 @@ export default function SaleModal({
   const [saleDate, setSaleDate] = useState(inventoryDate || today());
   const [discount, setDiscount] = useState("");
   const [deliveryCharge, setDeliveryCharge] = useState("");
+  const [checkDate, setCheckDate] = useState("");
+  const [checkAmount, setCheckAmount] = useState("");
 
   const updateItem = (index, field, value) => {
     setItems((prev) => {
@@ -55,7 +57,7 @@ export default function SaleModal({
   };
 
   const getLineSrp = (item) => {
-    const sec = SALES_SECTIONS.find((s) => s.key === item.section);
+    const sec = salesSections.find((s) => s.key === item.section);
     if (!sec) return 0;
     const prodKey = `${sec.productCategory}_${item.product}`;
     return getPricebookSrp(item.section, prodKey, activePricebook?.prices);
@@ -73,7 +75,10 @@ export default function SaleModal({
   const grandTotal = Math.max(0, subtotal - discountNum + deliveryNum);
 
   const handleSubmit = () => {
-    onSubmit(items, discountNum, saleDate, deliveryNum);
+    const checkData = payment === "ar" && checkDate
+      ? { checkDate, checkAmount: parseFloat(checkAmount) || 0 }
+      : null;
+    onSubmit(items, discountNum, saleDate, deliveryNum, checkData);
   };
 
   return (
@@ -229,7 +234,7 @@ export default function SaleModal({
                       fontFamily: "inherit",
                     }}
                   >
-                    {SALES_SECTIONS.map((s) => (
+                    {salesSections.map((s) => (
                       <option key={s.key} value={s.key}>{s.label}</option>
                     ))}
                   </select>
@@ -358,6 +363,49 @@ export default function SaleModal({
             ))}
           </div>
         </div>
+
+        {/* Post-dated check (AR only) */}
+        {payment === "ar" && (
+          <div style={{
+            marginBottom: "14px", padding: "12px", borderRadius: "10px",
+            background: "rgba(245,158,66,0.06)", border: "1px solid rgba(245,158,66,0.15)",
+          }}>
+            <label style={{ fontSize: "11px", color: "var(--accent-orange)", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>
+              Post-Dated Check
+            </label>
+            <div style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase" }}>Date of Check</span>
+                <input
+                  type="date"
+                  value={checkDate}
+                  onChange={(e) => setCheckDate(e.target.value)}
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: "8px", marginTop: "4px",
+                    background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                    color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+                    fontFamily: "var(--font-mono)", boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: "10px", color: "var(--text-dim)", textTransform: "uppercase" }}>Check Amount</span>
+                <input
+                  type="number"
+                  value={checkAmount}
+                  onChange={(e) => setCheckAmount(e.target.value)}
+                  placeholder="0"
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: "8px", marginTop: "4px",
+                    background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+                    color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+                    fontFamily: "var(--font-mono)", boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 5. Discount */}
         <div style={{ marginBottom: "14px" }}>

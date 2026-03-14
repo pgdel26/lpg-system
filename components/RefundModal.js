@@ -1,33 +1,34 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt } from "../lib/utils";
-import { FULL_CYLINDER_PRODUCTS, ALL_ACCESSORIES } from "../lib/constants";
 import CustomerSearch from "./CustomerSearch";
-
-const REFUND_SECTIONS = [
-  { key: "emptyCylinder", label: "Empty Cylinder", products: FULL_CYLINDER_PRODUCTS },
-  { key: "fullCylinder", label: "Full Cylinder", products: FULL_CYLINDER_PRODUCTS },
-  { key: "accessories", label: "Accessories", products: ALL_ACCESSORIES },
-];
-
-function getProductsForSection(sectionKey) {
-  const sec = REFUND_SECTIONS.find((s) => s.key === sectionKey);
-  return sec ? sec.products : [];
-}
 
 export default function RefundModal({
   saleTransactions,
   customers,
+  cylinderProducts,
+  allAccessoryProducts,
   error,
   onClose, onSubmit,
 }) {
+  const refundSections = useMemo(() => [
+    { key: "emptyCylinder", label: "Empty Cylinder", products: cylinderProducts },
+    { key: "fullCylinder", label: "Full Cylinder", products: cylinderProducts },
+    { key: "accessories", label: "Accessories", products: allAccessoryProducts },
+  ], [cylinderProducts, allAccessoryProducts]);
+
+  const getProductsForSection = (sectionKey) => {
+    const sec = refundSections.find((s) => s.key === sectionKey);
+    return sec ? sec.products : [];
+  };
+
   const [invoice, setInvoice] = useState("");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState("");
 
-  const defaultSection = REFUND_SECTIONS[0].key;
+  const defaultSection = refundSections[0].key;
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState([
@@ -280,7 +281,7 @@ export default function RefundModal({
                       fontFamily: "inherit",
                     }}
                   >
-                    {REFUND_SECTIONS.map((s) => (
+                    {refundSections.map((s) => (
                       <option key={s.key} value={s.key}>{s.label}</option>
                     ))}
                   </select>
