@@ -229,17 +229,8 @@ export default function GasulTracker() {
     return () => unsubscribers.forEach((unsub) => unsub());
   }, [inventoryDate]);
 
-  // ---- FIREBASE: Daily sales listener ----
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "dailySales", inventoryDate), (snapshot) => {
-      if (snapshot.exists()) {
-        setSales(snapshot.data().items || {});
-      } else {
-        setSales({});
-      }
-    });
-    return () => unsub();
-  }, [inventoryDate]);
+  // Note: dailySales is a legacy collection no longer written to by this app.
+  // Sales state is now derived entirely from saleTransactions (see listener below).
 
   // ---- FIREBASE: Pricebooks listener ----
   useEffect(() => {
@@ -394,13 +385,13 @@ export default function GasulTracker() {
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
         setSaleTransactions(list);
 
-        // Sync sale counts back to daily sales for inventory tracking
+        // Compute sale counts from live transactions (full replace, no merge with legacy data)
         const saleCounts = {};
         list.forEach((t) => {
           if (!saleCounts[t.saleSection]) saleCounts[t.saleSection] = {};
           saleCounts[t.saleSection][t.product] = (saleCounts[t.saleSection][t.product] || 0) + (t.quantity || 1);
         });
-        setSales((prev) => ({ ...prev, ...saleCounts }));
+        setSales(saleCounts);
       }
     );
     return () => unsub();

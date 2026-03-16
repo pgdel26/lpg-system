@@ -334,34 +334,20 @@ export default function SaleModal({
           <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Payment Type
           </label>
-          <div style={{ display: "flex", gap: "8px" }}>
-            {[
-              { value: "cash", label: "Cash" },
-              { value: "ar", label: "Accounts Receivable" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setPayment(opt.value)}
-                style={{
-                  flex: 1, padding: "8px 12px", borderRadius: "8px",
-                  border: payment === opt.value
-                    ? "1.5px solid var(--accent-blue)"
-                    : "1px solid var(--border-light)",
-                  cursor: "pointer",
-                  background: payment === opt.value
-                    ? "rgba(59,130,246,0.1)"
-                    : "rgba(241,245,249,0.6)",
-                  color: payment === opt.value
-                    ? "var(--accent-blue)"
-                    : "var(--text-muted)",
-                  fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <select
+            value={payment}
+            onChange={(e) => setPayment(e.target.value)}
+            style={{
+              width: "100%", padding: "8px 12px", borderRadius: "8px",
+              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+              fontFamily: "inherit", cursor: "pointer",
+            }}
+          >
+            <option value="cash">Cash</option>
+            <option value="gcash">GCash</option>
+            <option value="ar">Accounts Receivable</option>
+          </select>
         </div>
 
         {/* Post-dated check (AR only) */}

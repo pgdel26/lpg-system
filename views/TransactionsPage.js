@@ -55,7 +55,7 @@ export default function TransactionsPage({
       "SRP": t.srp || 0,
       "Discount": t.discount || 0,
       "Total": t.totalAmount || t.finalPrice || 0,
-      "Payment": t.paymentType === "cash" ? "Cash" : "AR",
+      "Payment": t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -172,7 +172,8 @@ export default function TransactionsPage({
         const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
         const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
         const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-        const expectedCashRemit = netSales - totalAR;
+        const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+        const expectedCashRemit = netSales - totalAR - totalGCash;
 
         return (
           <div>
@@ -755,6 +756,7 @@ export default function TransactionsPage({
                       <select value={editData.paymentType} onChange={(e) => setEditData((p) => ({ ...p, paymentType: e.target.value }))}
                         style={{ ...editInputStyle, display: "block", cursor: "pointer" }}>
                         <option value="cash">Cash</option>
+                        <option value="gcash">GCash</option>
                         <option value="ar">AR</option>
                       </select>
                     </div>
@@ -803,10 +805,10 @@ export default function TransactionsPage({
                 <span style={{ textAlign: "center" }}>
                   <span style={{
                     padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                    background: t.paymentType === "cash" ? "rgba(34,197,94,0.1)" : "rgba(245,158,66,0.1)",
-                    color: t.paymentType === "cash" ? "var(--accent-green)" : "var(--accent-orange)",
+                    background: t.paymentType === "cash" ? "rgba(34,197,94,0.1)" : t.paymentType === "gcash" ? "rgba(59,130,246,0.1)" : "rgba(245,158,66,0.1)",
+                    color: t.paymentType === "cash" ? "var(--accent-green)" : t.paymentType === "gcash" ? "var(--accent-blue)" : "var(--accent-orange)",
                   }}>
-                    {t.paymentType === "cash" ? "Cash" : "AR"}
+                    {t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR"}
                   </span>
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center" }}>
