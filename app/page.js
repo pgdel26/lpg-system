@@ -1109,6 +1109,30 @@ export default function GasulTracker() {
     }
   };
 
+  const handleUpdatePurchase = async (purchaseId, data) => {
+    try {
+      await updateDoc(doc(db, "purchases", purchaseId), {
+        quantity: parseInt(data.quantity) || 0,
+        unitCost: parseFloat(data.unitCost) || 0,
+        totalCost: parseFloat(data.totalCost) || 0,
+      });
+      setToast({ type: "success", message: "Purchase updated." });
+    } catch (error) {
+      console.error("Update purchase error:", error);
+      setToast({ type: "error", message: "Failed to update purchase." });
+    }
+  };
+
+  const handleDeletePurchase = async (purchaseId) => {
+    try {
+      await deleteDoc(doc(db, "purchases", purchaseId));
+      setToast({ type: "success", message: "Purchase deleted." });
+    } catch (error) {
+      console.error("Delete purchase error:", error);
+      setToast({ type: "error", message: "Failed to delete purchase." });
+    }
+  };
+
   const handleDeleteSwap = async (swapId) => {
     try {
       await deleteDoc(doc(db, "swaps", swapId));
@@ -1361,6 +1385,8 @@ export default function GasulTracker() {
             <PurchasesPage
               purchaseTransactions={purchaseTransactions}
               onOpenPurchaseModal={handleOpenPurchaseModal}
+              onUpdatePurchase={handleUpdatePurchase}
+              onDeletePurchase={handleDeletePurchase}
             />
           )}
 
@@ -1410,6 +1436,8 @@ export default function GasulTracker() {
             <ReceivablesPage
               arTransactions={arTransactions}
               onMarkCollected={handleMarkArCollected}
+              onUpdateSale={handleUpdateSale}
+              onDeleteSale={handleDeleteSale}
             />
           )}
 

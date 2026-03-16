@@ -203,6 +203,48 @@ export default function TransactionsPage({
                   Go to Today
                 </button>
               )}
+              <button
+                onClick={() => {
+                  const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
+                  const diff = actual - expectedCashRemit;
+                  const cashierName = dailyReport?.cashier ? ((staff || []).find((s) => s.id === dailyReport.cashier)?.name || "") : "";
+                  const staffNames = (dailyReport?.staff || []).map((id) => ((staff || []).find((s) => s.id === id)?.name || "")).filter(Boolean).join(", ");
+                  const rows = [
+                    { "Item": "Date", "Amount": inventoryDate },
+                    { "Item": "Cashier", "Amount": cashierName || "—" },
+                    { "Item": "Staff", "Amount": staffNames || "—" },
+                    { "Item": "", "Amount": "" },
+                    { "Item": "Gross Sales", "Amount": grossSales },
+                    { "Item": "Discounts", "Amount": totalDiscount > 0 ? -totalDiscount : 0 },
+                    { "Item": "Expenses", "Amount": totalExpenses > 0 ? -totalExpenses : 0 },
+                    { "Item": "Refunds", "Amount": totalRefunds > 0 ? -totalRefunds : 0 },
+                    { "Item": "Net Sales", "Amount": netSales },
+                    { "Item": "", "Amount": "" },
+                    { "Item": "Accounts Receivable", "Amount": totalAR > 0 ? -totalAR : 0 },
+                    { "Item": "GCash", "Amount": totalGCash > 0 ? -totalGCash : 0 },
+                    { "Item": "Expected Cash Remit", "Amount": expectedCashRemit },
+                    { "Item": "", "Amount": "" },
+                    { "Item": "Cash On Hand", "Amount": dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== "" ? actual : "" },
+                    ...(dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== ""
+                      ? [{ "Item": diff < 0 ? "Short" : diff > 0 ? "Over" : "Short / Over", "Amount": diff }]
+                      : []),
+                  ];
+                  const ws = XLSX.utils.json_to_sheet(rows);
+                  ws["!cols"] = [{ wch: 25 }, { wch: 20 }];
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+                  XLSX.writeFile(wb, `Sales_Report_${inventoryDate}.xlsx`);
+                }}
+                style={{
+                  marginLeft: "auto", padding: "10px 16px", borderRadius: "10px",
+                  border: "1px solid var(--border-light)", background: "transparent",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                  color: "var(--text-muted)", fontSize: "13px", fontWeight: 600,
+                  fontFamily: "inherit",
+                }}
+              >
+                <DownloadIcon /> Export
+              </button>
             </div>
 
             <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
@@ -315,6 +357,22 @@ export default function TransactionsPage({
                     </span>
                   </div>
 
+                  {/* GCash row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderTop: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>GCash</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {saleTransactions.filter((t) => t.paymentType === "gcash").length} GCash sale{saleTransactions.filter((t) => t.paymentType === "gcash").length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalGCash > 0 ? "var(--accent-blue)" : "var(--text-dim)" }}>
+                      {totalGCash > 0 ? `- ${fmt(totalGCash)}` : fmt(0)}
+                    </span>
+                  </div>
+
                   {/* Expected Cash Remit */}
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -329,13 +387,14 @@ export default function TransactionsPage({
                     </span>
                   </div>
 
-                  {/* Actual Cash Remit */}
+                  {/* Cash On Hand */}
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "12px 20px", borderTop: "1px solid rgba(15,23,42,0.04)",
+                    padding: "14px 20px", borderTop: "1px solid var(--border)",
+                    background: "rgba(59,130,246,0.06)",
                   }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                      Actual Cash Remit
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Cash On Hand
                     </span>
                     <input
                       type="number"
@@ -346,17 +405,17 @@ export default function TransactionsPage({
                       }}
                       placeholder="0"
                       style={{
-                        width: "140px", padding: "6px 10px", borderRadius: "6px",
+                        width: "160px", padding: "8px 12px", borderRadius: "6px",
                         background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-                        color: "var(--text-secondary)", fontSize: "14px", outline: "none",
+                        color: "var(--text-secondary)", fontSize: "18px", outline: "none",
                         fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700,
                       }}
                     />
                   </div>
 
-                  {/* Short / Over */}
-                  {(() => {
-                    const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
+                  {/* Short / Over — only show when Cash On Hand has a value */}
+                  {dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== "" && (() => {
+                    const actual = parseFloat(dailyReport.actualCashRemit) || 0;
                     const diff = actual - expectedCashRemit;
                     const isOver = diff > 0;
                     const isShort = diff < 0;

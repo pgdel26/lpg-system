@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from "react";
 import { fmt } from "../lib/utils";
+import { EditIcon, TrashIcon, XIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 
-export default function ReceivablesPage({ arTransactions, onMarkCollected }) {
+export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpdateSale, onDeleteSale }) {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending"); // "all", "pending", "collected"
   const [pendingCollect, setPendingCollect] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({});
 
   const filtered = useMemo(() => {
     let list = [...arTransactions];
@@ -52,6 +56,35 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected }) {
     background: "#fff", border: "1px solid var(--border)",
     color: "var(--text-secondary)", fontSize: "12px", outline: "none",
     fontFamily: "inherit",
+  };
+
+  const editInputStyle = {
+    padding: "4px 8px", borderRadius: "6px",
+    background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
+    color: "var(--text-secondary)", fontSize: "11px", outline: "none",
+    fontFamily: "inherit", width: "100%",
+  };
+
+  const startEdit = (t) => {
+    setEditingId(t.id);
+    setEditData({
+      invoice: t.invoice || "",
+      customerName: t.customerName || "",
+      discount: t.discount || 0,
+      totalAmount: t.totalAmount || 0,
+      paymentType: t.paymentType || "ar",
+    });
+  };
+
+  const saveEdit = () => {
+    onUpdateSale(editingId, editData);
+    setEditingId(null);
+    setEditData({});
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditData({});
   };
 
   return (
@@ -115,7 +148,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected }) {
           }}>
             {/* Header */}
             <div style={{
-              display: "grid", gridTemplateColumns: "1fr 1.2fr 1fr 0.8fr 0.8fr 90px",
+              display: "grid", gridTemplateColumns: "1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px",
               padding: "8px 14px", borderBottom: "1px solid var(--border)",
               fontSize: "10px", fontWeight: 600, color: "var(--text-dim)",
               textTransform: "uppercase", letterSpacing: "0.5px",
@@ -126,59 +159,120 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected }) {
               <span style={{ textAlign: "right" }}>Amount</span>
               <span style={{ textAlign: "center" }}>Check</span>
               <span style={{ textAlign: "center" }}>Status</span>
+              <span style={{ textAlign: "center" }}>Actions</span>
             </div>
 
             {group.items.map((t) => (
-              <div key={t.id} style={{
-                display: "grid", gridTemplateColumns: "1fr 1.2fr 1fr 0.8fr 0.8fr 90px",
-                padding: "10px 14px", alignItems: "center",
-                borderBottom: "1px solid rgba(15,23,42,0.04)",
-                fontSize: "12px",
-              }}>
-                <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
-                  {t.invoice || "\u2014"}
-                </span>
-                <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
-                  {t.customerName || "\u2014"}
-                </span>
-                <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
-                  {t.product || "\u2014"}
-                  {t.quantity > 1 && <span style={{ color: "var(--text-dim)" }}> x{t.quantity}</span>}
-                </span>
-                <span style={{ textAlign: "right", fontWeight: 600, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "11px" }}>
-                  {fmt(t.totalAmount)}
-                </span>
-                <span style={{ textAlign: "center", fontSize: "10px", color: "var(--text-dim)" }}>
-                  {t.checkDate ? (
-                    <span title={`Check: ${fmt(t.checkAmount)} on ${t.checkDate}`}>
-                      {t.checkDate}
-                    </span>
-                  ) : "\u2014"}
-                </span>
-                <div style={{ textAlign: "center" }}>
-                  {t.arCollected ? (
-                    <span style={{
-                      fontSize: "10px", fontWeight: 700, color: "var(--accent-green)",
-                      background: "rgba(34,197,94,0.1)", padding: "3px 8px",
-                      borderRadius: "6px",
-                    }}>
-                      Collected
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setPendingCollect(t)}
-                      style={{
-                        fontSize: "10px", fontWeight: 700, color: "var(--accent-blue)",
-                        background: "rgba(59,130,246,0.1)", padding: "3px 8px",
-                        borderRadius: "6px", border: "none", cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Mark Collected
-                    </button>
-                  )}
+              editingId === t.id ? (
+                <div key={t.id} style={{
+                  padding: "10px 14px",
+                  borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  background: "rgba(59,130,246,0.04)",
+                }}>
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: "100px" }}>
+                      <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Invoice</span>
+                      <input value={editData.invoice} onChange={(e) => setEditData((p) => ({ ...p, invoice: e.target.value }))}
+                        style={{ ...editInputStyle, display: "block" }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: "100px" }}>
+                      <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Customer</span>
+                      <input value={editData.customerName} onChange={(e) => setEditData((p) => ({ ...p, customerName: e.target.value }))}
+                        style={{ ...editInputStyle, display: "block" }} />
+                    </div>
+                    <div style={{ minWidth: "80px" }}>
+                      <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Discount</span>
+                      <input type="number" value={editData.discount} onChange={(e) => {
+                        const disc = parseFloat(e.target.value) || 0;
+                        setEditData((p) => ({ ...p, discount: disc }));
+                      }} style={{ ...editInputStyle, display: "block", fontFamily: "var(--font-mono)" }} />
+                    </div>
+                    <div style={{ minWidth: "100px" }}>
+                      <span style={{ fontSize: "9px", color: "var(--text-dim)", textTransform: "uppercase" }}>Total Amount</span>
+                      <input type="number" value={editData.totalAmount} onChange={(e) => {
+                        setEditData((p) => ({ ...p, totalAmount: parseFloat(e.target.value) || 0 }));
+                      }} style={{ ...editInputStyle, display: "block", fontFamily: "var(--font-mono)" }} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px" }}>
+                    <button onClick={cancelEdit} style={{
+                      padding: "4px 12px", borderRadius: "6px", border: "1px solid var(--border-light)",
+                      background: "transparent", cursor: "pointer", fontSize: "11px",
+                      color: "var(--text-muted)", fontFamily: "inherit",
+                    }}>Cancel</button>
+                    <button onClick={saveEdit} style={{
+                      padding: "4px 12px", borderRadius: "6px", border: "none",
+                      background: "var(--accent-blue)", cursor: "pointer", fontSize: "11px",
+                      color: "#fff", fontWeight: 600, fontFamily: "inherit",
+                    }}>Save</button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div key={t.id} style={{
+                  display: "grid", gridTemplateColumns: "1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px",
+                  padding: "10px 14px", alignItems: "center",
+                  borderBottom: "1px solid rgba(15,23,42,0.04)",
+                  fontSize: "12px",
+                }}>
+                  <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
+                    {t.invoice || "\u2014"}
+                  </span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+                    {t.customerName || "\u2014"}
+                  </span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+                    {t.product || "\u2014"}
+                    {t.quantity > 1 && <span style={{ color: "var(--text-dim)" }}> x{t.quantity}</span>}
+                  </span>
+                  <span style={{ textAlign: "right", fontWeight: 600, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "11px" }}>
+                    {fmt(t.totalAmount)}
+                  </span>
+                  <span style={{ textAlign: "center", fontSize: "10px", color: "var(--text-dim)" }}>
+                    {t.checkDate ? (
+                      <span title={`Check: ${fmt(t.checkAmount)} on ${t.checkDate}`}>
+                        {t.checkDate}
+                      </span>
+                    ) : "\u2014"}
+                  </span>
+                  <div style={{ textAlign: "center" }}>
+                    {t.arCollected ? (
+                      <span style={{
+                        fontSize: "10px", fontWeight: 700, color: "var(--accent-green)",
+                        background: "rgba(34,197,94,0.1)", padding: "3px 8px",
+                        borderRadius: "6px",
+                      }}>
+                        Collected
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setPendingCollect(t)}
+                        style={{
+                          fontSize: "10px", fontWeight: 700, color: "var(--accent-blue)",
+                          background: "rgba(59,130,246,0.1)", padding: "3px 8px",
+                          borderRadius: "6px", border: "none", cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Mark Collected
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center" }}>
+                    <button onClick={() => startEdit(t)} style={{
+                      background: "none", border: "none", cursor: "pointer", padding: "2px",
+                      color: "var(--text-dim)", display: "flex",
+                    }} title="Edit">
+                      <EditIcon />
+                    </button>
+                    <button onClick={() => setPendingDelete(t)} style={{
+                      background: "none", border: "none", cursor: "pointer", padding: "2px",
+                      color: "var(--text-dim)", display: "flex",
+                    }} title="Delete">
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              )
             ))}
           </div>
         </div>
@@ -201,6 +295,16 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected }) {
           confirmLabel="Collect"
           onConfirm={() => { onMarkCollected(pendingCollect.id); setPendingCollect(null); }}
           onCancel={() => setPendingCollect(null)}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete AR Transaction"
+          message={`Delete ${fmt(pendingDelete.totalAmount)} from "${pendingDelete.customerName || "Unknown"}" (Invoice: ${pendingDelete.invoice || "N/A"})? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => { onDeleteSale(pendingDelete.id); setPendingDelete(null); }}
+          onCancel={() => setPendingDelete(null)}
         />
       )}
     </div>
