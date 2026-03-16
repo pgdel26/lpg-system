@@ -984,7 +984,7 @@ export default function GasulTracker() {
       const qty = parseInt(item.qty) || 0;
       const unitCost = parseFloat(item.price) || 0;
       if (qty <= 0) { setPurchaseModalError("Each item must have a quantity of at least 1."); return; }
-      if (unitCost <= 0) { setPurchaseModalError("Each item must have a purchase price."); return; }
+      if (unitCost < 0) { setPurchaseModalError("Each item must have a valid purchase price."); return; }
     }
 
     try {
