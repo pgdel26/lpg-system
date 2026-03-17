@@ -91,7 +91,10 @@ export default function GasulTracker() {
   const [inventory, setInventory] = useState({});
   const [inventoryDate, setInventoryDate] = useState(today());
   const saveTimerRef = useRef({});
+  const saveAllTimerRef = useRef(null);
   const inventoryRef = useRef(inventory);
+  const resolvedInventoryRef = useRef({});
+  const inventorySectionsRef = useRef(inventorySections);
 
   // Daily Sales — { [saleCategory]: { [product]: soldQty } }
   const [sales, setSales] = useState({});
@@ -488,17 +491,30 @@ export default function GasulTracker() {
     }));
   }, []);
 
-  // Keep inventoryRef in sync so debounced saves always use latest state
+  // Keep refs in sync so debounced saves always use latest state
   useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+  useEffect(() => { inventorySectionsRef.current = inventorySections; }, [inventorySections]);
 
   // ---- Save a section to Firestore (debounced) ----
+  // Saves all resolved values including computed END for reporting
   const saveSection = useCallback((sectionKey) => {
     if (saveTimerRef.current[sectionKey]) {
       clearTimeout(saveTimerRef.current[sectionKey]);
     }
     saveTimerRef.current[sectionKey] = setTimeout(async () => {
       const docId = `${inventoryDate}_${sectionKey}`;
-      const items = inventoryRef.current[sectionKey] || {};
+      const rawItems = inventoryRef.current[sectionKey] || {};
+      const resolvedItems = resolvedInventoryRef.current[sectionKey] || {};
+      const section = inventorySectionsRef.current.find((s) => s.key === sectionKey);
+      // Merge raw inventory with resolved values and compute END
+      const items = {};
+      for (const product of Object.keys({ ...rawItems, ...resolvedItems })) {
+        const row = { ...rawItems[product], ...resolvedItems[product] };
+        if (section) {
+          row.end = section.calcEnd(row);
+        }
+        items[product] = row;
+      }
       try {
         await setDoc(doc(db, "dailyInventory", docId), {
           date: inventoryDate, section: sectionKey,
@@ -845,10 +861,26 @@ export default function GasulTracker() {
     return resolved;
   }, [inventory, sales, purchaseTransactions, swaps, refunds, inventoryDate, inventorySections]);
 
+  // Keep resolvedInventoryRef in sync so debounced saves include computed values
+  useEffect(() => { resolvedInventoryRef.current = resolvedInventory; }, [resolvedInventory]);
+
+  // Auto-save all sections when transactions change (keeps END up to date in DB for reports)
+  useEffect(() => {
+    if (saveAllTimerRef.current) clearTimeout(saveAllTimerRef.current);
+    saveAllTimerRef.current = setTimeout(() => {
+      for (const section of inventorySectionsRef.current) {
+        saveSection(section.key);
+      }
+    }, 2000);
+    return () => { if (saveAllTimerRef.current) clearTimeout(saveAllTimerRef.current); };
+  }, [sales, purchaseTransactions, swaps, refunds, saveSection]);
+
   // ---- Initialize today from previous day's data ----
   const initFromPreviousDay = async () => {
     try {
+      // Step 1: Fetch previous day's raw inventory and determine the previous date
       const prevAllItems = {};
+      let prevDate = null;
       for (const section of inventorySections) {
         const q2 = query(
           collection(db, "dailyInventory"),
@@ -858,44 +890,118 @@ export default function GasulTracker() {
           limit(1)
         );
         const snap = await getDocs(q2);
-        prevAllItems[section.key] = snap.empty ? {} : (snap.docs[0].data().items || {});
+        if (!snap.empty) {
+          prevAllItems[section.key] = snap.docs[0].data().items || {};
+          if (!prevDate) prevDate = snap.docs[0].data().date;
+        } else {
+          prevAllItems[section.key] = {};
+        }
       }
 
-      const prevSalesQ = query(
-        collection(db, "dailySales"),
-        where("date", "<", inventoryDate),
-        orderBy("date", "desc"),
-        limit(1)
-      );
-      const prevSalesSnap = await getDocs(prevSalesQ);
-      const prevSales = prevSalesSnap.empty ? {} : (prevSalesSnap.docs[0].data().items || {});
+      if (!prevDate) {
+        setToast({ type: "error", message: "No previous day data found." });
+        return;
+      }
 
+      // Step 2: Fetch previous day's transactions (sales, purchases, swaps, refunds)
+      const [salesSnap, purchasesSnap, swapsSnap, refundsSnap] = await Promise.all([
+        getDocs(query(collection(db, "saleTransactions"), where("date", "==", prevDate))),
+        getDocs(query(collection(db, "purchases"), where("date", "==", prevDate))),
+        getDocs(query(collection(db, "swaps"), where("date", "==", prevDate))),
+        getDocs(query(collection(db, "refunds"), where("date", "==", prevDate))),
+      ]);
+
+      // Aggregate sale counts: { [saleSection]: { [product]: qty } }
+      const saleCounts = {};
+      salesSnap.forEach((d) => {
+        const t = d.data();
+        if (!saleCounts[t.saleSection]) saleCounts[t.saleSection] = {};
+        saleCounts[t.saleSection][t.product] = (saleCounts[t.saleSection][t.product] || 0) + (t.quantity || 1);
+      });
+
+      // Aggregate purchase counts: { [purchaseSection]: { [product]: qty } }
+      const purchaseCounts = {};
+      purchasesSnap.forEach((d) => {
+        const t = d.data();
+        if (!purchaseCounts[t.purchaseSection]) purchaseCounts[t.purchaseSection] = {};
+        purchaseCounts[t.purchaseSection][t.product] = (purchaseCounts[t.purchaseSection][t.product] || 0) + (t.quantity || 0);
+      });
+
+      // Aggregate swap counts
+      const swapToCounts = {};
+      const swapFromCounts = {};
+      swapsSnap.forEach((d) => {
+        const s = d.data();
+        swapToCounts[s.productTo] = (swapToCounts[s.productTo] || 0) + 1;
+        if (cylinderProducts.includes(s.productFrom)) {
+          swapFromCounts[s.productFrom] = (swapFromCounts[s.productFrom] || 0) + 1;
+        }
+      });
+
+      // Aggregate refund counts
+      const refundCounts = {};
+      const refundNonDefectiveCounts = {};
+      refundsSnap.forEach((d) => {
+        (d.data().items || []).forEach((item) => {
+          const qty = parseInt(item.qty) || 1;
+          if (!refundCounts[item.section]) refundCounts[item.section] = {};
+          refundCounts[item.section][item.product] = (refundCounts[item.section][item.product] || 0) + qty;
+          if (!item.defective) {
+            if (!refundNonDefectiveCounts[item.section]) refundNonDefectiveCounts[item.section] = {};
+            refundNonDefectiveCounts[item.section][item.product] = (refundNonDefectiveCounts[item.section][item.product] || 0) + qty;
+          }
+        });
+      });
+
+      // Step 3: Resolve all columns (same logic as resolvedInventory)
+      const resolved = {};
+      // Pass 1: merge raw inventory with transaction-sourced values
       for (const section of inventorySections) {
+        resolved[section.key] = {};
         for (const product of section.products) {
-          if (!prevAllItems[section.key][product]) prevAllItems[section.key][product] = {};
+          const row = { ...(prevAllItems[section.key]?.[product] || {}) };
           for (const col of section.columns) {
             if (col.salesSource) {
-              prevAllItems[section.key][product][col.field] = (prevSales[col.salesSource] || {})[product] || 0;
+              row[col.field] = (saleCounts[col.salesSource] || {})[product] || 0;
+            }
+            if (col.purchaseSource) {
+              const sources = Array.isArray(col.purchaseSource) ? col.purchaseSource : [col.purchaseSource];
+              row[col.field] = sources.reduce((sum, src) => sum + ((purchaseCounts[src] || {})[product] || 0), 0);
+            }
+            if (col.swapSource === "to") {
+              row[col.field] = swapToCounts[product] || 0;
+            }
+            if (col.swapSource === "from") {
+              row[col.field] = swapFromCounts[product] || 0;
+            }
+            if (col.refundSource) {
+              const src = col.refundSource;
+              const counts = src.defective === false ? refundNonDefectiveCounts : refundCounts;
+              row[col.field] = (counts[src.section] || {})[product] || 0;
+            }
+          }
+          resolved[section.key][product] = row;
+        }
+      }
+      // Pass 2: resolve cross-section sources
+      for (const section of inventorySections) {
+        for (const product of section.products) {
+          for (const col of section.columns) {
+            if (col.source) {
+              const srcRow = resolved[col.source.section]?.[product] || {};
+              resolved[section.key][product][col.field] = srcRow[col.source.field] || 0;
             }
           }
         }
       }
 
+      // Step 4: Calculate END and set as new BEG (prefer AUD over END)
       for (const section of inventorySections) {
-        const prevItems = prevAllItems[section.key] || {};
         const newItems = {};
-
         for (const product of section.products) {
-          const prev = { ...(prevItems[product] || {}) };
-          for (const col of section.columns) {
-            if (col.source) {
-              const srcItems = prevAllItems[col.source.section] || {};
-              const srcRow = srcItems[product] || {};
-              prev[col.field] = srcRow[col.source.field] || 0;
-            }
-          }
-          const prevEnd = section.calcEnd(prev);
-          const prevAud = prev.aud;
+          const row = resolved[section.key][product] || {};
+          const prevEnd = section.calcEnd(row);
+          const prevAud = row.aud;
           const beg = (prevAud != null && prevAud !== "") ? parseFloat(prevAud) || 0 : prevEnd;
           newItems[product] = { beg };
         }
