@@ -91,6 +91,7 @@ export default function GasulTracker() {
   const [inventory, setInventory] = useState({});
   const [inventoryDate, setInventoryDate] = useState(today());
   const saveTimerRef = useRef({});
+  const inventoryRef = useRef(inventory);
 
   // Daily Sales — { [saleCategory]: { [product]: soldQty } }
   const [sales, setSales] = useState({});
@@ -487,6 +488,9 @@ export default function GasulTracker() {
     }));
   }, []);
 
+  // Keep inventoryRef in sync so debounced saves always use latest state
+  useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+
   // ---- Save a section to Firestore (debounced) ----
   const saveSection = useCallback((sectionKey) => {
     if (saveTimerRef.current[sectionKey]) {
@@ -494,7 +498,7 @@ export default function GasulTracker() {
     }
     saveTimerRef.current[sectionKey] = setTimeout(async () => {
       const docId = `${inventoryDate}_${sectionKey}`;
-      const items = inventory[sectionKey] || {};
+      const items = inventoryRef.current[sectionKey] || {};
       try {
         await setDoc(doc(db, "dailyInventory", docId), {
           date: inventoryDate, section: sectionKey,
@@ -505,7 +509,7 @@ export default function GasulTracker() {
         setToast({ type: "error", message: "Failed to save. Check connection." });
       }
     }, 500);
-  }, [inventoryDate, inventory]);
+  }, [inventoryDate]);
 
   // ---- Add Customer ----
   const handleAddCustomer = async () => {
