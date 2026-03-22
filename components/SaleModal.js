@@ -334,20 +334,33 @@ export default function SaleModal({
           <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Payment Type
           </label>
-          <select
-            value={payment}
-            onChange={(e) => setPayment(e.target.value)}
-            style={{
-              width: "100%", padding: "8px 12px", borderRadius: "8px",
-              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
-              fontFamily: "inherit", cursor: "pointer",
-            }}
-          >
-            <option value="cash">Cash</option>
-            <option value="gcash">GCash</option>
-            <option value="ar">Accounts Receivable</option>
-          </select>
+          <div style={{ display: "flex", gap: "0", borderRadius: "10px", overflow: "hidden", border: "1px solid var(--border-light)" }}>
+            {[
+              { value: "cash", label: "Cash", color: "#22c55e", bg: "rgba(34,197,94,0.10)" },
+              { value: "gcash", label: "GCash", color: "#3b82f6", bg: "rgba(59,130,246,0.10)" },
+              { value: "ar", label: "AR", color: "#f59e42", bg: "rgba(245,158,66,0.10)" },
+            ].map((opt, i) => {
+              const isActive = payment === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPayment(opt.value)}
+                  style={{
+                    flex: 1, padding: "9px 0", border: "none",
+                    borderRight: i < 2 ? "1px solid var(--border-light)" : "none",
+                    cursor: "pointer", fontSize: "12px", fontWeight: isActive ? 700 : 500,
+                    fontFamily: "inherit", transition: "all 0.15s ease",
+                    background: isActive ? opt.bg : "rgba(241,245,249,0.5)",
+                    color: isActive ? opt.color : "var(--text-dim)",
+                    boxShadow: isActive ? `inset 0 -2px 0 ${opt.color}` : "none",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Post-dated check (AR only) */}

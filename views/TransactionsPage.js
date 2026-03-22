@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { fmt, today } from "../lib/utils";
 import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon, XIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
@@ -16,6 +16,7 @@ export default function TransactionsPage({
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
+  onNavigate,
 }) {
   const [subTab, setSubTab] = useState("report");
   const [editingId, setEditingId] = useState(null);
@@ -45,22 +46,181 @@ export default function TransactionsPage({
   const refundTotal = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const grandTotal = totalRevenue + swapTotal - refundTotal;
 
-  const exportSales = () => {
-    const rows = sorted.map((t) => ({
-      "Invoice": t.invoice || "",
-      "Customer": t.customerName || "",
-      "Product": t.product || "",
-      "Type": saleTypeLabel(t.saleSection),
-      "Qty": t.quantity || 1,
-      "SRP": t.srp || 0,
-      "Discount": t.discount || 0,
-      "Total": t.totalAmount || t.finalPrice || 0,
-      "Payment": t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR",
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+  const exportFullReport = () => {
+    const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
+      + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
+    const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
+    const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
+    const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
+    const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+    const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+    const expectedCashRemit = netSales - totalAR - totalGCash;
+    const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
+    const diff = actual - expectedCashRemit;
+    const cashierName = dailyReport?.cashier ? ((staff || []).find((s) => s.id === dailyReport.cashier)?.name || "") : "";
+    const assignedStaff = (dailyReport?.staff || []).map((id) => (staff || []).find((s) => s.id === id)).filter(Boolean);
+    const hasCashOnHand = dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== "";
+
+    // Style helpers
+    const boldSz = (sz) => ({ font: { bold: true, sz } });
+    const sectionHeader = { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "left" } };
+    const tableHeader = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "E2E8F0" } }, border: { bottom: { style: "thin", color: { rgb: "94A3B8" } } } };
+    const totalRowStyle = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "F1F5F9" } }, border: { top: { style: "thin", color: { rgb: "94A3B8" } } } };
+    const numFmt = '#,##0.00';
+
+    const sectionRows = [];
+    const tableHeaderRows = [];
+    const totalRows = [];
+
+    const data = [];
+    const merges = [];
+    let r;
+
+    // === HEADER ===
+    data.push(["DAILY SALES REPORT"]);
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
+    data.push([`Date: ${inventoryDate}`]);
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } });
+    data.push([]);
+
+    // === SECTION 1: Staff on Duty ===
+    r = data.length;
+    data.push(["STAFF ON DUTY"]);
+    sectionRows.push(r);
+    merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+    r = data.length;
+    data.push(["Role", "Name"]);
+    tableHeaderRows.push(r);
+    data.push(["Cashier", cashierName || "—"]);
+    assignedStaff.forEach((s) => {
+      data.push(["Staff", `${s.name}${s.role ? ` (${s.role})` : ""}`]);
+    });
+    if (assignedStaff.length === 0) data.push(["Staff", "—"]);
+    data.push([]);
+
+    // === SECTION 2: Sales Daily Breakdown ===
+    r = data.length;
+    data.push(["SALES DAILY BREAKDOWN"]);
+    sectionRows.push(r);
+    merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+    r = data.length;
+    data.push(["", "Amount"]);
+    tableHeaderRows.push(r);
+    data.push(["Gross Sales", grossSales]);
+    data.push(["Discounts", totalDiscount > 0 ? -totalDiscount : 0]);
+    data.push(["Expenses", totalExpenses > 0 ? -totalExpenses : 0]);
+    data.push(["Refunds", totalRefunds > 0 ? -totalRefunds : 0]);
+    r = data.length;
+    data.push(["Net Sales", netSales]);
+    totalRows.push(r);
+    data.push([]);
+    data.push(["Accounts Receivable", totalAR > 0 ? -totalAR : 0]);
+    data.push(["GCash", totalGCash > 0 ? -totalGCash : 0]);
+    r = data.length;
+    data.push(["Expected Cash Remit", expectedCashRemit]);
+    totalRows.push(r);
+    data.push([]);
+    data.push(["Cash On Hand", hasCashOnHand ? actual : ""]);
+    if (hasCashOnHand) {
+      r = data.length;
+      data.push([diff < 0 ? "Short" : diff > 0 ? "Over" : "Short / Over", diff]);
+      totalRows.push(r);
+    }
+    data.push([]);
+
+    // === SECTION 3: Expenses ===
+    r = data.length;
+    data.push(["EXPENSES"]);
+    sectionRows.push(r);
+    merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+    if ((expenses || []).length > 0) {
+      r = data.length;
+      data.push(["Description", "Amount"]);
+      tableHeaderRows.push(r);
+      (expenses || []).forEach((e) => {
+        data.push([e.description || "", e.amount || 0]);
+      });
+      r = data.length;
+      data.push(["Total Expenses", totalExpenses]);
+      totalRows.push(r);
+    } else {
+      data.push(["No expenses recorded.", ""]);
+    }
+    data.push([]);
+
+    // === SECTION 4: Daily Sales ===
+    r = data.length;
+    data.push(["DAILY SALES"]);
+    sectionRows.push(r);
+    merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+    if (sorted.length > 0 || swaps.length > 0 || (refunds || []).length > 0) {
+      r = data.length;
+      data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Total", "Payment"]);
+      tableHeaderRows.push(r);
+      sorted.forEach((t) => {
+        data.push([
+          t.invoice || "", t.customerName || "", t.product || "",
+          saleTypeLabel(t.saleSection), t.quantity || 1, t.srp || 0,
+          t.discount || 0, t.totalAmount || t.finalPrice || 0,
+          t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR",
+        ]);
+      });
+      swaps.forEach((s) => {
+        data.push([
+          "", s.customerName || "", `${s.productFrom} → ${s.productTo}`,
+          "Swap", 1, s.price || 0, 0, s.price || 0, "Cash",
+        ]);
+      });
+      (refunds || []).forEach((rf) => {
+        data.push([
+          rf.invoice || "", rf.customerName || "",
+          (rf.items || []).map((it) => it.product).join(", "),
+          "Refund", (rf.items || []).reduce((sum, it) => sum + (it.qty || 0), 0),
+          "", "", -(rf.totalRefund || 0), "",
+        ]);
+      });
+      const salesTotalDiscount = sorted.reduce((sum, t) => sum + (t.discount || 0), 0);
+      const salesTotalAmount = sorted.reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0)
+        + swaps.reduce((sum, s) => sum + (s.price || 0), 0)
+        - (refunds || []).reduce((sum, rf) => sum + (rf.totalRefund || 0), 0);
+      r = data.length;
+      data.push(["", "", "", "", "", "", salesTotalDiscount, salesTotalAmount, ""]);
+      totalRows.push(r);
+    } else {
+      data.push(["No sales recorded.", "", "", "", "", "", "", "", ""]);
+    }
+
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws["!merges"] = merges;
+    ws["!cols"] = [
+      { wch: 22 }, { wch: 20 }, { wch: 24 }, { wch: 14 },
+      { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+    ];
+
+    // Apply styles
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[addr]) continue;
+        if (R === 0) ws[addr].s = boldSz(16);
+        else if (R === 1) ws[addr].s = boldSz(12);
+        else if (sectionRows.includes(R)) ws[addr].s = sectionHeader;
+        else if (tableHeaderRows.includes(R)) ws[addr].s = tableHeader;
+        else if (totalRows.includes(R)) {
+          ws[addr].s = { ...totalRowStyle };
+          if (typeof ws[addr].v === "number") ws[addr].s.numFmt = numFmt;
+        } else if (typeof ws[addr].v === "number") {
+          ws[addr].s = { numFmt };
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sales");
-    XLSX.writeFile(wb, `Sales_${inventoryDate}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+    XLSX.writeFile(wb, `Sales_Report_${inventoryDate}.xlsx`);
   };
 
   const startEdit = (type, item) => {
@@ -204,37 +364,7 @@ export default function TransactionsPage({
                 </button>
               )}
               <button
-                onClick={() => {
-                  const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
-                  const diff = actual - expectedCashRemit;
-                  const cashierName = dailyReport?.cashier ? ((staff || []).find((s) => s.id === dailyReport.cashier)?.name || "") : "";
-                  const staffNames = (dailyReport?.staff || []).map((id) => ((staff || []).find((s) => s.id === id)?.name || "")).filter(Boolean).join(", ");
-                  const rows = [
-                    { "Item": "Date", "Amount": inventoryDate },
-                    { "Item": "Cashier", "Amount": cashierName || "—" },
-                    { "Item": "Staff", "Amount": staffNames || "—" },
-                    { "Item": "", "Amount": "" },
-                    { "Item": "Gross Sales", "Amount": grossSales },
-                    { "Item": "Discounts", "Amount": totalDiscount > 0 ? -totalDiscount : 0 },
-                    { "Item": "Expenses", "Amount": totalExpenses > 0 ? -totalExpenses : 0 },
-                    { "Item": "Refunds", "Amount": totalRefunds > 0 ? -totalRefunds : 0 },
-                    { "Item": "Net Sales", "Amount": netSales },
-                    { "Item": "", "Amount": "" },
-                    { "Item": "Accounts Receivable", "Amount": totalAR > 0 ? -totalAR : 0 },
-                    { "Item": "GCash", "Amount": totalGCash > 0 ? -totalGCash : 0 },
-                    { "Item": "Expected Cash Remit", "Amount": expectedCashRemit },
-                    { "Item": "", "Amount": "" },
-                    { "Item": "Cash On Hand", "Amount": dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== "" ? actual : "" },
-                    ...(dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== ""
-                      ? [{ "Item": diff < 0 ? "Short" : diff > 0 ? "Over" : "Short / Over", "Amount": diff }]
-                      : []),
-                  ];
-                  const ws = XLSX.utils.json_to_sheet(rows);
-                  ws["!cols"] = [{ wch: 25 }, { wch: 20 }];
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
-                  XLSX.writeFile(wb, `Sales_Report_${inventoryDate}.xlsx`);
-                }}
+                onClick={exportFullReport}
                 style={{
                   marginLeft: "auto", padding: "10px 16px", borderRadius: "10px",
                   border: "1px solid var(--border-light)", background: "transparent",
@@ -708,7 +838,31 @@ export default function TransactionsPage({
         )}
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
           <button
-            onClick={exportSales}
+            onClick={() => onOpenSaleModal()}
+            style={{
+              padding: "10px 20px", borderRadius: "10px", border: "none",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+              background: "var(--accent-blue)", color: "#fff",
+              fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
+              boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+            }}
+          >
+            <PlusIcon /> Add Sale
+          </button>
+          <button
+            onClick={() => onNavigate("inventory")}
+            style={{
+              padding: "10px 20px", borderRadius: "10px", border: "none",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+              background: "var(--accent-blue)", color: "#fff",
+              fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
+              boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+            }}
+          >
+            View Inventory
+          </button>
+          <button
+            onClick={exportFullReport}
             disabled={sorted.length === 0}
             style={{
               padding: "10px 16px", borderRadius: "10px",
@@ -721,18 +875,6 @@ export default function TransactionsPage({
             }}
           >
             <DownloadIcon /> Export
-          </button>
-          <button
-            onClick={() => onOpenSaleModal()}
-            style={{
-              padding: "10px 20px", borderRadius: "10px", border: "none",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
-              background: "var(--accent-blue)", color: "#fff",
-              fontSize: "13px", fontWeight: 700, fontFamily: "inherit",
-              boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
-            }}
-          >
-            <PlusIcon /> Add Sale
           </button>
         </div>
       </div>

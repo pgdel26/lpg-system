@@ -1,56 +1,14 @@
 import React from "react";
-import { fmt, today } from "../lib/utils";
-import { CopyIcon } from "../components/Icons";
 import InventoryTable from "../components/InventoryTable";
 
 export default function InventoryPage({
-  inventoryDate, setInventoryDate,
+  inventoryDate,
   resolvedInventory, totalCylinderData,
   inventorySections,
-  onInventoryChange, onSaveSection, onInitFromPreviousDay,
+  onInventoryChange, onSaveSection,
 }) {
   return (
     <div className="animate-fade">
-      {/* Date selector + actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <input
-          type="date"
-          value={inventoryDate}
-          onChange={(e) => setInventoryDate(e.target.value)}
-          style={{
-            padding: "8px 12px", borderRadius: "8px",
-            background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-            color: "var(--text-secondary)", fontSize: "13px",
-            fontFamily: "var(--font-mono)", outline: "none",
-          }}
-        />
-        <button
-          onClick={onInitFromPreviousDay}
-          style={{
-            padding: "8px 14px", borderRadius: "8px", border: "none",
-            cursor: "pointer", background: "rgba(241,245,249,0.8)",
-            color: "var(--text-muted)", fontSize: "12px", fontWeight: 600,
-            fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px",
-            transition: "all 0.15s",
-          }}
-        >
-          <CopyIcon /> Load BEG from Previous Day
-        </button>
-        {inventoryDate !== today() && (
-          <button
-            onClick={() => setInventoryDate(today())}
-            style={{
-              padding: "8px 14px", borderRadius: "8px", border: "none",
-              cursor: "pointer", background: "rgba(37,99,235,0.1)",
-              color: "var(--accent-blue)", fontSize: "12px", fontWeight: 600,
-              fontFamily: "inherit",
-            }}
-          >
-            Go to Today
-          </button>
-        )}
-      </div>
-
       {/* Inventory sections */}
       {inventorySections.map((section) => (
         <div key={section.key} style={{ marginBottom: "28px" }}>
@@ -103,7 +61,7 @@ export default function InventoryPage({
                 }}>Product</th>
                 <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>BEG</th>
                 <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>END</th>
-                <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>VAR</th>
+                <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>DIFF</th>
               </tr>
             </thead>
             <tbody>

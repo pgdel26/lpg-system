@@ -3,6 +3,9 @@ import React from "react";
 export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection }) {
   const { columns, products, calcEnd, subgroups } = section;
 
+  const hasAudit = Object.values(data).some((row) => row.aud != null && row.aud !== "");
+  const visibleColumns = hasAudit ? columns : columns.filter((col) => !col.auditSource && col.field !== "var");
+
   const getMergedRow = (product) => {
     const row = { ...(data[product] || {}) };
     for (const col of columns) {
@@ -85,7 +88,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
           }}>
             {product}
           </td>
-          {columns.map((col) => {
+          {visibleColumns.map((col) => {
             if (col.field === "end") {
               return (
                 <td key={col.field} style={cellStyle(true)}>
@@ -148,6 +151,14 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
                 </td>
               );
             }
+            if (col.field === "beg") {
+              const begVal = mergedRow[col.field];
+              return (
+                <td key={col.field} style={sourcedCellStyle} title="Beginning inventory">
+                  {begVal != null && begVal !== "" && begVal !== 0 ? begVal : "—"}
+                </td>
+              );
+            }
             const val = mergedRow[col.field];
             return (
               <td key={col.field} style={{ padding: "2px 2px" }}>
@@ -169,7 +180,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
 
   return (
     <div style={{ overflowX: "auto", borderRadius: "12px", border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: `${120 + columns.length * 80}px` }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: `${120 + visibleColumns.length * 80}px` }}>
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
             <th style={{
@@ -180,7 +191,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
             }}>
               Product
             </th>
-            {columns.map((col) => (
+            {visibleColumns.map((col) => (
               <th key={col.field} style={{
                 padding: "8px 4px", textAlign: "center", fontSize: "10px",
                 fontWeight: 600,
@@ -199,7 +210,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
               <React.Fragment key={sg.label}>
                 <tr>
                   <td
-                    colSpan={columns.length + 1}
+                    colSpan={visibleColumns.length + 1}
                     style={{
                       padding: "6px 12px", fontSize: "10px", fontWeight: 700,
                       color: "var(--text-dim)", textTransform: "uppercase",
