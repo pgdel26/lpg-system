@@ -7,6 +7,7 @@
 (async () => {
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js");
   const { getFirestore, doc, getDoc, setDoc, Timestamp } = await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js");
+  const { getAuth, signInWithPopup, GoogleAuthProvider } = await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js");
 
   const app = initializeApp({
     apiKey: "AIzaSyAQlnug8U_CvnyODtaT3unNvLY0FjQvPr8",
@@ -17,6 +18,10 @@
     appId: "1:473215094403:web:0334f6366587cbdf8215b6",
   }, "fix-beg-script");
   const db = getFirestore(app);
+  const auth = getAuth(app);
+  console.log("Signing in...");
+  await signInWithPopup(auth, new GoogleAuthProvider());
+  console.log("Signed in!");
 
   // Get today and yesterday in YYYY-MM-DD (Philippine Time)
   const toDateStr = (d) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });

@@ -572,6 +572,8 @@ export default function GasulTracker() {
       const docId = `${inventoryDate}_${sectionKey}`;
       const rawItems = inventoryRef.current[sectionKey] || {};
       const resolvedItems = resolvedInventoryRef.current[sectionKey] || {};
+      // Skip saving if we have no data for this section yet (avoids wiping BEG from daily script)
+      if (Object.keys(rawItems).length === 0 && Object.keys(resolvedItems).length === 0) return;
       const section = inventorySectionsRef.current.find((s) => s.key === sectionKey);
       // Merge raw inventory with resolved values and compute END
       const items = {};
