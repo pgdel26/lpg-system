@@ -180,8 +180,9 @@ export default function GasulTracker() {
     return () => unsub();
   }, []);
 
-  // ---- FIREBASE: Products listener ----
+  // ---- FIREBASE: Products listener (only after auth) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       const prodMap = {};
       snapshot.forEach((d) => { prodMap[d.id] = d.data(); });
@@ -189,7 +190,7 @@ export default function GasulTracker() {
       setLoading(false);
     });
     return () => unsubProducts();
-  }, []);
+  }, [authUser]);
 
   // ---- Seed products if empty ----
   useEffect(() => {
@@ -213,6 +214,7 @@ export default function GasulTracker() {
   // ---- FIREBASE: Daily inventory listener ----
   // Section keys are stable ("full", "empty", "accessories") regardless of product list
   useEffect(() => {
+    if (!authUser) return;
     const sectionKeys = ["full", "empty", "accessories"];
     const unsubscribers = sectionKeys.map((sectionKey) => {
       const docId = `${inventoryDate}_${sectionKey}`;
@@ -231,11 +233,12 @@ export default function GasulTracker() {
       });
     });
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // ---- Client-side BEG fallback: use previous day's saved END if BEG is missing ----
   const begFallbackRanRef = useRef(null);
   useEffect(() => {
+    if (!authUser) return;
     begFallbackRanRef.current = null;
     const sectionKeys = ["full", "empty", "accessories"];
     const prevDate = (() => {
@@ -285,19 +288,20 @@ export default function GasulTracker() {
       }
     }, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // Note: dailySales is a legacy collection no longer written to by this app.
   // Sales state is now derived entirely from saleTransactions (see listener below).
 
   // ---- FIREBASE: Pricebooks listener ----
   useEffect(() => {
+    if (!authUser) return;
     const q = query(collection(db, "pricebooks"), orderBy("effectiveDate", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setPricebooks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- Derive active pricebook ----
   useEffect(() => {
@@ -397,6 +401,7 @@ export default function GasulTracker() {
 
   // ---- FIREBASE: Customers listener ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "customers"), orderBy("name", "asc")),
       (snapshot) => {
@@ -406,10 +411,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- FIREBASE: Swaps listener (by date) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "swaps"), where("date", "==", inventoryDate), orderBy("createdAt", "desc")),
       (snapshot) => {
@@ -419,10 +425,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // ---- FIREBASE: Purchases listener (all recent) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "purchases"), orderBy("createdAt", "desc"), limit(100)),
       (snapshot) => {
@@ -432,10 +439,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- FIREBASE: Sale transactions listener (by date) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "saleTransactions"), where("date", "==", inventoryDate), orderBy("createdAt", "desc")),
       (snapshot) => {
@@ -453,7 +461,7 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // Refunds for the current date (derived from allRefunds)
   const refunds = useMemo(() =>
@@ -463,6 +471,7 @@ export default function GasulTracker() {
 
   // ---- FIREBASE: All refunds listener (for Refunds tab) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       collection(db, "refunds"),
       (snapshot) => {
@@ -473,10 +482,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- FIREBASE: AR transactions listener (all AR sales) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "saleTransactions"), where("paymentType", "==", "ar")),
       (snapshot) => {
@@ -487,10 +497,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- FIREBASE: Expenses listener (by date) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "expenses"), where("date", "==", inventoryDate)),
       (snapshot) => {
@@ -501,10 +512,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // ---- FIREBASE: Staff listener ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       query(collection(db, "staff"), orderBy("name", "asc")),
       (snapshot) => {
@@ -514,10 +526,11 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [authUser]);
 
   // ---- FIREBASE: Daily staff assignment listener (by date) ----
   useEffect(() => {
+    if (!authUser) return;
     const unsub = onSnapshot(
       doc(db, "dailyReport", inventoryDate),
       (snapshot) => {
@@ -529,7 +542,7 @@ export default function GasulTracker() {
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, authUser]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((sectionKey, product, field, value) => {
