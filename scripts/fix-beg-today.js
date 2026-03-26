@@ -1,7 +1,9 @@
 /**
- * Fix BEG for today — run with: node scripts/fix-beg-today.js
+ * Fix BEG for a given date — run with:
+ *   node scripts/fix-beg-today.js            # fixes today
+ *   node scripts/fix-beg-today.js 2026-03-25  # fixes a specific date
  *
- * Sets today's BEG = yesterday's AUD (if exists) or yesterday's END.
+ * Sets the target date's BEG = previous day's AUD (if exists) or previous day's END.
  * Uses Firebase Admin SDK to bypass Firestore security rules.
  */
 
@@ -21,13 +23,14 @@ const db = admin.firestore();
 db.settings({ preferRest: true });
 
 (async () => {
-  // Get today and yesterday in YYYY-MM-DD (Philippine Time)
+  // Get target date and previous day in YYYY-MM-DD (Philippine Time)
   const toDateStr = (d) =>
     d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
-  const todayDate = toDateStr(new Date());
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const prevDate = toDateStr(yesterday);
+  const argDate = process.argv[2]; // optional: YYYY-MM-DD
+  const todayDate = argDate || toDateStr(new Date());
+  const targetDay = new Date(todayDate + "T00:00:00+08:00");
+  targetDay.setDate(targetDay.getDate() - 1);
+  const prevDate = toDateStr(targetDay);
 
   console.log(`Fixing BEG for ${todayDate} using END/AUD from ${prevDate}...`);
 
