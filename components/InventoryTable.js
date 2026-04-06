@@ -1,10 +1,9 @@
 import React from "react";
 
-export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection }) {
+export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection, showAudit = true }) {
   const { columns, products, calcEnd, subgroups } = section;
 
-  const hasAudit = Object.values(data).some((row) => row.aud != null && row.aud !== "");
-  const visibleColumns = hasAudit ? columns : columns.filter((col) => !col.auditSource && col.field !== "var");
+  const visibleColumns = showAudit ? columns : columns.filter((col) => !col.auditSource && col.field !== "var");
 
   const getMergedRow = (product) => {
     const row = { ...(data[product] || {}) };
@@ -59,12 +58,6 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
     color: "var(--accent-blue)", background: "rgba(59,130,246,0.04)",
   };
 
-  const auditCellStyle = {
-    padding: "4px 6px", textAlign: "center", fontSize: "12px",
-    fontFamily: "var(--font-mono)", fontWeight: 600,
-    color: "#22c55e", background: "rgba(34,197,94,0.04)",
-  };
-
   const inputStyle = {
     width: "100%", padding: "4px 4px", textAlign: "center", fontSize: "12px",
     fontFamily: "var(--font-mono)", background: "transparent",
@@ -80,11 +73,25 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
       const varVal = getVarValue(product);
 
       return (
-        <tr key={product} style={{ borderBottom: "1px solid rgba(15,23,42,0.04)" }}>
+        <tr
+          key={product}
+          style={{ borderBottom: "1px solid rgba(15,23,42,0.04)", transition: "background 0.1s" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(37,99,235,0.04)";
+            const sticky = e.currentTarget.querySelector("td");
+            if (sticky) sticky.style.background = "rgba(226,232,240,0.95)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "";
+            const sticky = e.currentTarget.querySelector("td");
+            if (sticky) sticky.style.background = "var(--bg-secondary)";
+          }}
+        >
           <td style={{
             padding: "6px 12px", fontSize: "12px", fontWeight: 600,
             color: "var(--text-secondary)", whiteSpace: "nowrap",
             position: "sticky", left: 0, background: "var(--bg-secondary)", zIndex: 2,
+            transition: "background 0.1s",
           }}>
             {product}
           </td>
@@ -146,8 +153,20 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
             if (col.auditSource) {
               const audVal = mergedRow[col.field];
               return (
-                <td key={col.field} style={auditCellStyle} title="From Audit">
-                  {audVal != null && audVal !== "" ? audVal : "—"}
+                <td key={col.field} style={{ padding: "2px 2px" }}>
+                  <input
+                    type="number"
+                    value={audVal != null && audVal !== "" ? audVal : ""}
+                    placeholder="—"
+                    onChange={(e) => handleCellChange(product, col.field, e.target.value)}
+                    onFocus={(e) => { e.target.style.borderColor = "rgba(34,197,94,0.4)"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "transparent"; onSaveSection(section.key); }}
+                    style={{
+                      ...inputStyle,
+                      color: "#22c55e",
+                      fontWeight: 600,
+                    }}
+                  />
                 </td>
               );
             }

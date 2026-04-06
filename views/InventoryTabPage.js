@@ -3,7 +3,7 @@ import * as XLSX from "xlsx-js-style";
 import InventoryPage from "./InventoryPage";
 import AuditPage from "./AuditPage";
 import InventoryTable from "../components/InventoryTable";
-import { DownloadIcon, PlusIcon, XIcon } from "../components/Icons";
+import { DownloadIcon } from "../components/Icons";
 import { db } from "../lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { today } from "../lib/utils";
@@ -33,11 +33,8 @@ export default function InventoryTabPage({
   const [rangeEndDate, setRangeEndDate] = useState("");
   const [rangeInventory, setRangeInventory] = useState(null);
   const [rangeLoading, setRangeLoading] = useState(false);
-  const [auditModalOpen, setAuditModalOpen] = useState(false);
-  const [auditSelected, setAuditSelected] = useState(new Set());
-  const [auditSearch, setAuditSearch] = useState("");
-  const [auditDropdownOpen, setAuditDropdownOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [showAudit, setShowAudit] = useState(true);
   const [rangeDailyData, setRangeDailyData] = useState(null);
   const exportBtnRef = useRef(null);
 
@@ -132,12 +129,12 @@ export default function InventoryTabPage({
     r = data.length;
     data.push(["TOTAL CYLINDER (Full + Empty)"]);
     sectionRows.push(r);
-    merges.push({ s: { r, c: 0 }, e: { r, c: 3 } });
+    merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
     r = data.length;
-    data.push(["Product", "BEG", "END", "DIFF"]);
+    data.push(["Product", "BEG", "END"]);
     tableHeaderRows.push(r);
     for (const row of totalCylinderData) {
-      data.push([row.product, row.beg, row.end, row.var != null ? row.var : ""]);
+      data.push([row.product, row.beg, row.end]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -241,19 +238,16 @@ export default function InventoryTabPage({
         r = data.length;
         data.push(["TOTAL CYLINDER (Full + Empty)"]);
         sectionRows.push(r);
-        merges.push({ s: { r, c: 0 }, e: { r, c: 3 } });
+        merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
         r = data.length;
-        data.push(["Product", "BEG", "END", "DIFF"]);
+        data.push(["Product", "BEG", "END"]);
         tableHeaderRows.push(r);
         for (const product of fullSection.products) {
           const fr = (dayData.full || {})[product] || {};
           const er = (dayData.empty || {})[product] || {};
           const beg = (fr.beg || 0) + (er.beg || 0);
           const end = fullSection.calcEnd(fr) + emptySection.calcEnd(er);
-          const fAud = fr.aud != null && fr.aud !== "" ? parseFloat(fr.aud) || 0 : null;
-          const eAud = er.aud != null && er.aud !== "" ? parseFloat(er.aud) || 0 : null;
-          const varVal = (fAud != null && eAud != null) ? (fAud + eAud) - end : null;
-          data.push([product, beg, end, varVal != null ? varVal : ""]);
+          data.push([product, beg, end]);
         }
       }
 
@@ -619,28 +613,18 @@ export default function InventoryTabPage({
                   )}
                 </div>
                 <button
-                  onClick={() => {
-                    const existing = new Set();
-                    inventorySections.forEach((s) => {
-                      const sectionData = inventory?.[s.key] || {};
-                      Object.entries(sectionData).forEach(([product, row]) => {
-                        if (row.aud != null && row.aud !== "") existing.add(`${s.key}:${product}`);
-                      });
-                    });
-                    setAuditSelected(existing);
-                    setAuditSearch("");
-                    setAuditDropdownOpen(false);
-                    setAuditModalOpen(true);
-                  }}
+                  onClick={() => setShowAudit((v) => !v)}
                   style={{
                     padding: "6px 14px", borderRadius: "8px", border: "none",
+                    background: showAudit ? "#16a34a" : "#22c55e",
                     cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
-                    background: "#22c55e", color: "#fff",
+                    color: "#fff",
                     fontSize: "12px", fontWeight: 700, fontFamily: "inherit",
                     boxShadow: "0 2px 8px rgba(34,197,94,0.3)",
+                    transition: "all 0.15s",
                   }}
                 >
-                  <PlusIcon /> Add Audit
+                  {showAudit ? "Hide" : "Show"} Audit
                 </button>
               </div>
             </div>
@@ -655,6 +639,7 @@ export default function InventoryTabPage({
                 onInventoryChange={onInventoryChange}
                 onSaveSection={onSaveSection}
                 inventory={inventory}
+                showAudit={showAudit}
               />
             )}
 
@@ -760,303 +745,6 @@ export default function InventoryTabPage({
               </div>
             )}
 
-            {/* Audit Modal */}
-            {auditModalOpen && (() => {
-              const allProducts = inventorySections.flatMap((s) =>
-                s.products.map((p) => ({ sectionKey: s.key, sectionLabel: s.label, sectionColor: s.color, product: p, key: `${s.key}:${p}` }))
-              );
-              const searchLower = auditSearch.toLowerCase();
-              const suggestions = auditDropdownOpen
-                ? allProducts.filter((p) => !auditSelected.has(p.key) && (!auditSearch || p.product.toLowerCase().includes(searchLower)))
-                : [];
-              const allSelected = allProducts.every((p) => auditSelected.has(p.key));
-
-              const handleAddProduct = (key) => {
-                setAuditSelected((prev) => new Set([...prev, key]));
-                setAuditSearch("");
-                setAuditDropdownOpen(false);
-              };
-              const handleRemoveProduct = (key) => {
-                setAuditSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
-              };
-              const handleShowAll = () => {
-                setAuditSelected(new Set(allProducts.map((p) => p.key)));
-                setAuditSearch("");
-              };
-
-              const handleAudChange = (sectionKey, product, value) => {
-                const numVal = value === "" ? "" : parseFloat(value) || 0;
-                onInventoryChange(sectionKey, product, "aud", numVal);
-              };
-              const handleReasonChange = (sectionKey, product, value) => {
-                onInventoryChange(sectionKey, product, "audReason", value);
-              };
-              const handleSaveAndClose = () => {
-                inventorySections.forEach((s) => onSaveSection(s.key));
-                setAuditModalOpen(false);
-              };
-
-              return (
-                <div
-                  style={{
-                    position: "fixed", inset: 0, zIndex: 1000,
-                    background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                  onClick={(e) => { if (e.target === e.currentTarget) handleSaveAndClose(); }}
-                >
-                  <div style={{
-                    background: "var(--bg-secondary)", borderRadius: "16px",
-                    border: "1px solid var(--border)", padding: "24px",
-                    width: "100%", maxWidth: "640px",
-                    boxShadow: "0 20px 60px rgba(15,23,42,0.12)",
-                    maxHeight: "90vh", overflowY: "auto",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                      <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        Audit Inventory
-                      </h3>
-                      <button
-                        onClick={handleSaveAndClose}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex" }}
-                      >
-                        <XIcon />
-                      </button>
-                    </div>
-
-                    {/* Product picker */}
-                    <div style={{ marginBottom: "20px" }}>
-                      <p style={{ fontSize: "12px", color: "var(--text-dim)", margin: "0 0 8px 0" }}>
-                        Select a product below or click Show All to audit everything.
-                      </p>
-                      <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-                        <div style={{ position: "relative", flex: 1 }}>
-                          <input
-                            type="text"
-                            value={auditSearch}
-                            onChange={(e) => setAuditSearch(e.target.value)}
-                            onFocus={() => setAuditDropdownOpen(true)}
-                            onBlur={() => setTimeout(() => setAuditDropdownOpen(false), 150)}
-                            placeholder="Select a product..."
-                            style={{
-                              width: "100%", padding: "8px 12px", borderRadius: "8px",
-                              background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-                              color: "var(--text-secondary)", fontSize: "13px",
-                              fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-                            }}
-                          />
-                          {suggestions.length > 0 && (
-                            <div style={{
-                              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 10,
-                              background: "var(--bg-secondary)", border: "1px solid var(--border)",
-                              borderRadius: "8px", boxShadow: "0 8px 24px rgba(15,23,42,0.1)",
-                              overflow: "auto", maxHeight: "220px",
-                            }}>
-                              {suggestions.map((p) => (
-                                <button
-                                  key={p.key}
-                                  onClick={() => handleAddProduct(p.key)}
-                                  style={{
-                                    display: "flex", alignItems: "center", gap: "8px",
-                                    width: "100%", padding: "8px 12px", background: "none",
-                                    border: "none", cursor: "pointer", textAlign: "left",
-                                    fontSize: "12px", color: "var(--text-secondary)", fontFamily: "inherit",
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(241,245,249,0.8)"}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                                >
-                                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.sectionColor, flexShrink: 0 }} />
-                                  <span style={{ fontWeight: 600 }}>{p.product}</span>
-                                  <span style={{ color: "var(--text-dim)", fontSize: "11px" }}>{p.sectionLabel}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        {!allSelected && (
-                          <button
-                            onClick={handleShowAll}
-                            style={{
-                              padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--border-light)",
-                              background: "transparent", cursor: "pointer", whiteSpace: "nowrap",
-                              fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", fontFamily: "inherit",
-                            }}
-                          >
-                            Show All
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Selected product chips */}
-                      {auditSelected.size > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {[...auditSelected].map((key) => {
-                            const p = allProducts.find((x) => x.key === key);
-                            if (!p) return null;
-                            return (
-                              <span key={key} style={{
-                                display: "inline-flex", alignItems: "center", gap: "5px",
-                                padding: "3px 8px 3px 6px", borderRadius: "20px",
-                                background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.15)",
-                                fontSize: "11px", fontWeight: 600, color: "var(--accent-blue)",
-                              }}>
-                                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: p.sectionColor }} />
-                                {p.product}
-                                <button
-                                  onClick={() => handleRemoveProduct(key)}
-                                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--text-dim)", display: "flex", lineHeight: 1 }}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* Audit table — only selected products */}
-                    {auditSelected.size > 0 && inventorySections.map((section) => {
-                      const sectionProducts = section.products.filter((p) => auditSelected.has(`${section.key}:${p}`));
-                      if (sectionProducts.length === 0) return null;
-                      const colCount = 5;
-
-                      const renderRows = (products) =>
-                        products.map((product) => {
-                          const row = getMergedRow(section, product);
-                          const endVal = section.calcEnd ? section.calcEnd(row) : (row.end || 0);
-                          const audVal = inventory?.[section.key]?.[product]?.aud;
-                          const audReason = inventory?.[section.key]?.[product]?.audReason || "";
-                          const hasAud = audVal != null && audVal !== "";
-                          const variance = hasAud ? (parseFloat(audVal) || 0) - endVal : null;
-                          const hasDiscrepancy = variance != null && variance !== 0;
-
-                          return (
-                            <tr key={product} style={{ borderBottom: "1px solid rgba(15,23,42,0.04)" }}>
-                              <td style={{ padding: "6px 12px", fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                                {product}
-                              </td>
-                              <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "12px", fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-secondary)" }}>
-                                {endVal}
-                              </td>
-                              <td style={{ padding: "2px 4px", textAlign: "center" }}>
-                                <input
-                                  type="number"
-                                  value={hasAud ? audVal : ""}
-                                  placeholder="—"
-                                  onChange={(e) => handleAudChange(section.key, product, e.target.value)}
-                                  onBlur={() => onSaveSection(section.key)}
-                                  style={{
-                                    width: "60px", padding: "5px 6px", borderRadius: "6px",
-                                    background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-                                    color: "var(--text-secondary)", fontSize: "12px", outline: "none",
-                                    fontFamily: "var(--font-mono)", textAlign: "center",
-                                  }}
-                                />
-                              </td>
-                              <td style={{
-                                padding: "4px 6px", textAlign: "center", fontSize: "11px",
-                                fontFamily: "var(--font-mono)", fontWeight: 700, minWidth: "40px",
-                                color: variance == null ? "var(--text-dim)" : variance > 0 ? "#4ade80" : variance < 0 ? "#f87171" : "var(--text-dim)",
-                              }}>
-                                {variance != null ? (variance > 0 ? `+${variance}` : variance) : "—"}
-                              </td>
-                              <td style={{ padding: "2px 6px" }}>
-                                {hasDiscrepancy ? (
-                                  <input
-                                    type="text"
-                                    value={audReason}
-                                    placeholder="Reason..."
-                                    onChange={(e) => handleReasonChange(section.key, product, e.target.value)}
-                                    onBlur={() => onSaveSection(section.key)}
-                                    style={{
-                                      width: "100%", padding: "5px 8px", borderRadius: "6px",
-                                      background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.15)",
-                                      color: "var(--text-secondary)", fontSize: "11px", outline: "none",
-                                      fontFamily: "inherit", minWidth: "120px",
-                                    }}
-                                  />
-                                ) : (
-                                  <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        });
-
-                      return (
-                        <div key={section.key} style={{ marginBottom: "16px" }}>
-                          <div style={{
-                            display: "flex", alignItems: "center", gap: "6px",
-                            padding: "8px 12px", borderRadius: "8px 8px 0 0",
-                            background: "rgba(241,245,249,0.8)", borderBottom: "1px solid var(--border)",
-                          }}>
-                            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: section.color }} />
-                            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                              {section.label}
-                            </span>
-                          </div>
-                          <div style={{ border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 8px 8px", overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                              <thead>
-                                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                                  <th style={{ padding: "6px 12px", textAlign: "left", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product</th>
-                                  <th style={{ padding: "6px 6px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>END</th>
-                                  <th style={{ padding: "6px 6px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "#22c55e", textTransform: "uppercase" }}>Audit</th>
-                                  <th style={{ padding: "6px 6px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>DIFF</th>
-                                  <th style={{ padding: "6px 6px", textAlign: "left", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reason</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {section.subgroups && section.subgroups.length > 0 ? (
-                                  section.subgroups.map((sg) => {
-                                    const sgProducts = sg.products.filter((p) => auditSelected.has(`${section.key}:${p}`));
-                                    if (sgProducts.length === 0) return null;
-                                    return (
-                                      <React.Fragment key={sg.label}>
-                                        <tr>
-                                          <td colSpan={colCount} style={{
-                                            padding: "5px 12px", fontSize: "10px", fontWeight: 700,
-                                            color: "var(--text-dim)", textTransform: "uppercase",
-                                            letterSpacing: "1px", background: "rgba(241,245,249,0.4)",
-                                          }}>
-                                            {sg.label}
-                                          </td>
-                                        </tr>
-                                        {renderRows(sgProducts)}
-                                      </React.Fragment>
-                                    );
-                                  })
-                                ) : (
-                                  renderRows(sectionProducts)
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
-                      <button
-                        onClick={handleSaveAndClose}
-                        style={{
-                          padding: "10px 24px", borderRadius: "10px", border: "none",
-                          cursor: "pointer",
-                          background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                          color: "#fff", fontSize: "13px", fontWeight: 700,
-                          fontFamily: "inherit",
-                          boxShadow: "0 2px 8px rgba(34,197,94,0.3)",
-                        }}
-                      >
-                        Save & Close
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
           </>
         )}
 

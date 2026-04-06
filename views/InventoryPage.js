@@ -6,6 +6,7 @@ export default function InventoryPage({
   resolvedInventory, totalCylinderData,
   inventorySections,
   onInventoryChange, onSaveSection,
+  showAudit = false,
 }) {
   return (
     <div className="animate-fade">
@@ -32,6 +33,7 @@ export default function InventoryPage({
             allInventory={resolvedInventory}
             onChange={onInventoryChange}
             onSaveSection={onSaveSection}
+            showAudit={showAudit}
           />
         </div>
       ))}
@@ -61,7 +63,6 @@ export default function InventoryPage({
                 }}>Product</th>
                 <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>BEG</th>
                 <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>END</th>
-                <th style={{ padding: "8px 4px", textAlign: "center", fontSize: "10px", fontWeight: 600, color: "var(--accent-orange)", textTransform: "uppercase" }}>DIFF</th>
               </tr>
             </thead>
             <tbody>
@@ -75,13 +76,6 @@ export default function InventoryPage({
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "12px", fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-secondary)" }}>
                     {row.end}
-                  </td>
-                  <td style={{
-                    padding: "4px 6px", textAlign: "center", fontSize: "12px",
-                    fontFamily: "var(--font-mono)", fontWeight: 700,
-                    color: row.var == null ? "var(--text-dim)" : row.var > 0 ? "#4ade80" : row.var < 0 ? "#f87171" : "var(--text-secondary)",
-                  }}>
-                    {row.var != null ? row.var : "—"}
                   </td>
                 </tr>
               ))}
