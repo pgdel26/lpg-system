@@ -1270,9 +1270,9 @@ export default function GasulTracker() {
     }
   };
 
-  const handleMarkArCollected = async (saleId) => {
+  const handleMarkArCollected = async (saleId, method) => {
     try {
-      await updateDoc(doc(db, "saleTransactions", saleId), { arCollected: true });
+      await updateDoc(doc(db, "saleTransactions", saleId), { arCollected: true, collectedDate: today(), collectionMethod: method || "cash" });
       setToast({ type: "success", message: "Marked as collected." });
     } catch (error) {
       console.error("Mark AR collected error:", error);
@@ -1405,6 +1405,7 @@ export default function GasulTracker() {
               dailyReport={dailyReport}
               onUpdateDailyStaff={handleUpdateDailyStaff}
               allRefunds={allRefunds}
+              arTransactions={arTransactions}
               onOpenSaleModal={handleOpenSaleModal}
               onOpenSwapModal={handleOpenSwapModal}
               onOpenRefundModal={handleOpenRefundModal}

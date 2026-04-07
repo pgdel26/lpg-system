@@ -8,6 +8,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
   const [filterTo, setFilterTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending"); // "all", "pending", "collected"
   const [pendingCollect, setPendingCollect] = useState(null);
+  const [collectionMethod, setCollectionMethod] = useState("cash");
   const [pendingDelete, setPendingDelete] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -241,7 +242,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                         background: "rgba(34,197,94,0.1)", padding: "3px 8px",
                         borderRadius: "6px",
                       }}>
-                        Collected
+                        {t.collectionMethod === "check" ? "Check" : "Cash"}
                       </span>
                     ) : (
                       <button
@@ -289,13 +290,89 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
       )}
 
       {pendingCollect && (
-        <ConfirmModal
-          title="Mark as Collected"
-          message={`Mark ${fmt(pendingCollect.totalAmount)} from "${pendingCollect.customerName || "Unknown"}" (Invoice: ${pendingCollect.invoice || "N/A"}) as collected?`}
-          confirmLabel="Collect"
-          onConfirm={() => { onMarkCollected(pendingCollect.id); setPendingCollect(null); }}
-          onCancel={() => setPendingCollect(null)}
-        />
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1100,
+            background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setPendingCollect(null); setCollectionMethod("cash"); } }}
+        >
+          <div style={{
+            background: "var(--bg-secondary)", borderRadius: "16px",
+            border: "1px solid var(--border)", padding: "24px",
+            width: "100%", maxWidth: "400px",
+            boxShadow: "0 20px 60px rgba(15,23,42,0.12)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>
+                Mark as Collected
+              </h3>
+              <button
+                onClick={() => { setPendingCollect(null); setCollectionMethod("cash"); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex" }}
+              >
+                <XIcon />
+              </button>
+            </div>
+
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "16px" }}>
+              Mark {fmt(pendingCollect.totalAmount)} from &quot;{pendingCollect.customerName || "Unknown"}&quot; (Invoice: {pendingCollect.invoice || "N/A"}) as collected?
+            </p>
+
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                Payment Method
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {[
+                  { value: "cash", label: "Cash", color: "#22c55e" },
+                  { value: "check", label: "Check", color: "#3b82f6" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCollectionMethod(opt.value)}
+                    style={{
+                      flex: 1, padding: "10px 14px", borderRadius: "10px",
+                      border: collectionMethod === opt.value ? `2px solid ${opt.color}` : "2px solid var(--border-light)",
+                      background: collectionMethod === opt.value ? `${opt.color}11` : "transparent",
+                      cursor: "pointer", fontSize: "13px", fontWeight: 600,
+                      color: collectionMethod === opt.value ? opt.color : "var(--text-muted)",
+                      fontFamily: "inherit", transition: "all 0.15s",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { setPendingCollect(null); setCollectionMethod("cash"); }}
+                style={{
+                  padding: "8px 16px", borderRadius: "8px",
+                  border: "1px solid var(--border-light)", background: "transparent",
+                  cursor: "pointer", fontSize: "12px", fontWeight: 600,
+                  color: "var(--text-muted)", fontFamily: "inherit",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { onMarkCollected(pendingCollect.id, collectionMethod); setPendingCollect(null); setCollectionMethod("cash"); }}
+                style={{
+                  padding: "8px 16px", borderRadius: "8px", border: "none",
+                  cursor: "pointer", fontSize: "12px", fontWeight: 600,
+                  color: "#fff", fontFamily: "inherit",
+                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                }}
+              >
+                Collect
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendingDelete && (

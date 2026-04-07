@@ -11,7 +11,7 @@ export default function TransactionsPage({
   saleTransactions, swaps, refunds,
   expenses,
   staff, dailyReport, onUpdateDailyStaff,
-  allRefunds,
+  allRefunds, arTransactions,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
@@ -55,7 +55,9 @@ export default function TransactionsPage({
     const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
     const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
     const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-    const expectedCashRemit = netSales - totalAR - totalGCash;
+    const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
+    const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
     const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
     const diff = actual - expectedCashRemit;
     const cashierName = dailyReport?.cashier ? ((staff || []).find((s) => s.id === dailyReport.cashier)?.name || "") : "";
@@ -117,6 +119,7 @@ export default function TransactionsPage({
     data.push([]);
     data.push(["Accounts Receivable", totalAR > 0 ? -totalAR : 0]);
     data.push(["GCash", totalGCash > 0 ? -totalGCash : 0]);
+    data.push(["Collections", totalCollections > 0 ? totalCollections : 0]);
     r = data.length;
     data.push(["Expected Cash Remit", expectedCashRemit]);
     totalRows.push(r);
@@ -333,7 +336,9 @@ export default function TransactionsPage({
         const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
         const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
         const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-        const expectedCashRemit = netSales - totalAR - totalGCash;
+        const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
+        const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+        const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
 
         return (
           <div>
@@ -500,6 +505,22 @@ export default function TransactionsPage({
                     </div>
                     <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalGCash > 0 ? "var(--accent-blue)" : "var(--text-dim)" }}>
                       {totalGCash > 0 ? `- ${fmt(totalGCash)}` : fmt(0)}
+                    </span>
+                  </div>
+
+                  {/* Collections row */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 20px", borderTop: "1px solid rgba(15,23,42,0.04)",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Collections</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "2px" }}>
+                        {collectionsForDay.length} AR collected
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono)", color: totalCollections > 0 ? "var(--accent-green)" : "var(--text-dim)" }}>
+                      {totalCollections > 0 ? `+ ${fmt(totalCollections)}` : fmt(0)}
                     </span>
                   </div>
 
