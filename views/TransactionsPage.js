@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { fmt, today } from "../lib/utils";
-import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon, XIcon } from "../components/Icons";
+import { PlusIcon, SwapIcon, HistoryIcon, EditIcon, TrashIcon, DownloadIcon, XIcon, ChevronLeftIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import ExpenseModal from "../components/ExpenseModal";
 import RefundsPage from "./RefundsPage";
@@ -24,6 +24,7 @@ export default function TransactionsPage({
   const [pendingDelete, setPendingDelete] = useState(null);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [showAddStaffDropdown, setShowAddStaffDropdown] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
   const saleTypeLabel = (section) => {
     if (section === "cylinderWithRefill") return "Full Cylinder";
@@ -928,7 +929,7 @@ export default function TransactionsPage({
           border: "1px solid var(--border)", overflow: "hidden",
         }}>
           <div style={{
-            display: "grid", gridTemplateColumns: "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.7fr 52px",
+            display: "grid", gridTemplateColumns: "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.7fr 1fr 52px",
             padding: "8px 14px", borderBottom: "1px solid var(--border)",
             fontSize: "10px", fontWeight: 600, color: "var(--text-dim)",
             textTransform: "uppercase", letterSpacing: "0.5px",
@@ -943,6 +944,7 @@ export default function TransactionsPage({
             <span style={{ textAlign: "right" }}>Disc.</span>
             <span style={{ textAlign: "right" }}>Final</span>
             <span style={{ textAlign: "center" }}>Pay</span>
+            <span>GCash Ref No</span>
             <span />
           </div>
 
@@ -1006,7 +1008,7 @@ export default function TransactionsPage({
 
             return (
               <div key={t.id} style={{
-                display: "grid", gridTemplateColumns: "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.7fr 52px",
+                display: "grid", gridTemplateColumns: "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.7fr 1fr 52px",
                 padding: "8px 14px", alignItems: "center",
                 borderBottom: "1px solid rgba(15,23,42,0.04)",
                 fontSize: "12px",
@@ -1032,6 +1034,9 @@ export default function TransactionsPage({
                   }}>
                     {t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR"}
                   </span>
+                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: t.gcashRef ? "var(--accent-blue)" : "var(--text-dim)" }}>
+                  {t.gcashRef || "\u2014"}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center" }}>
                   <button onClick={() => startEdit("sale", t)} style={{
@@ -1072,8 +1077,24 @@ export default function TransactionsPage({
         </div>
       </div>
 
-      {/* Side panel: Swap + Refund */}
-      <div style={{ width: "400px", flexShrink: 0 }}>
+      {/* Side panel toggle + collapsible Swap + Refund */}
+      <div style={{ display: "flex", alignItems: "flex-start", flexShrink: 0 }}>
+        <button
+          onClick={() => setSidePanelOpen((v) => !v)}
+          title={sidePanelOpen ? "Collapse panel" : "Expand panel"}
+          style={{
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            borderRadius: "8px", cursor: "pointer", padding: "8px 2px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "var(--text-muted)", marginTop: "28px", flexShrink: 0,
+            transition: "all 0.15s ease",
+            transform: sidePanelOpen ? "rotate(0deg)" : "rotate(180deg)",
+          }}
+        >
+          <ChevronLeftIcon />
+        </button>
+        {sidePanelOpen && (
+        <div style={{ width: "400px", marginLeft: "8px" }}>
 
       {/* Upgrade / Swap section */}
       <div style={{ marginBottom: "16px" }}>
@@ -1362,6 +1383,8 @@ export default function TransactionsPage({
         </div>
       </div>
 
+      </div>
+      )}
       </div>{/* end side panel */}
       </div>{/* end flex row */}
 

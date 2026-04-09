@@ -32,6 +32,7 @@ export default function SaleModal({
   const [deliveryCharge, setDeliveryCharge] = useState("");
   const [checkDate, setCheckDate] = useState("");
   const [checkAmount, setCheckAmount] = useState("");
+  const [gcashRef, setGcashRef] = useState("");
 
   const updateItem = (index, field, value) => {
     setItems((prev) => {
@@ -78,7 +79,7 @@ export default function SaleModal({
     const checkData = payment === "ar" && checkDate
       ? { checkDate, checkAmount: parseFloat(checkAmount) || 0 }
       : null;
-    onSubmit(items, discountNum, saleDate, deliveryNum, checkData);
+    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, gcashRef.trim());
   };
 
   return (
@@ -362,6 +363,37 @@ export default function SaleModal({
             })}
           </div>
         </div>
+
+        {/* GCash Reference Number (GCash only) */}
+        {payment === "gcash" && (
+          <div style={{
+            marginBottom: "14px", padding: "12px", borderRadius: "10px",
+            background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)",
+          }}>
+            <label style={{ fontSize: "11px", color: "#3b82f6", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>
+              GCash Reference Number <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={gcashRef}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 13);
+                setGcashRef(v);
+              }}
+              placeholder="e.g. 1234567890123"
+              maxLength={13}
+              style={{
+                width: "100%", padding: "8px 12px", borderRadius: "8px",
+                background: "rgba(241,245,249,0.8)", border: `1px solid ${gcashRef.length === 13 ? "var(--border-light)" : "rgba(239,68,68,0.3)"}`,
+                color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+                fontFamily: "var(--font-mono)", boxSizing: "border-box",
+              }}
+            />
+            <span style={{ fontSize: "10px", color: gcashRef.length === 13 ? "var(--text-dim)" : "#ef4444", marginTop: "4px", display: "block" }}>
+              {gcashRef.length}/13 digits
+            </span>
+          </div>
+        )}
 
         {/* Post-dated check (AR only) */}
         {payment === "ar" && (
