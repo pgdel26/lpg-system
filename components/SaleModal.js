@@ -371,7 +371,7 @@ export default function SaleModal({
             background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)",
           }}>
             <label style={{ fontSize: "11px", color: "#3b82f6", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>
-              GCash Reference Number <span style={{ color: "#ef4444" }}>*</span>
+              GCash Reference Number
             </label>
             <input
               type="text"
@@ -384,13 +384,13 @@ export default function SaleModal({
               maxLength={13}
               style={{
                 width: "100%", padding: "8px 12px", borderRadius: "8px",
-                background: "rgba(241,245,249,0.8)", border: `1px solid ${gcashRef.length === 13 ? "var(--border-light)" : "rgba(239,68,68,0.3)"}`,
+                background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
                 color: "var(--text-secondary)", fontSize: "13px", outline: "none",
                 fontFamily: "var(--font-mono)", boxSizing: "border-box",
               }}
             />
-            <span style={{ fontSize: "10px", color: gcashRef.length === 13 ? "var(--text-dim)" : "#ef4444", marginTop: "4px", display: "block" }}>
-              {gcashRef.length}/13 digits
+            <span style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "4px", display: "block" }}>
+              {gcashRef.length > 0 ? `${gcashRef.length}/13 digits` : "Optional — can be added later"}
             </span>
           </div>
         )}

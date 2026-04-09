@@ -771,8 +771,7 @@ export default function GasulTracker() {
     if (!items || items.length === 0) { setSaleModalError("Please add at least one item."); return; }
     if (!saleModalCustomer && !saleModalNewCustomer) { setSaleModalError("Please select or add a customer."); return; }
     if (saleModalNewCustomer && !saleModalNewName.trim()) { setSaleModalError("Please enter customer name."); return; }
-    if (saleModalPayment === "gcash" && !gcashRef) { setSaleModalError("Please enter GCash reference number."); return; }
-    if (saleModalPayment === "gcash" && !/^\d{13}$/.test(gcashRef)) { setSaleModalError("GCash reference number must be exactly 13 digits."); return; }
+    if (saleModalPayment === "gcash" && gcashRef && !/^\d{13}$/.test(gcashRef)) { setSaleModalError("GCash reference number must be exactly 13 digits."); return; }
 
     try {
       const { id: customerId, name: customerName } = await findOrCreateCustomer(
