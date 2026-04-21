@@ -242,9 +242,9 @@ export default function GasulTracker() {
     begFallbackRanRef.current = null;
     const sectionKeys = ["full", "empty", "accessories"];
     const prevDate = (() => {
-      const d = new Date(inventoryDate + "T00:00:00");
+      const d = new Date(inventoryDate + "T00:00:00+08:00");
       d.setDate(d.getDate() - 1);
-      return d.toISOString().split("T")[0];
+      return d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     })();
     let cancelled = false;
     // Small delay to let Firestore listeners populate first
@@ -363,6 +363,16 @@ export default function GasulTracker() {
       console.error("Create pricebook error:", error);
       setToast({ type: "error", message: "Failed to create pricebook." });
       return null;
+    }
+  };
+
+  const handleDeletePricebook = async (pricebookId) => {
+    try {
+      await deleteDoc(doc(db, "pricebooks", pricebookId));
+      setToast({ type: "success", message: "Draft discarded." });
+    } catch (error) {
+      console.error("Delete pricebook error:", error);
+      setToast({ type: "error", message: "Failed to discard draft." });
     }
   };
 
@@ -1454,6 +1464,7 @@ export default function GasulTracker() {
               onCreatePricebook={handleCreatePricebook}
               onUpdatePricebook={handleUpdatePricebook}
               onActivatePricebook={handleActivatePricebook}
+              onDeletePricebook={handleDeletePricebook}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}

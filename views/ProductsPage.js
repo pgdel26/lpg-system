@@ -67,7 +67,7 @@ function CylinderPriceTable({ products: cylinderProducts, prices, editable, onCh
   );
 }
 
-function AccessoryPriceTable({ label, products: accessoryProducts, prices, editable, onChange }) {
+function AccessoryPriceTable({ label, products: accessoryProducts, prices, editable, onChange, keyPrefix = "accessories" }) {
   return (
     <div style={{
       background: "var(--bg-card)", borderRadius: "10px",
@@ -83,7 +83,7 @@ function AccessoryPriceTable({ label, products: accessoryProducts, prices, edita
         </div>
       )}
       {accessoryProducts.map((product) => {
-        const key = `accessories_${product}`;
+        const key = `${keyPrefix}_${product}`;
         const srp = prices?.[key]?.srp || 0;
         return (
           <div key={product} style={{
@@ -107,7 +107,7 @@ function AccessoryPriceTable({ label, products: accessoryProducts, prices, edita
 
 export default function ProductsPage({
   products, pricebooks, activePricebook,
-  onCreatePricebook, onUpdatePricebook, onActivatePricebook,
+  onCreatePricebook, onUpdatePricebook, onActivatePricebook, onDeletePricebook,
   onAddProduct, onUpdateProduct, onDeleteProduct,
 }) {
   const [subTab, setSubTab] = useState("pricing");
@@ -130,6 +130,7 @@ export default function ProductsPage({
   const [editCustomCategory, setEditCustomCategory] = useState("");
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState(null);
   const [pendingReactivate, setPendingReactivate] = useState(null);
+  const [pendingDiscardDraft, setPendingDiscardDraft] = useState(null);
 
   // Draft pricebook editing state
   const [draftSyncId, setDraftSyncId] = useState(null);
@@ -138,7 +139,9 @@ export default function ProductsPage({
   const [draftDate, setDraftDate] = useState("");
 
   const draftPricebook = pricebooks.find((pb) => pb.status === "draft");
-  const otherPricebooks = pricebooks.filter((pb) => pb.id !== activePricebook?.id);
+  const otherPricebooks = pricebooks.filter(
+    (pb) => pb.id !== activePricebook?.id && pb.status !== "draft"
+  );
 
   // Sync draft local state when a new draft appears (only if modal not open)
   if (draftPricebook && draftPricebook.id !== draftSyncId && !editingDraft) {
@@ -151,12 +154,13 @@ export default function ProductsPage({
   const buildDefaultPrices = () => {
     const prices = {};
     for (const [key, prod] of Object.entries(products)) {
+      if (hiddenCategories.includes(prod.category)) continue;
       if (prod.category === "cylinder") {
         prices[key] = {
           cylinder: (prod.srp || 0) - (prod.srpRefill || 0),
           refill: prod.srpRefill || 0,
         };
-      } else if (prod.category === "accessories") {
+      } else {
         prices[key] = { srp: prod.srp || 0 };
       }
     }
@@ -235,14 +239,11 @@ export default function ProductsPage({
 
   // Dynamic product name lists from Firestore products (for pricebook tables)
   const hiddenCategories = ["borrowed"];
-  const dynamicFullProducts = Object.entries(products)
-    .filter(([, p]) => p.category === "cylinder")
-    .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
-    .map(([, p]) => p.name);
-  const dynamicAccessoryProducts = Object.entries(products)
-    .filter(([, p]) => p.category === "accessories")
-    .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
-    .map(([, p]) => p.name);
+  const productNamesInCategory = (cat) =>
+    Object.entries(products)
+      .filter(([, p]) => p.category === cat)
+      .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
+      .map(([, p]) => p.name);
 
   // Grouped products for the Products sub-tab (exclude "borrowed" — not a valid category)
   const productsByCategory = Object.entries(products).reduce((acc, [key, prod]) => {
@@ -270,6 +271,34 @@ export default function ProductsPage({
       colorIdx++;
     }
   });
+
+  // Categories shown in pricebook modals: only those with products, ordered
+  // cylinder → accessories → other categories alphabetically.
+  const pricebookCategories = Object.keys(productsByCategory).sort((a, b) => {
+    if (a === "cylinder") return -1;
+    if (b === "cylinder") return 1;
+    if (a === "accessories") return -1;
+    if (b === "accessories") return 1;
+    return a.localeCompare(b);
+  });
+
+  const renderPriceSections = (prices, { editable = false, onChange } = {}) =>
+    pricebookCategories.map((cat) => {
+      const names = productNamesInCategory(cat);
+      if (names.length === 0) return null;
+      return (
+        <React.Fragment key={cat}>
+          <div style={{ ...labelStyle, marginBottom: "6px" }}>{categoryLabels[cat]}</div>
+          <div style={{ marginBottom: editable ? "14px" : "16px" }}>
+            {cat === "cylinder" ? (
+              <CylinderPriceTable products={names} prices={prices} editable={editable} onChange={onChange} />
+            ) : (
+              <AccessoryPriceTable products={names} prices={prices} editable={editable} onChange={onChange} keyPrefix={cat} />
+            )}
+          </div>
+        </React.Fragment>
+      );
+    });
 
   const handleAddProductSubmit = async () => {
     if (!newProductName.trim()) return;
@@ -614,15 +643,7 @@ export default function ProductsPage({
             )}
           </div>
 
-          <div style={{ ...labelStyle, marginBottom: "6px" }}>Cylinders</div>
-          <div style={{ marginBottom: "16px" }}>
-            <CylinderPriceTable products={dynamicFullProducts} prices={activePricebook.prices} />
-          </div>
-
-          <div style={{ ...labelStyle, marginBottom: "6px" }}>Accessories</div>
-          <div style={{ marginBottom: "16px" }}>
-            <AccessoryPriceTable products={dynamicAccessoryProducts} prices={activePricebook.prices} />
-          </div>
+          {renderPriceSections(activePricebook.prices)}
         </div>
       )}
 
@@ -652,6 +673,66 @@ export default function ProductsPage({
         </div>
       )}
 
+      {/* Draft Pricebook (dedicated card) */}
+      {draftPricebook && (
+        <div style={{
+          marginBottom: "28px",
+          padding: "14px 18px",
+          borderRadius: "12px",
+          border: "1.5px solid var(--accent-blue)",
+          background: "rgba(59,130,246,0.04)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "12px",
+        }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent-blue)" }} />
+              <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>
+                {draftPricebook.name || "Untitled Draft"}
+              </h3>
+              <span style={{
+                fontSize: "10px", fontWeight: 700, color: "var(--accent-blue)",
+                background: "rgba(59,130,246,0.15)", padding: "2px 8px", borderRadius: "10px",
+                textTransform: "uppercase", letterSpacing: "0.5px",
+              }}>
+                Draft
+              </span>
+            </div>
+            <p style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px", marginLeft: "16px" }}>
+              Effective from {draftPricebook.effectiveDate || "—"}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={openDraftModal}
+              style={{
+                padding: "8px 14px", borderRadius: "8px", border: "none",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: "5px",
+                background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                color: "#fff", fontSize: "12px", fontWeight: 700, fontFamily: "inherit",
+              }}
+            >
+              <EditIcon /> Edit Draft
+            </button>
+            <button
+              onClick={() => setPendingDiscardDraft(draftPricebook)}
+              style={{
+                padding: "8px 14px", borderRadius: "8px",
+                border: "1px solid var(--border-light)", cursor: "pointer",
+                background: "transparent", color: "var(--text-muted)",
+                fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: "5px",
+              }}
+            >
+              <TrashIcon /> Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* All Other Pricebooks */}
       {otherPricebooks.length > 0 && (
         <div>
@@ -662,41 +743,37 @@ export default function ProductsPage({
             Pricebooks
           </h3>
 
-          {otherPricebooks.slice(0, visibleCount).map((pb) => {
-            const isDraft = pb.status === "draft";
-            return (
-              <div key={pb.id} style={{
-                marginBottom: "8px", borderRadius: "10px",
-                background: "var(--bg-card)", overflow: "hidden",
-                border: isDraft ? "1.5px solid var(--accent-blue)" : "1px solid var(--border)",
-              }}>
-                <div
-                  onClick={() => isDraft ? openDraftModal() : setViewingPb(pb)}
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 16px", cursor: "pointer",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                      {isDraft ? (draftPricebook.name || "Untitled") : pb.name}
-                    </span>
-                    <span style={{ fontSize: "11px", color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
-                      {isDraft ? draftPricebook.effectiveDate : pb.effectiveDate}
-                    </span>
-                    <span style={{
-                      fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "10px",
-                      textTransform: "uppercase", letterSpacing: "0.5px",
-                      color: isDraft ? "var(--accent-blue)" : "var(--text-dim)",
-                      background: isDraft ? "rgba(59,130,246,0.1)" : "rgba(100,116,139,0.1)",
-                    }}>
-                      {isDraft ? "Draft" : "Deactivated"}
-                    </span>
-                  </div>
+          {otherPricebooks.slice(0, visibleCount).map((pb) => (
+            <div key={pb.id} style={{
+              marginBottom: "8px", borderRadius: "10px",
+              background: "var(--bg-card)", overflow: "hidden",
+              border: "1px solid var(--border)",
+            }}>
+              <div
+                onClick={() => setViewingPb(pb)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "10px 16px", cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                    {pb.name}
+                  </span>
+                  <span style={{ fontSize: "11px", color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+                    {pb.effectiveDate}
+                  </span>
+                  <span style={{
+                    fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "10px",
+                    textTransform: "uppercase", letterSpacing: "0.5px",
+                    color: "var(--text-dim)", background: "rgba(100,116,139,0.1)",
+                  }}>
+                    Deactivated
+                  </span>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
 
           {otherPricebooks.length > visibleCount && (
             <button
@@ -778,15 +855,7 @@ export default function ProductsPage({
               </div>
             </div>
 
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Cylinders</div>
-            <div style={{ marginBottom: "14px" }}>
-              <CylinderPriceTable products={dynamicFullProducts} prices={newPrices} editable onChange={handleNewPriceChange} />
-            </div>
-
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Accessories</div>
-            <div style={{ marginBottom: "14px" }}>
-              <AccessoryPriceTable products={dynamicAccessoryProducts} prices={newPrices} editable onChange={handleNewPriceChange} />
-            </div>
+            {renderPriceSections(newPrices, { editable: true, onChange: handleNewPriceChange })}
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "16px" }}>
               <button
@@ -881,15 +950,7 @@ export default function ProductsPage({
               </div>
             </div>
 
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Cylinders</div>
-            <div style={{ marginBottom: "14px" }}>
-              <CylinderPriceTable products={dynamicFullProducts} prices={draftPrices} editable onChange={handleDraftPriceChange} />
-            </div>
-
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Accessories</div>
-            <div style={{ marginBottom: "14px" }}>
-              <AccessoryPriceTable products={dynamicAccessoryProducts} prices={draftPrices} editable onChange={handleDraftPriceChange} />
-            </div>
+            {renderPriceSections(draftPrices, { editable: true, onChange: handleDraftPriceChange })}
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "16px" }}>
               <button
@@ -963,15 +1024,7 @@ export default function ProductsPage({
               Effective from {viewingPb.effectiveDate}
             </p>
 
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Cylinders</div>
-            <div style={{ marginBottom: "14px" }}>
-              <CylinderPriceTable products={dynamicFullProducts} prices={viewingPb.prices} />
-            </div>
-
-            <div style={{ ...labelStyle, marginBottom: "6px" }}>Accessories</div>
-            <div style={{ marginBottom: "14px" }}>
-              <AccessoryPriceTable products={dynamicAccessoryProducts} prices={viewingPb.prices} />
-            </div>
+            {renderPriceSections(viewingPb.prices)}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
@@ -1022,6 +1075,19 @@ export default function ProductsPage({
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
           onCancel={() => setPendingReactivate(null)}
+        />
+      )}
+
+      {pendingDiscardDraft && (
+        <ConfirmModal
+          title="Discard Draft"
+          message={`Discard draft "${pendingDiscardDraft.name || "Untitled"}"? This cannot be undone.`}
+          confirmLabel="Discard"
+          onConfirm={async () => {
+            await onDeletePricebook(pendingDiscardDraft.id);
+            setPendingDiscardDraft(null);
+          }}
+          onCancel={() => setPendingDiscardDraft(null)}
         />
       )}
     </div>
