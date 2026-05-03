@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BriefcaseIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon } from "./Icons";
+import { BriefcaseIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, MailIcon, PhoneIcon } from "./Icons";
 
 export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
@@ -142,6 +142,12 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
 
         {/* Staff */}
         {renderNavButton({ id: "staff", label: "Staff", icon: <UserIcon /> }, false)}
+
+        {/* Notifications — hidden until cron job is wired up */}
+        {/* {renderNavButton({ id: "notifications", label: "Notifications", icon: <MailIcon /> }, false)} */}
+
+        {/* Contact Us */}
+        {renderNavButton({ id: "contact", label: "Contact Us", icon: <PhoneIcon /> }, false)}
       </nav>
 
       {/* Collapse toggle */}

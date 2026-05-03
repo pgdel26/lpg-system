@@ -38,6 +38,7 @@ The single most common bug class in this repo. Before changing any code that inv
 Use these via the `Agent` tool with `subagent_type` set to the name:
 
 - **`product-owner`** — defines business requirements with acceptance criteria. Call before building any non-trivial feature.
+- **`ui-ux-designer`** — designs/critiques UI surfaces and flows in TankTracker's existing visual language. Call when designing a new screen or when something feels off. Pairs with `product-owner` (PO defines what; designer decides how).
 - **`code-reviewer`** — reviews diffs for correctness, simplicity, security, conventions. Call before committing.
 - **`tester`** — verifies features end-to-end (lint, build, manual UI). Call before declaring work done.
 

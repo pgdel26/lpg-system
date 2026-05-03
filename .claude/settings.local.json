@@ -6,7 +6,8 @@
       "Bash(npx next build:*)",
       "Bash(rm -rf node_modules .next)",
       "Bash(npm install)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git stash *)"
     ]
   }
 }

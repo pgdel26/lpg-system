@@ -27,6 +27,8 @@ import RefundsPage from "../views/RefundsPage";
 import InventoryTabPage from "../views/InventoryTabPage";
 import StaffPage from "../views/StaffPage";
 import ReceivablesPage from "../views/ReceivablesPage";
+import NotificationsPage from "../views/NotificationsPage";
+import ContactUsPage from "../views/ContactUsPage";
 
 // ============================================================
 // MAIN APP
@@ -137,6 +139,9 @@ export default function GasulTracker() {
   // Staff
   const [staff, setStaff] = useState([]);
   const [dailyReport, setDailyStaff] = useState({ cashier: null, staff: [] });
+
+  // Notification recipients (single doc: settings/notifications)
+  const [notificationRecipients, setNotificationRecipients] = useState([]);
 
   // Refunds
   const [allRefunds, setAllRefunds] = useState([]);
@@ -553,6 +558,19 @@ export default function GasulTracker() {
     );
     return () => unsub();
   }, [inventoryDate, authUser]);
+
+  // ---- FIREBASE: Notification recipients listener ----
+  useEffect(() => {
+    if (!authUser) return;
+    const unsub = onSnapshot(doc(db, "settings", "notifications"), (snapshot) => {
+      if (snapshot.exists()) {
+        setNotificationRecipients(snapshot.data().recipients || []);
+      } else {
+        setNotificationRecipients([]);
+      }
+    });
+    return () => unsub();
+  }, [authUser]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((sectionKey, product, field, value) => {
@@ -1282,6 +1300,62 @@ export default function GasulTracker() {
     }
   };
 
+  // ---- Notification recipient handlers ----
+  const handleAddRecipient = async (email) => {
+    try {
+      const next = [
+        ...notificationRecipients.filter((r) => r.email !== email),
+        { email, addedAt: Timestamp.now() },
+      ];
+      await setDoc(doc(db, "settings", "notifications"), {
+        recipients: next,
+        updatedAt: Timestamp.now(),
+        updatedBy: authUser?.email || null,
+      }, { merge: true });
+      setToast({ type: "success", message: `Added ${email}` });
+      return true;
+    } catch (error) {
+      console.error("Add recipient error:", error);
+      setToast({ type: "error", message: "Failed to add recipient." });
+      return false;
+    }
+  };
+
+  const handleRemoveRecipient = async (email) => {
+    try {
+      const next = notificationRecipients.filter((r) => r.email !== email);
+      await setDoc(doc(db, "settings", "notifications"), {
+        recipients: next,
+        updatedAt: Timestamp.now(),
+        updatedBy: authUser?.email || null,
+      }, { merge: true });
+      setToast({ type: "success", message: `Removed ${email}` });
+    } catch (error) {
+      console.error("Remove recipient error:", error);
+      setToast({ type: "error", message: "Failed to remove recipient." });
+    }
+  };
+
+  const handleSendSupportMessage = async ({ subject, message }) => {
+    try {
+      const response = await fetch("/api/send-support-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, message, fromEmail: authUser?.email || "" }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Send failed");
+      }
+      setToast({ type: "success", message: "Message sent. We'll be in touch." });
+      return true;
+    } catch (error) {
+      console.error("Send support message error:", error);
+      setToast({ type: "error", message: error.message || "Failed to send message." });
+      return false;
+    }
+  };
+
   const handleMarkArCollected = async (saleId, method) => {
     try {
       await updateDoc(doc(db, "saleTransactions", saleId), { arCollected: true, collectedDate: today(), collectionMethod: method || "cash" });
@@ -1369,7 +1443,7 @@ export default function GasulTracker() {
               <MenuIcon />
             </button>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
-              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Inventory" : activePage === "customers" ? "Customers" : activePage === "staff" ? "Staff" : activePage === "receivables" ? "Accounts Receivable" : "Pricing"}
+              {activePage === "transactions" ? "Sales" : activePage === "purchases" ? "Purchases" : activePage === "inventory" ? "Inventory" : activePage === "customers" ? "Customers" : activePage === "staff" ? "Staff" : activePage === "receivables" ? "Accounts Receivable" : activePage === "notifications" ? "Notifications" : "Pricing"}
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -1500,6 +1574,21 @@ export default function GasulTracker() {
               onAddStaff={handleAddStaff}
               onUpdateStaff={handleUpdateStaff}
               onDeleteStaff={handleDeleteStaff}
+            />
+          )}
+
+          {activePage === "notifications" && (
+            <NotificationsPage
+              recipients={notificationRecipients}
+              onAddRecipient={handleAddRecipient}
+              onRemoveRecipient={handleRemoveRecipient}
+            />
+          )}
+
+          {activePage === "contact" && (
+            <ContactUsPage
+              currentUserEmail={authUser?.email || ""}
+              onSendSupportMessage={handleSendSupportMessage}
             />
           )}
         </main>
