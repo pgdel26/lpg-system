@@ -2,6 +2,20 @@
 
 Next.js + Firestore app for a Philippine LPG cylinder retail business. Product name: TankTracker. Repo/package name: `gasul-inventory`.
 
+## Teaching Mode
+
+I'm a Salesforce developer learning this stack (Next.js, React, Firestore). When possible, draw analogies to Apex, SOQL, Lightning components, or platform events.
+
+After every code change you make:
+
+1. **What changed** — list the files and a one-line summary of each edit
+2. **Why this approach** — explain the reasoning, including why you chose this pattern over alternatives
+3. **Stack concept** — name the underlying concept (e.g., "this uses React's useEffect cleanup function because...") and link it to something I might already know from Salesforce/Apex
+4. **What to watch for** — gotchas, side effects, or related patterns I'll likely encounter next
+5. **Check my understanding** — end with one question to make sure I followed
+
+Don't skip this even for small changes. If a change is trivial (typo, formatting), say so and skip the deep explanation.
+
 ## Stack and conventions
 
 - **Framework:** Next.js 16 (App Router), React 19. No TypeScript anywhere — do not introduce it.

@@ -3,7 +3,9 @@ import React from "react";
 export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection, showAudit = true }) {
   const { columns, products, calcEnd, subgroups } = section;
 
-  const visibleColumns = showAudit ? columns : columns.filter((col) => !col.auditSource && col.field !== "var");
+  const visibleColumns = showAudit
+    ? columns
+    : columns.filter((col) => !col.auditSource && !col.auditReason && col.field !== "var");
 
   const getMergedRow = (product) => {
     const row = { ...(data[product] || {}) };
@@ -170,6 +172,28 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
                 </td>
               );
             }
+            if (col.auditReason) {
+              const reasonVal = mergedRow[col.field];
+              return (
+                <td key={col.field} style={{ padding: "2px 2px" }}>
+                  <input
+                    type="text"
+                    value={reasonVal != null ? reasonVal : ""}
+                    placeholder="—"
+                    onChange={(e) => onChange(section.key, product, col.field, e.target.value)}
+                    onFocus={(e) => { e.target.style.borderColor = "rgba(34,197,94,0.4)"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "transparent"; onSaveSection(section.key); }}
+                    style={{
+                      ...inputStyle,
+                      color: "#22c55e",
+                      fontWeight: 500,
+                      textAlign: "left",
+                      paddingLeft: "8px",
+                    }}
+                  />
+                </td>
+              );
+            }
             if (col.field === "beg") {
               const begVal = mergedRow[col.field];
               return (
@@ -214,9 +238,9 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
               <th key={col.field} style={{
                 padding: "8px 4px", textAlign: "center", fontSize: "10px",
                 fontWeight: 600,
-                color: col.calc ? "var(--accent-orange)" : col.auditSource ? "#22c55e" : (col.source || col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) ? "var(--accent-blue)" : "var(--text-muted)",
+                color: col.calc ? "var(--accent-orange)" : (col.auditSource || col.auditReason) ? "#22c55e" : (col.source || col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) ? "var(--accent-blue)" : "var(--text-muted)",
                 textTransform: "uppercase", letterSpacing: "0.5px",
-                whiteSpace: "nowrap", minWidth: "70px",
+                whiteSpace: "nowrap", minWidth: col.auditReason ? "140px" : "70px",
               }}>
                 {col.label}
               </th>
