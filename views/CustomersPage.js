@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { fmt, formatDate } from "../lib/utils";
-import { PlusIcon, PhoneIcon, EditIcon, TrashIcon, ChevronLeftIcon, HistoryIcon } from "../components/Icons";
+import { PlusIcon, PhoneIcon, EditIcon, TrashIcon, ChevronLeftIcon, HistoryIcon, DownloadIcon, SearchIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
+import AddCustomerModal from "../components/AddCustomerModal";
+import ExportCustomerSalesModal from "../components/ExportCustomerSalesModal";
 
 const TYPE_STYLES = {
   sale: { label: "Sale", bg: "rgba(16,185,129,0.08)", color: "#10b981" },
@@ -11,8 +13,6 @@ const TYPE_STYLES = {
 
 export default function CustomersPage({
   customers,
-  formName, setFormName,
-  formPhone, setFormPhone,
   onAddCustomer,
   onUpdateCustomer,
   onDeleteCustomer,
@@ -25,6 +25,18 @@ export default function CustomersPage({
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loadingTx, setLoadingTx] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  const filteredCustomers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter((c) =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.toLowerCase().includes(q))
+    );
+  }, [customers, searchQuery]);
 
   const startEdit = (cust) => {
     setEditingId(cust.id);
@@ -118,7 +130,7 @@ export default function CustomersPage({
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
                 <PhoneIcon />
                 <span style={{ fontSize: "13px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                  {selectedCustomer.phone || "\u2014"}
+                  {selectedCustomer.phone || "—"}
                 </span>
               </div>
             </div>
@@ -273,64 +285,56 @@ export default function CustomersPage({
   // ---- List view ----
   return (
     <div className="animate-fade">
-      {/* Add customer form */}
+      {/* Header: search + action buttons */}
       <div style={{
-        background: "var(--bg-card)", borderRadius: "12px",
-        border: "1px solid var(--border)", padding: "20px",
-        marginBottom: "24px",
+        display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap",
+        marginBottom: "20px",
       }}>
-        <h3 style={{
-          fontSize: "12px", fontWeight: 700, color: "var(--text-muted)",
-          textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "14px",
-        }}>
-          Add New Customer
-        </h3>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "180px" }}>
-            <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px" }}>Name *</label>
-            <input
-              type="text"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="Customer name"
-              onKeyDown={(e) => { if (e.key === "Enter") onAddCustomer(); }}
-              style={{
-                width: "100%", padding: "8px 12px", borderRadius: "8px",
-                background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-                color: "var(--text-secondary)", fontSize: "13px", outline: "none",
-                fontFamily: "inherit",
-              }}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: "180px" }}>
-            <label style={{ fontSize: "11px", color: "var(--text-dim)", display: "block", marginBottom: "4px" }}>Phone</label>
-            <input
-              type="text"
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-              placeholder="Phone number"
-              onKeyDown={(e) => { if (e.key === "Enter") onAddCustomer(); }}
-              style={{
-                width: "100%", padding: "8px 12px", borderRadius: "8px",
-                background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-                color: "var(--text-secondary)", fontSize: "13px", outline: "none",
-                fontFamily: "inherit",
-              }}
-            />
-          </div>
-          <button
-            onClick={onAddCustomer}
+        <div style={{ position: "relative", flex: 1, minWidth: "220px" }}>
+          <span style={{
+            position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)",
+            display: "flex", alignItems: "center", color: "var(--text-dim)", pointerEvents: "none",
+          }}>
+            <SearchIcon />
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search customers by name or phone..."
             style={{
-              padding: "8px 18px", borderRadius: "8px", border: "none",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-              color: "#fff", fontSize: "12px", fontWeight: 700,
-              fontFamily: "inherit", whiteSpace: "nowrap",
+              width: "100%", padding: "10px 12px 10px 34px", borderRadius: "10px",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              color: "var(--text-secondary)", fontSize: "13px", outline: "none",
+              fontFamily: "inherit", boxSizing: "border-box",
             }}
-          >
-            <PlusIcon /> Add Customer
-          </button>
+          />
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            padding: "10px 18px", borderRadius: "10px", border: "none",
+            cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+            color: "#fff", fontSize: "12px", fontWeight: 700,
+            fontFamily: "inherit", whiteSpace: "nowrap",
+          }}
+        >
+          <PlusIcon /> Add Customer
+        </button>
+        <button
+          onClick={() => setShowExportModal(true)}
+          style={{
+            padding: "10px 18px", borderRadius: "10px",
+            border: "1px solid rgba(37,99,235,0.25)",
+            background: "rgba(37,99,235,0.06)",
+            cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+            color: "var(--accent-blue)", fontSize: "12px", fontWeight: 700,
+            fontFamily: "inherit", whiteSpace: "nowrap",
+          }}
+        >
+          <DownloadIcon /> Export Customer Sales
+        </button>
       </div>
 
       {/* Customer list */}
@@ -351,10 +355,14 @@ export default function CustomersPage({
 
         {customers.length === 0 ? (
           <div style={{ padding: "20px", textAlign: "center", fontSize: "13px", color: "var(--text-dim)" }}>
-            No customers yet. Add one above.
+            No customers yet. Click &ldquo;Add Customer&rdquo; above.
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div style={{ padding: "20px", textAlign: "center", fontSize: "13px", color: "var(--text-dim)" }}>
+            No customers match &ldquo;{searchQuery}&rdquo;.
           </div>
         ) : (
-          customers.map((cust) => {
+          filteredCustomers.map((cust) => {
             if (editingId === cust.id) {
               return (
                 <div key={cust.id} style={{
@@ -424,7 +432,7 @@ export default function CustomersPage({
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <PhoneIcon />
                   <span style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                    {cust.phone || "\u2014"}
+                    {cust.phone || "—"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "2px", justifyContent: "center" }}>
@@ -454,6 +462,21 @@ export default function CustomersPage({
           confirmLabel="Delete"
           onConfirm={() => { onDeleteCustomer(pendingDelete.id); setPendingDelete(null); }}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {showAddModal && (
+        <AddCustomerModal
+          onSubmit={(name, phone) => onAddCustomer(name, phone)}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {showExportModal && (
+        <ExportCustomerSalesModal
+          customers={customers}
+          onFetchCustomerTransactions={onFetchCustomerTransactions}
+          onClose={() => setShowExportModal(false)}
         />
       )}
     </div>

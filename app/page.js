@@ -152,8 +152,6 @@ export default function GasulTracker() {
   const [arTransactions, setArTransactions] = useState([]);
 
   // Customer form
-  const [customerFormName, setCustomerFormName] = useState("");
-  const [customerFormPhone, setCustomerFormPhone] = useState("");
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -628,18 +626,16 @@ export default function GasulTracker() {
   }, [inventoryDate]);
 
   // ---- Add Customer ----
-  const handleAddCustomer = async () => {
-    const name = customerFormName.trim();
-    if (!name) { setToast({ type: "error", message: "Customer name is required." }); return; }
+  const handleAddCustomer = async (name, phone) => {
+    const trimmedName = (name || "").trim();
+    if (!trimmedName) { setToast({ type: "error", message: "Customer name is required." }); return; }
     try {
       await addDoc(collection(db, "customers"), {
-        name,
-        phone: customerFormPhone.trim(),
+        name: trimmedName,
+        phone: (phone || "").trim(),
         createdAt: Timestamp.now(),
       });
-      setCustomerFormName("");
-      setCustomerFormPhone("");
-      setToast({ type: "success", message: `Added customer: ${name}` });
+      setToast({ type: "success", message: `Added customer: ${trimmedName}` });
     } catch (error) {
       console.error("Add customer error:", error);
       setToast({ type: "error", message: "Failed to add customer." });
@@ -1548,10 +1544,6 @@ export default function GasulTracker() {
           {activePage === "customers" && (
             <CustomersPage
               customers={customers}
-              formName={customerFormName}
-              setFormName={setCustomerFormName}
-              formPhone={customerFormPhone}
-              setFormPhone={setCustomerFormPhone}
               onAddCustomer={handleAddCustomer}
               onUpdateCustomer={handleUpdateCustomer}
               onDeleteCustomer={handleDeleteCustomer}
