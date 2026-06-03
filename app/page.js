@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { db, auth, googleProvider } from "../lib/firebase";
 import {
   collection, addDoc, getDocs, getDoc, query, orderBy, Timestamp,
-  doc, updateDoc, deleteDoc, onSnapshot, where, setDoc, limit,
+  doc, updateDoc, deleteDoc, onSnapshot, where, setDoc, limit, deleteField,
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { fmt, today, getPricebookSrp } from "../lib/utils";
@@ -608,9 +608,12 @@ export default function GasulTracker() {
         if (section) {
           row.end = section.calcEnd(row);
         }
-        // Don't persist empty/cleared audit values (they are managed by AuditPage)
-        if (row.aud == null || row.aud === "") delete row.aud;
-        if (row.audReason == null || row.audReason === "") delete row.audReason;
+        // Don't persist empty/cleared audit values. Use deleteField() rather than
+        // `delete row.x`: with { merge: true } an omitted key is left untouched, so a
+        // cleared aud/reason would silently revert. deleteField() forces removal, and
+        // works for dotted product names since it targets an object key, not a path.
+        if (row.aud == null || row.aud === "") row.aud = deleteField();
+        if (row.audReason == null || row.audReason === "") row.audReason = deleteField();
         items[product] = row;
       }
       try {

@@ -238,17 +238,15 @@ export default function ProductsPage({
   };
 
   // Dynamic product name lists from Firestore products (for pricebook tables)
-  const hiddenCategories = ["borrowed"];
   const productNamesInCategory = (cat) =>
     Object.entries(products)
       .filter(([, p]) => p.category === cat)
       .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
       .map(([, p]) => p.name);
 
-  // Grouped products for the Products sub-tab (exclude "borrowed" — not a valid category)
+  // Grouped products for the Products sub-tab
   const productsByCategory = Object.entries(products).reduce((acc, [key, prod]) => {
     const cat = prod.category || "unknown";
-    if (hiddenCategories.includes(cat)) return acc;
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push({ key, ...prod });
     return acc;

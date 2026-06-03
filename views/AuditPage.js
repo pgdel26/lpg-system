@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, doc, getDoc, updateDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, updateDoc, setDoc, deleteField, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
@@ -112,11 +112,19 @@ export default function AuditPage({
     setSaving(true);
     try {
       const docId = `${rec.date}_${rec.section}`;
-      const newAud = editValues.aud === "" ? "" : parseFloat(editValues.aud) || 0;
-      await updateDoc(doc(db, "dailyInventory", docId), {
-        [`items.${rec.product}.aud`]: newAud,
-        [`items.${rec.product}.audReason`]: editValues.reason,
-      });
+      const audEmpty = editValues.aud === "";
+      const newAud = audEmpty ? "" : parseFloat(editValues.aud) || 0;
+      // Write via a nested object (object keys are dot-safe) instead of a dotted
+      // field-path string like `items.2.7KG.aud`, which Firestore would mis-parse as
+      // items > 2 > 7KG. Cleared values use deleteField() so they're actually removed.
+      await setDoc(doc(db, "dailyInventory", docId), {
+        items: {
+          [rec.product]: {
+            aud: audEmpty ? deleteField() : newAud,
+            audReason: editValues.reason ? editValues.reason : deleteField(),
+          },
+        },
+      }, { merge: true });
       const newAudNum = parseFloat(newAud) || 0;
       const newVariance = newAudNum - rec.end;
       setAuditRecords((prev) => prev.map((r) =>
