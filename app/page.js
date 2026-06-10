@@ -628,6 +628,50 @@ export default function GasulTracker() {
     }, 500);
   }, [inventoryDate]);
 
+  // ---- Manually re-pull BEG from the previous day's saved END ----
+  // The auto-fallback (see effect above) only fires when BEG is entirely missing.
+  // This handler is the manual trigger: it overwrites the viewed date's BEG for
+  // every product with the prior day's END, then persists each section.
+  const handleFixBeginning = useCallback(async () => {
+    const sectionKeys = ["full", "empty", "accessories"];
+    const prevDate = (() => {
+      const d = new Date(inventoryDate + "T00:00:00+08:00");
+      d.setDate(d.getDate() - 1);
+      return d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+    })();
+    try {
+      const prevItems = {};
+      for (const sk of sectionKeys) {
+        const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${sk}`));
+        prevItems[sk] = snap.exists() ? (snap.data().items || {}) : {};
+      }
+      const hasAnyPrev = sectionKeys.some((sk) => Object.keys(prevItems[sk]).length > 0);
+      if (!hasAnyPrev) {
+        setToast({ type: "error", message: `No saved inventory found for ${prevDate}.` });
+        return;
+      }
+      setInventory((prev) => {
+        const updated = { ...prev };
+        for (const sk of sectionKeys) {
+          const newItems = { ...(prev[sk] || {}) };
+          for (const [product, row] of Object.entries(prevItems[sk])) {
+            const beg = row.end != null ? (parseFloat(row.end) || 0) : 0;
+            newItems[product] = { ...(newItems[product] || {}), beg };
+          }
+          updated[sk] = newItems;
+        }
+        return updated;
+      });
+      // Persist so the re-pulled BEG survives a reload. saveSection reads
+      // inventoryRef.current, which the sync effect updates from the setInventory above.
+      sectionKeys.forEach((sk) => saveSection(sk));
+      setToast({ type: "success", message: `Beginning inventory re-pulled from ${prevDate}.` });
+    } catch (err) {
+      console.error("Fix beginning error:", err);
+      setToast({ type: "error", message: "Failed to fix beginning inventory." });
+    }
+  }, [inventoryDate, saveSection]);
+
   // ---- Add Customer ----
   const handleAddCustomer = async (name, phone) => {
     const trimmedName = (name || "").trim();
@@ -1524,6 +1568,7 @@ export default function GasulTracker() {
               inventorySections={inventorySections}
               onInventoryChange={handleInventoryChange}
               onSaveSection={saveSection}
+              onFixBeginning={handleFixBeginning}
               inventory={inventory}
               staff={staff}
             />

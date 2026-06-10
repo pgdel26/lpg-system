@@ -25,7 +25,7 @@ function getDatesInRange(start, end) {
 export default function InventoryTabPage({
   inventoryDate, setInventoryDate,
   resolvedInventory, totalCylinderData, inventorySections,
-  onInventoryChange, onSaveSection,
+  onInventoryChange, onSaveSection, onFixBeginning,
   inventory, staff,
 }) {
   const [subTab, setSubTab] = useState("inventory");
@@ -553,6 +553,20 @@ export default function InventoryTabPage({
               )}
 
               <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+                {!rangeMode && (
+                  <button
+                    onClick={onFixBeginning}
+                    title="Re-pull this date's beginning inventory from the previous day's ending inventory"
+                    style={{
+                      padding: "6px 14px", borderRadius: "8px", border: "none",
+                      cursor: "pointer", background: "rgba(37,99,235,0.1)",
+                      color: "var(--accent-blue)",
+                      fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
+                    }}
+                  >
+                    Fix Beginning
+                  </button>
+                )}
                 <div style={{ position: "relative" }}>
                   <button
                     ref={exportBtnRef}
@@ -561,10 +575,10 @@ export default function InventoryTabPage({
                       else exportInventory();
                     }}
                     style={{
-                      padding: "6px 14px", borderRadius: "8px",
-                      border: "1px solid var(--border-light)", background: "transparent",
+                      padding: "6px 14px", borderRadius: "8px", border: "none",
+                      background: "rgba(37,99,235,0.1)",
                       cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
-                      color: "var(--text-muted)", fontSize: "12px", fontWeight: 600,
+                      color: "var(--accent-blue)", fontSize: "12px", fontWeight: 600,
                       fontFamily: "inherit",
                     }}
                   >
