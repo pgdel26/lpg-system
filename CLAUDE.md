@@ -38,10 +38,9 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 
 Don't fumble these — the Product Owner agent's file has the full domain, but at minimum:
 
-- **Products** have a `category` field. The two categories with first-class pricing support are `cylinder` (two prices: full + refill) and `accessories` (single SRP). Other categories exist (e.g., `cylinder_deposit`, `borrowed`) and must not be silently ignored.
+- **Products** have a `category` field. The two categories with first-class pricing support are `cylinder` (two prices: full + refill) and `accessories` (single SRP). Other categories exist (e.g., `cylinder_deposit`) and must not be silently ignored.
 - **Pricebooks** have states: `active` (at most one), `draft` (at most one), deactivated (historical, immutable). Active is what sales price against.
 - **Sales** accept cash or GCash (Philippine mobile wallet). GCash ref number is optional.
-- **Borrowed cylinders** are tracked separately — never mix with regular inventory.
 
 ## Known hotspot: hardcoded category filters
 
