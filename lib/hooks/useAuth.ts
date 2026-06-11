@@ -1,18 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
-import { auth, googleProvider } from "../firebase";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { auth } from "../firebase";
 import { isEmailAllowed } from "../allowedEmails";
 
 export interface UseAuth {
-  authUser: User | null | false; // null = loading, false = logged out
+  authUser: User | null; // null = not yet resolved (loading) or signed out
   authLoading: boolean;
   accessDenied: boolean;
-  login: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
 export function useAuth(): UseAuth {
-  const [authUser, setAuthUser] = useState<User | null | false>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
@@ -37,8 +36,7 @@ export function useAuth(): UseAuth {
     return () => unsub();
   }, []);
 
-  const login = useCallback(async () => { await signInWithPopup(auth, googleProvider); }, []);
   const logout = useCallback(async () => { await signOut(auth); }, []);
 
-  return { authUser, authLoading, accessDenied, login, logout };
+  return { authUser, authLoading, accessDenied, logout };
 }

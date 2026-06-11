@@ -37,7 +37,6 @@ export function useInventoryData(
 
   // ---- Refs used by debounced saves ----
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const saveAllTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inventoryRef = useRef<InventoryState>(inventory);
   const resolvedInventoryRef = useRef<InventoryState>({});
   const inventorySectionsRef = useRef<ReturnType<typeof buildInventorySections>>(inventorySections);
@@ -229,12 +228,11 @@ export function useInventoryData(
     }
   }, [inventoryDate, saveSection, onToast]);
 
-  // ---- Cleanup: clear all pending timers on unmount ----
+  // ---- Cleanup: clear all pending per-section save timers on unmount ----
+  // (The debounced "save all" timer lives in AppDataProvider, which clears its own.)
   useEffect(() => {
-    const saveAllTimer = saveAllTimerRef;
     const saveTimers = saveTimerRef;
     return () => {
-      if (saveAllTimer.current) clearTimeout(saveAllTimer.current);
       Object.values(saveTimers.current).forEach(clearTimeout);
     };
   }, []);
