@@ -12,6 +12,7 @@ type ToastFn = (t: { type: string; message: string }) => void;
 
 export interface UseProductsData {
   products: ProductMap;
+  loading: boolean;
   cylinderProducts: string[];
   accessoryGroups: { label: string; products: string[] }[];
   allAccessoryProducts: string[];
@@ -25,6 +26,9 @@ export interface UseProductsData {
 
 export function useProductsData(onToast: ToastFn): UseProductsData {
   const [products, setProducts] = useState<ProductMap>({});
+  // True until the first products snapshot arrives; drives the app's
+  // "Connecting to Firebase..." gate (matches page.js's `loading` state).
+  const [loading, setLoading] = useState(true);
 
   // ---- FIREBASE: Products listener ----
   // No auth gate needed: AppDataProvider only mounts after authentication.
@@ -33,6 +37,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
       const prodMap: ProductMap = {};
       snapshot.forEach((d) => { prodMap[d.id] = d.data() as Product; });
       setProducts(prodMap);
+      setLoading(false);
     });
     return () => unsubProducts();
   }, []);
@@ -136,6 +141,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
 
   return {
     products,
+    loading,
     cylinderProducts,
     accessoryGroups,
     allAccessoryProducts,

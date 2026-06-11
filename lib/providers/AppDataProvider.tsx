@@ -15,7 +15,7 @@ import { useExpensesData, type UseExpensesData } from "../hooks/useExpensesData"
 import { useStaffData, type UseStaffData } from "../hooks/useStaffData";
 import { useNotificationsData, type UseNotificationsData } from "../hooks/useNotificationsData";
 import { useReceivablesData, type UseReceivablesData } from "../hooks/useReceivablesData";
-import type { InventoryState } from "../types";
+import type { InventoryState, Refund } from "../types";
 
 // The column descriptors come from constants.js (untyped JS). TS infers a wide
 // union of per-variant shapes where no single member declares every source key,
@@ -38,7 +38,13 @@ interface InvColumn {
 export interface AppData extends
   UseProductsData, UsePricebooksData, UseInventoryData, UseCustomersData,
   UseSalesData, UseSwapsData, UsePurchasesData, UseRefundsData,
-  UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData {}
+  UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData {
+  // Cross-domain derived values computed in the provider (not owned by any
+  // single hook). resolvedInventory merges raw inventory + movements; refunds
+  // is allRefunds filtered to the viewed date (page.js passed this as `refunds`).
+  resolvedInventory: InventoryState;
+  refunds: Refund[];
+}
 
 const AppDataContext = createContext<AppData | null>(null);
 
@@ -58,6 +64,13 @@ export function AppDataProvider({
   // Toast state lives in the provider; every hook receives onToast.
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null);
   const onToast = useCallback((t: { type: string; message: string }) => setToast(t), []);
+
+  // Auto-dismiss toasts after 3s (matches page.js's original toast effect).
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // ---- Compose the 12 domain hooks in dependency order ----
   const products = useProductsData(onToast);
@@ -248,6 +261,8 @@ export function AppDataProvider({
     ...staff,
     ...notifications,
     ...receivables,
+    resolvedInventory,
+    refunds: dateRefunds,
   };
 
   return (
