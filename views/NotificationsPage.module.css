@@ -1,0 +1,215 @@
+.infoBanner {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.infoIcon {
+  color: var(--accent-blue);
+  display: flex;
+}
+
+.infoText {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.infoSubtext {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.reportsSection {
+  margin-bottom: 20px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.reportsCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.reportsPendingBanner {
+  padding: 10px 16px;
+  background: rgba(15, 23, 42, 0.03);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.reportRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.reportRowBordered {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.reportIcon {
+  color: var(--accent-blue);
+  display: flex;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.reportBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.reportName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.reportDescription {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.addFormCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.addRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.emailInput {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.addButton {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  white-space: nowrap;
+}
+
+.errorText {
+  font-size: 11px;
+  color: #ef4444;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.recipientList {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.recipientListHeader {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recipientRow {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  padding: 10px 14px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.recipientEmail {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: flex;
+  padding: 4px 6px;
+  border-radius: 6px;
+  margin-left: auto;
+}
+
+.removeButton:hover {
+  color: #ef4444;
+}
+
+.emptyState {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}

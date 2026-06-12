@@ -1,0 +1,150 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.closeButtonNormal {
+  cursor: pointer;
+}
+
+.closeButtonBusy {
+  cursor: wait;
+}
+
+.fieldGroup {
+  margin-bottom: 16px;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.dateRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dateCol {
+  flex: 1;
+}
+
+.dateLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dateInput {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+.errorText {
+  font-size: 11px;
+  color: var(--accent-red);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.cancelButtonNormal {
+  cursor: pointer;
+}
+
+.cancelButtonBusy {
+  cursor: wait;
+}
+
+.exportButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  font-family: inherit;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exportButtonNormal {
+  cursor: pointer;
+  opacity: 1;
+}
+
+.exportButtonBusy {
+  cursor: wait;
+  opacity: 0.7;
+}

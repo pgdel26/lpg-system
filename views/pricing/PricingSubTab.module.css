@@ -1,0 +1,391 @@
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ---- Active pricebook block ---- */
+
+.activeBlock {
+  margin-bottom: 28px;
+}
+
+.activeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dotGreen {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.dotBlue {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+}
+
+.pbName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.badgeActive {
+  font-size: 10px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badgeDraft {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.effectiveText {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  margin-left: 16px;
+}
+
+.primaryButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+/* ---- No active pricebook ---- */
+
+.emptyCard {
+  padding: 24px;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.emptyButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  margin: 0 auto;
+}
+
+/* ---- Draft pricebook card ---- */
+
+.draftCard {
+  margin-bottom: 28px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1.5px solid var(--accent-blue);
+  background: rgba(59, 130, 246, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.draftActions {
+  display: flex;
+  gap: 8px;
+}
+
+.ghostButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- Other pricebooks list ---- */
+
+.otherHeading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.otherCard {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.otherRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.otherInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.otherName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.otherDate {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.badgeDeactivated {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.showMore {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  margin-top: 4px;
+}
+
+/* ---- Modals ---- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.fieldsRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.nameField {
+  flex: 1;
+  min-width: 180px;
+}
+
+.dateField {
+  min-width: 160px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.viewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalCancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.modalSaveBlue {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.modalSaveGreen {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.viewTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewEffective {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.reactivateButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}

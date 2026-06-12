@@ -1,0 +1,731 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.todayButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.toolbarActions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.primaryButton {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.exportButton {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  opacity: 1;
+}
+
+.exportButtonDisabled {
+  cursor: default;
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+.grandTotalCard {
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0.04));
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grandTotalLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.grandTotalValue {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-gold);
+}
+
+.mainLayout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.tableCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.tableHeading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.saleRow {
+  display: grid;
+  padding: 8px 14px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+}
+
+.indexCell {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.invoiceCell {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.secondaryCell {
+  color: var(--text-secondary);
+}
+
+.productCell {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.typeCell {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.qtyCell {
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.srpCell {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.discCell {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.discActive {
+  color: var(--accent-red);
+}
+
+.discDim {
+  color: var(--text-dim);
+}
+
+.finalCell {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-size: 12px;
+}
+
+.payBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.payCash {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--accent-green);
+}
+
+.payGcash {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+}
+
+.payAr {
+  background: rgba(245, 158, 66, 0.1);
+  color: var(--accent-orange);
+}
+
+.gcashCell {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.gcashOn {
+  color: var(--accent-blue);
+}
+
+.gcashOff {
+  color: var(--text-dim);
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+.emptyRow {
+  padding: 20px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.totalRow {
+  display: grid;
+  grid-template-columns: 36px 1fr 1.2fr 1.2fr 0.8fr 0.8fr 0.7fr 0.8fr 0.7fr 52px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+}
+
+.totalRowLabel {
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.totalRowValue {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-size: 13px;
+}
+
+/* ---- Side panel ---- */
+
+.sidePanelWrap {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.toggleButton {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  margin-top: 28px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.toggleOpen {
+  transform: rotate(0deg);
+}
+
+.toggleClosed {
+  transform: rotate(180deg);
+}
+
+.sidePanel {
+  width: 400px;
+  margin-left: 8px;
+}
+
+.panelSection {
+  margin-bottom: 16px;
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.panelHeadingInner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panelHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dotBlue {
+  background: #3b82f6;
+}
+
+.dotRed {
+  background: #ef4444;
+}
+
+.panelTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.swapNewButton {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.refundNewButton {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.panelRow {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.panelRowInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.swapText {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.swapProduct {
+  font-weight: 600;
+}
+
+.swapArrow {
+  color: var(--text-dim);
+  margin: 0 6px;
+}
+
+.panelRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swapPrice {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-gold);
+}
+
+.panelEmpty {
+  padding: 12px 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.panelTotalRow {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panelTotalLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.panelTotalValue {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-size: 12px;
+}
+
+.refundTotalValue {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+  font-size: 12px;
+}
+
+/* ---- Refund row ---- */
+
+.refundRowInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refundInfo {
+  min-width: 0;
+}
+
+.refundLine1 {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.refundInvoice {
+  font-weight: 600;
+}
+
+.refundLine2 {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+.refundDefective {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.refundRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.refundAmount {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #f87171;
+}
+
+/* ---- Inline edit (shared sale/swap) ---- */
+
+.editRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.editFields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editInput {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editInputInvoice {
+  width: 100px;
+  display: block;
+}
+
+.editInputCustomer {
+  width: 140px;
+  display: block;
+}
+
+.editInputDiscount {
+  width: 80px;
+  display: block;
+}
+
+.editInputReason {
+  width: 160px;
+  display: block;
+}
+
+.editInputValue {
+  width: 70px;
+}
+
+.editInputMono {
+  font-family: var(--font-mono);
+}
+
+.editSelect {
+  display: block;
+  cursor: pointer;
+}
+
+.editFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editFooterEnd {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.editTotal {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-gold);
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
+}
+
+.arrowEdit {
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+/* ---- Refund inline edit ---- */
+
+.refundEditRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.refundEditFields {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.refundEditItem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.6);
+}
+
+.refundItemLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.refundItemValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pesoSign {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.defectiveLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.defectiveCheckbox {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.defectiveText {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.defectiveTextOn {
+  color: #f87171;
+}
+
+.refundEditFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.refundEditTotal {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+}

@@ -1,0 +1,170 @@
+.aside {
+  width: 250px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #1e3a8a, #1d4ed8);
+  border-right: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease;
+}
+.aside.collapsed {
+  width: 60px;
+}
+
+/* Logo / brand link */
+.logoLink {
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  background: none;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+}
+.aside.collapsed .logoLink {
+  padding: 16px 10px;
+}
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: none;
+}
+.logoText {
+  overflow: hidden;
+}
+.logoTitle {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #fff;
+  white-space: nowrap;
+}
+.logoSub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Nav */
+.nav {
+  padding: 12px 8px;
+  flex: 1;
+}
+
+/* Group button (Operations / Accounting) */
+.groupButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  justify-content: flex-start;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.15s;
+  margin-bottom: 2px;
+}
+.groupButton.active {
+  color: rgba(255, 255, 255, 0.9);
+}
+.groupLabel {
+  flex: 1;
+  text-align: left;
+}
+.groupChevron {
+  transition: transform 0.2s;
+  display: flex;
+}
+.groupChevron.open {
+  transform: rotate(0deg);
+}
+.groupChevron.closed {
+  transform: rotate(-90deg);
+}
+
+/* Nav link */
+.navLink {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  justify-content: flex-start;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s;
+  margin-bottom: 2px;
+  text-decoration: none;
+}
+.navLink.indented {
+  padding-left: 36px;
+}
+.aside.collapsed .navLink {
+  padding: 10px 0;
+  justify-content: center;
+}
+.navLink.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.navIcon {
+  flex-shrink: 0;
+  display: flex;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 14px;
+}
+
+/* Collapse toggle */
+.toggleButton {
+  padding: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.toggleChevron {
+  transition: transform 0.25s;
+  display: flex;
+}
+.toggleChevron.collapsed {
+  transform: rotate(180deg);
+}

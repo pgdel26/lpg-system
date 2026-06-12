@@ -1,0 +1,197 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.fieldGroup {
+  margin-bottom: 14px;
+}
+
+.fieldHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toggleButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  font-family: inherit;
+}
+
+.newCustomerInputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.productRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.productCol {
+  flex: 1;
+}
+
+.smallLabel {
+  font-size: 10px;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.selectInput {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+
+.customInput {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  margin-top: 6px;
+  box-sizing: border-box;
+}
+
+.swapIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 22px;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
+.priceInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: var(--font-mono);
+  box-sizing: border-box;
+}
+
+.error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.submitButton {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}

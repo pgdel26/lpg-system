@@ -1,0 +1,186 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background decorative glows */
+.glowTopRight {
+  position: absolute;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.glowBottomLeft {
+  position: absolute;
+  bottom: -300px;
+  left: -200px;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Glass card */
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4);
+}
+
+.brandTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.brandSub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 36px;
+}
+
+/* Access denied */
+.deniedBox {
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.deniedEmoji {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+.deniedHeading {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f87171;
+  margin-bottom: 4px;
+}
+.deniedBody {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.deniedEmail {
+  color: rgba(255, 255, 255, 0.7);
+}
+.retryButton {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.retryButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Sign-in form */
+.form {
+  text-align: left;
+}
+.inputGroup {
+  margin-bottom: 12px;
+}
+.inputGroupLast {
+  margin-bottom: 16px;
+}
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+.errorBox {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  font-size: 12px;
+  color: #f87171;
+}
+.submitButton {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.8);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.submitButton.submitting {
+  background: rgba(37, 99, 235, 0.4);
+  cursor: not-allowed;
+}
+
+/* Divider */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.dividerText {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 500;
+}
+
+/* Google sign-in button */
+.googleButton {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.15s;
+}
+.googleButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

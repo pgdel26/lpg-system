@@ -1,0 +1,111 @@
+.sectionBlock {
+  margin-bottom: 28px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* background is data-driven (section.color) — inline handles that property */
+.sectionDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sectionLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Total Cylinder summary */
+.summaryBlock {
+  margin-bottom: 28px;
+}
+
+.summaryDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 400px;
+}
+
+.tableHeadRow {
+  border-bottom: 1px solid var(--border);
+}
+
+.thProduct {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  min-width: 120px;
+}
+
+.thBeg {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.thEnd {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-orange);
+  text-transform: uppercase;
+}
+
+.tableBodyRow {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.tdProduct {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tdBeg {
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.tdEnd {
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-secondary);
+}

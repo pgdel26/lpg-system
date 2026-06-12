@@ -17,20 +17,6 @@ import { useNotificationsData, type UseNotificationsData } from "../hooks/useNot
 import { useReceivablesData, type UseReceivablesData } from "../hooks/useReceivablesData";
 import type { InventoryState, Refund } from "../types";
 
-// The column descriptors come from constants.js (untyped JS). TS infers a wide
-// union of per-variant shapes where no single member declares every source key,
-// so we read columns through this permissive accessor shape. page.js had no such
-// issue because it is plain JS; this only restores that access without changing
-// any runtime behavior.
-interface InvColumn {
-  field: string;
-  salesSource?: string;
-  purchaseSource?: string | string[];
-  swapSource?: "to" | "from";
-  refundSource?: { section: string; defective?: boolean };
-  source?: { section: string; field: string };
-}
-
 // The composed context value: the union of every domain hook's return shape.
 // The 12 interfaces have no overlapping property names, so this intersection
 // is a clean merge (verified during the integration step). If two hooks ever
@@ -162,7 +148,7 @@ export function AppDataProvider({
       resolved[section.key] = {};
       for (const product of section.products) {
         const row: Record<string, unknown> = { ...(inventory.inventory[section.key]?.[product] || {}) };
-        for (const col of section.columns as InvColumn[]) {
+        for (const col of section.columns) {
           if (col.salesSource) {
             row[col.field] = (sales.sales[col.salesSource] || {})[product] || 0;
           }
@@ -191,7 +177,7 @@ export function AppDataProvider({
     // Pass 2: resolve cross-section sources
     for (const section of products.inventorySections) {
       for (const product of section.products) {
-        for (const col of section.columns as InvColumn[]) {
+        for (const col of section.columns) {
           if (col.source) {
             const srcRow = resolved[col.source.section]?.[product] || {};
             (resolved[section.key][product] as Record<string, unknown>)[col.field] =

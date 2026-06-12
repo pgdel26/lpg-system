@@ -6,7 +6,7 @@ export type ProductCategory =
   | "cylinder_deposit"
   | string; // other categories exist and must not be dropped (see safe-category-change)
 
-export type PaymentType = "cash" | "gcash";
+export type PaymentType = "cash" | "gcash" | "ar";
 export type PricebookStatus = "active" | "draft" | "inactive";
 
 // products collection — keyed by `${category}_${name}`

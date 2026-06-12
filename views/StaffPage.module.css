@@ -1,0 +1,287 @@
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.addButton {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  white-space: nowrap;
+}
+
+.tableCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 80px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.editRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.editFields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.editField {
+  flex: 1;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editInput {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 80px;
+  padding: 10px 14px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+}
+
+.staffName {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.staffRole {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.staffPhone {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+.emptyState {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Add Staff Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalDialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modalCloseButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.modalField {
+  margin-bottom: 14px;
+}
+
+.modalFieldLast {
+  margin-bottom: 20px;
+}
+
+.modalLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modalInput {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+.modalInputMono {
+  font-family: var(--font-mono);
+}
+
+.formError {
+  font-size: 11px;
+  color: var(--accent-red);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalCancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.modalSubmitButton {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  font-family: inherit;
+  background: var(--accent-blue);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}

@@ -1,0 +1,397 @@
+.summaryCards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.summaryCard {
+  flex: 1;
+  min-width: 160px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.summaryLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.summaryValueRed {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-red);
+}
+
+.summaryValueGreen {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-green);
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filterInput {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+
+.filterSep {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.filterSelect {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.dateGroup {
+  margin-bottom: 16px;
+}
+
+.dateGroupLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.tableCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.editRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.editFields {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.editFieldFlex {
+  flex: 1;
+  min-width: 100px;
+}
+
+.editFieldShort {
+  min-width: 80px;
+}
+
+.editFieldMed {
+  min-width: 100px;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editInput {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+}
+
+.editInputMono {
+  font-family: var(--font-mono);
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
+  padding: 10px 14px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+}
+
+.invoiceCell {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.customerCell {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.productCell {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.qtyHint {
+  color: var(--text-dim);
+}
+
+.amountCell {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.checkCell {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.statusCell {
+  text-align: center;
+}
+
+.collectedBadge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-green);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.markCollectedButton {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.emptyStateText {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* Collect Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalDialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modalCloseButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+
+.modalBody {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.paymentMethodSection {
+  margin-bottom: 20px;
+}
+
+.paymentMethodLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.paymentMethodOptions {
+  display: flex;
+  gap: 8px;
+}
+
+/* border/bg/color are runtime-dynamic (per-option color + active state) — kept inline */
+.paymentMethodButton {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalCancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.collectButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  font-family: inherit;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}

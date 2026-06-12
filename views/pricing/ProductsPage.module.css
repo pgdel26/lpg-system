@@ -1,0 +1,36 @@
+.subTabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.subTab {
+  padding: 10px 24px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 0;
+  border: 1px solid rgba(200, 210, 220, 0.5);
+  border-bottom: 1px solid rgba(200, 210, 220, 0.5);
+  background: transparent;
+  color: var(--text-dim);
+  position: relative;
+  z-index: 0;
+  margin-bottom: -1px;
+  transition: all 0.15s ease;
+}
+
+.subTabActive {
+  border-bottom: 1px solid var(--bg-card);
+  background: var(--bg-card);
+  color: var(--accent-blue);
+  z-index: 1;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: 0 0 0 0;
+  border: 1px solid var(--border);
+  padding: 24px;
+}

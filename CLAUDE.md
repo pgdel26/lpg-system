@@ -18,8 +18,8 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 
 ## Stack and conventions
 
-- **Framework:** Next.js 16 (App Router), React 19. **TypeScript** is used — new code is `.ts`/`.tsx`. The domain model lives in `lib/types.ts`. Some `views/` are still `.js` and are being migrated incrementally (`allowJs` is on).
-- **Styling:** Inline `style={{}}` objects are the house style. Do not add Tailwind class usage (Tailwind is installed but not used this way), CSS modules, or styled-components. (CSS Modules migration is a planned future sub-project — see `docs/superpowers/specs/`.)
+- **Framework:** Next.js 16 (App Router), React 19. **TypeScript everywhere** — the entire codebase is `.ts`/`.tsx` (only `scripts/` one-offs are exempt). The domain model lives in `lib/types.ts`; section/column types in `lib/constants.ts`.
+- **Styling:** **Co-located CSS Modules** are the house style — each component is a `Foo.tsx` + `Foo.module.css` pair. Design tokens (colors, etc.) live in `app/globals.css` and are referenced via `var(--token)`. Minimal inline `style` is allowed ONLY for genuinely runtime-dynamic values (data-driven colors, computed widths). Do not add Tailwind class usage (installed but unused) or styled-components.
 - **Data:** Firebase / Firestore. All subscriptions and mutations live in **`lib/hooks/*Data.ts`** (one hook per domain), composed by **`lib/providers/AppDataProvider.tsx`** and consumed via the **`useAppData()`** hook. Auth lives in `lib/hooks/useAuth.ts`. Pages/views receive data and handlers and do not touch Firestore directly. Cross-domain effects (e.g. the inventory auto-save that reacts to sales/swaps/refunds/purchases) live in the provider.
 - **No test framework.** Verification is lint + build + manual in the dev server. Don't scaffold Jest/Vitest unless the user asks.
 - **No commit co-author footers on solo commits** (the user is the only contributor).
@@ -32,7 +32,7 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 - `lib/hooks/*Data.ts` — one hook per domain (products, sales, inventory, …); each owns its Firestore subscription + mutations. `lib/hooks/useAuth.ts` owns auth.
 - `lib/providers/AppDataProvider.tsx` — composes the data hooks, hosts cross-domain effects + toast, exposes `useAppData()`.
 - `app/layout.js` — root layout.
-- `views/` — page-level components (DashboardPage, ProductsPage, etc.).
+- `views/` — page-level components. Decomposed views live in folders (`views/inventory/`, `views/transactions/`, `views/pricing/`) with a parent orchestrator + focused children + pure-logic `.ts` helpers; simple views stay flat files (CustomersPage, StaffPage, etc.). Rule of thumb: no view file over ~400 lines — decompose into a folder instead.
 - `components/` — reusable UI (SaleModal, CustomerSearch, ConfirmModal, Icons, Toast, LoginPage).
 - `lib/utils.js` — shared helpers. **`today()` is the canonical date-string helper — use it, don't `new Date().toISOString()`.**
 - `lib/allowedEmails.js` — email allowlist for access.

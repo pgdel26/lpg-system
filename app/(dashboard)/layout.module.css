@@ -1,0 +1,133 @@
+.root {
+  min-height: 100vh;
+  position: relative;
+}
+
+.glowTop {
+  position: fixed;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.glowBottom {
+  position: fixed;
+  bottom: -300px;
+  left: -200px;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* marginLeft is runtime-dynamic (sidebar width) — set inline */
+.contentArea {
+  transition: margin-left 0.25s ease;
+  min-height: 100vh;
+}
+
+.header {
+  padding: 16px 24px;
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(20px);
+  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  padding: 4px;
+}
+
+.pageTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dateText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-mono);
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.signOutButton {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.signOutButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.main {
+  padding: 20px 24px;
+}
+
+.loadingGate {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.authLoading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loadingText {
+  color: var(--text-muted);
+  font-size: 14px;
+}
