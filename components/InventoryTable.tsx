@@ -1,33 +1,7 @@
 import React from "react";
 import styles from "./InventoryTable.module.css";
 import type { InventoryState, InventoryCell } from "../lib/types";
-
-interface InventoryColumn {
-  field: string;
-  label: string;
-  calc?: boolean;
-  auditSource?: boolean;
-  auditReason?: boolean;
-  source?: { section: string; field: string };
-  salesSource?: string;
-  purchaseSource?: string | string[];
-  swapSource?: string;
-  refundSource?: { section: string; defective?: boolean } | string;
-}
-
-interface InventorySubgroup {
-  label: string;
-  products: string[];
-}
-
-interface InventorySection {
-  key: string;
-  label: string;
-  products: string[];
-  columns: InventoryColumn[];
-  calcEnd: (row: InventoryCell) => number;
-  subgroups?: InventorySubgroup[];
-}
+import type { SectionColumn, InventorySection } from "../lib/constants";
 
 interface InventoryTableProps {
   section: InventorySection;
@@ -90,7 +64,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
   };
 
   // th color is determined by column flags at render time
-  const getColThColor = (col: InventoryColumn): string => {
+  const getColThColor = (col: SectionColumn): string => {
     if (col.calc) return "var(--accent-orange)";
     if (col.auditSource || col.auditReason) return "#22c55e";
     if (col.source || col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) return "var(--accent-blue)";

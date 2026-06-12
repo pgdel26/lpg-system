@@ -1,10 +1,112 @@
 // ============================================================
 // CONSTANTS
 // ============================================================
+import type { InventoryCell } from "./types";
 
+// ---------------------------------------------------------------------------
+// Shared building-block types
+// ---------------------------------------------------------------------------
+
+/** An accessory group used as input to all three builders. */
+export interface AccessoryGroup {
+  label: string;
+  products: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Inventory section types
+// ---------------------------------------------------------------------------
+
+/**
+ * A column descriptor inside an InventorySection.
+ * Every column has field + label; the optional source flags are mutually
+ * exclusive in practice but all optional for the type.
+ */
+export interface SectionColumn {
+  /** The row-level key this column reads / writes. */
+  field: string;
+  label: string;
+  /** True for computed columns (END, DIFF). */
+  calc?: true;
+  /** True for the AUDIT count column (editable number input). */
+  auditSource?: true;
+  /** True for the AUDIT REASON column (editable text input). */
+  auditReason?: true;
+  /** Sale-section key whose count populates this column. */
+  salesSource?: string;
+  /** Purchase-section key (or array of keys) whose counts are summed. */
+  purchaseSource?: string | string[];
+  /** Swap direction: "to" = outbound (full), "from" = inbound (empty). */
+  swapSource?: "to" | "from";
+  /**
+   * Refund source descriptor.
+   * When `defective` is explicitly `false`, only non-defective refunds are counted.
+   * When `defective` is absent, all refunds for that section are counted.
+   */
+  refundSource?: { section: string; defective?: false };
+  /** Cross-section source: pull the value from another resolved section's field. */
+  source?: { section: string; field: string };
+}
+
+/** A resolved inventory section (full, empty, or accessories). */
+export interface InventorySection {
+  key: string;
+  label: string;
+  products: string[];
+  color: string;
+  columns: SectionColumn[];
+  /** Compute the END value for a product row. */
+  calcEnd: (r: Partial<InventoryCell>) => number;
+  /** Present on the accessories section only. */
+  subgroups?: AccessoryGroup[];
+}
+
+// ---------------------------------------------------------------------------
+// Sales / purchase section types
+// ---------------------------------------------------------------------------
+
+/** A sales section (cylinderWithRefill | refill | accessories). */
+export interface SalesSection {
+  key: string;
+  label: string;
+  /** Present on cylinder sections; absent on the accessories section. */
+  products?: string[];
+  productCategory: string;
+  srpField: string;
+  /** Present on the accessories section only. */
+  subgroups?: AccessoryGroup[];
+}
+
+/** A purchase section (cylinderWithRefill | refill | accessories). */
+export interface PurchaseSection {
+  key: string;
+  label: string;
+  /** Present on cylinder sections; absent on the accessories section. */
+  products?: string[];
+  productCategory: string;
+  /** Present on the accessories section only. */
+  subgroups?: AccessoryGroup[];
+}
+
+// ---------------------------------------------------------------------------
+// Product seed type
+// ---------------------------------------------------------------------------
+
+export interface ProductSeedEntry {
+  category: "cylinder" | "accessories";
+  name: string;
+  srp: number;
+  srpRefill: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Inventory section definitions — columns match the spreadsheet
 // Cylinders automatically split into full and empty sub-categories
-export function buildInventorySections(cylinderProducts, accessoryGroups) {
+// ---------------------------------------------------------------------------
+export function buildInventorySections(
+  cylinderProducts: string[],
+  accessoryGroups: AccessoryGroup[],
+): InventorySection[] {
   const allAccessories = accessoryGroups.flatMap((g) => g.products);
   return [
     {
@@ -72,7 +174,10 @@ export function buildInventorySections(cylinderProducts, accessoryGroups) {
 }
 
 // Sales sections — matches spreadsheet columns A-D
-export function buildSalesSections(cylinderProducts, accessoryGroups) {
+export function buildSalesSections(
+  cylinderProducts: string[],
+  accessoryGroups: AccessoryGroup[],
+): SalesSection[] {
   return [
     {
       key: "cylinderWithRefill",
@@ -99,7 +204,10 @@ export function buildSalesSections(cylinderProducts, accessoryGroups) {
 }
 
 // Purchase sections — mirrors sales sections for the buying side
-export function buildPurchaseSections(cylinderProducts, accessoryGroups) {
+export function buildPurchaseSections(
+  cylinderProducts: string[],
+  accessoryGroups: AccessoryGroup[],
+): PurchaseSection[] {
   return [
     {
       key: "cylinderWithRefill",
@@ -123,7 +231,7 @@ export function buildPurchaseSections(cylinderProducts, accessoryGroups) {
 }
 
 // Product seed data for SRP
-export const PRODUCT_SEED_DATA = [
+export const PRODUCT_SEED_DATA: ProductSeedEntry[] = [
   { category: "cylinder", name: "2.7KG", srp: 1489, srpRefill: 289 },
   { category: "cylinder", name: "2.7KG FIESTA", srp: 1489, srpRefill: 289 },
   { category: "cylinder", name: "7KG PASAK", srp: 2588, srpRefill: 688 },
