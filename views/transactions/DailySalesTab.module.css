@@ -716,3 +716,16 @@
 .amountCash { color: var(--accent-green); }
 .amountGcash { color: var(--accent-blue); }
 .amountAr { color: var(--accent-orange); }
+
+/* ---- Scrollable table body (header + totals stay pinned outside it) ---- */
+.tableCard {
+  display: flex;
+  flex-direction: column;
+}
+
+.tableBody {
+  overflow-y: auto;
+  max-height: 60vh;
+  /* keep header/body column alignment stable when the scrollbar appears */
+  scrollbar-gutter: stable;
+}

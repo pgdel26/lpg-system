@@ -97,7 +97,7 @@ export default function DailySalesTab({
         {/* Sales transactions table */}
         <div className={styles.tableCol}>
           <h3 className={styles.tableHeading}>Sales</h3>
-          <div className={styles.card}>
+          <div className={`${styles.card} ${styles.tableCard}`}>
             <div className={styles.tableHeader} style={{ gridTemplateColumns: SALE_GRID }}>
               <span>#</span>
               <span>Invoice</span>
@@ -114,6 +114,7 @@ export default function DailySalesTab({
               <span />
             </div>
 
+            <div className={styles.tableBody}>
             {sorted.length > 0 ? sorted.map((t, i) => {
               const isEditing = editingId === `sale_${t.id}`;
 
@@ -196,6 +197,7 @@ export default function DailySalesTab({
             }) : (
               <div className={styles.emptyRow}>No sales transactions recorded today.</div>
             )}
+            </div>
 
             {sorted.length > 0 && (
               <div className={styles.totalRow} style={{ gridTemplateColumns: SALE_GRID }}>
