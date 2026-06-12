@@ -1,33 +1,34 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { XIcon, DownloadIcon } from "./Icons";
 import { today } from "../lib/utils";
 import CustomerSearch from "./CustomerSearch";
+import styles from "./ExportCustomerSalesModal.module.css";
+import type { Customer, CustomerTransaction } from "../lib/types";
 
-const TYPE_LABEL = { sale: "Sale", swap: "Swap", refund: "Refund" };
+const TYPE_LABEL: Record<string, string> = { sale: "Sale", swap: "Swap", refund: "Refund" };
 
-const getTxDescription = (tx) => {
-  if (tx.type === "sale") return `${tx.product || "Item"} x${tx.quantity || 1}`;
-  if (tx.type === "swap") return `${tx.productFrom || "?"} → ${tx.productTo || "?"}`;
-  if (tx.type === "refund") return `${tx.product || tx.saleSection || "Refund"}${tx.quantity ? ` x${tx.quantity}` : ""}`;
+const getTxDescription = (tx: CustomerTransaction): string => {
+  if (tx.type === "sale") return `${(tx.product as string) || "Item"} x${(tx.quantity as number) || 1}`;
+  if (tx.type === "swap") return `${(tx.productFrom as string) || "?"} → ${(tx.productTo as string) || "?"}`;
+  if (tx.type === "refund") return `${(tx.product as string) || (tx.saleSection as string) || "Refund"}${tx.quantity ? ` x${tx.quantity}` : ""}`;
   return "";
 };
 
-const getTxAmount = (tx) => {
-  if (tx.type === "sale") return tx.totalAmount || 0;
-  if (tx.type === "swap") return tx.price || 0;
-  if (tx.type === "refund") return tx.totalRefund || tx.refundAmount || 0;
+const getTxAmount = (tx: CustomerTransaction): number => {
+  if (tx.type === "sale") return (tx.totalAmount as number) || 0;
+  if (tx.type === "swap") return (tx.price as number) || 0;
+  if (tx.type === "refund") return (tx.totalRefund as number) || (tx.refundAmount as number) || 0;
   return 0;
 };
 
-const inputStyle = {
-  width: "100%", padding: "8px 10px", borderRadius: "8px",
-  background: "rgba(241,245,249,0.8)", border: "1px solid var(--border-light)",
-  color: "var(--text-secondary)", fontSize: "12px", outline: "none",
-  fontFamily: "inherit", boxSizing: "border-box",
-};
+interface ExportCustomerSalesModalProps {
+  customers: Customer[];
+  onFetchCustomerTransactions: (customerId: string) => Promise<CustomerTransaction[]>;
+  onClose: () => void;
+}
 
-export default function ExportCustomerSalesModal({ customers, onFetchCustomerTransactions, onClose }) {
+export default function ExportCustomerSalesModal({ customers, onFetchCustomerTransactions, onClose }: ExportCustomerSalesModalProps) {
   const firstOfMonth = today().slice(0, 7) + "-01";
   const [customerId, setCustomerId] = useState("");
   const [fromDate, setFromDate] = useState(firstOfMonth);
@@ -118,7 +119,7 @@ export default function ExportCustomerSalesModal({ customers, onFetchCustomerTra
         { s: { r: 12, c: 0 }, e: { r: 12, c: 7 } },
       ];
 
-      const setStyle = (addr, style) => {
+      const setStyle = (addr: string, style: Record<string, unknown>) => {
         if (!ws[addr]) ws[addr] = { t: "s", v: "" };
         ws[addr].s = { ...(ws[addr].s || {}), ...style };
       };
@@ -152,94 +153,61 @@ export default function ExportCustomerSalesModal({ customers, onFetchCustomerTra
 
   return (
     <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 1100,
-        background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}
+      className={styles.overlay}
       onClick={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }}
     >
-      <div style={{
-        background: "var(--bg-secondary)", borderRadius: "16px",
-        border: "1px solid var(--border)", padding: "24px",
-        width: "100%", maxWidth: "440px",
-        boxShadow: "0 20px 60px rgba(15,23,42,0.12)",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-          <h3 style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>
-            Export Customer Sales
-          </h3>
+      <div className={styles.dialog}>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Export Customer Sales</h3>
           <button
             onClick={onClose}
             disabled={exporting}
-            style={{ background: "none", border: "none", cursor: exporting ? "wait" : "pointer", color: "var(--text-muted)", display: "flex" }}
+            className={`${styles.closeButton} ${exporting ? styles.closeButtonBusy : styles.closeButtonNormal}`}
           >
             <XIcon />
           </button>
         </div>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", display: "block", marginBottom: "6px" }}>
-            Customer
-          </label>
+        <div className={styles.fieldGroup}>
+          <label className={styles.label}>Customer</label>
           <CustomerSearch customers={customers} value={customerId} onChange={setCustomerId} />
         </div>
 
-        <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              From
-            </label>
+        <div className={styles.dateRow}>
+          <div className={styles.dateCol}>
+            <label className={styles.dateLabel}>From</label>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              style={{ ...inputStyle, marginTop: "6px" }}
+              className={styles.dateInput}
             />
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              To
-            </label>
+          <div className={styles.dateCol}>
+            <label className={styles.dateLabel}>To</label>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              style={{ ...inputStyle, marginTop: "6px" }}
+              className={styles.dateInput}
             />
           </div>
         </div>
 
-        {error && (
-          <p style={{ fontSize: "11px", color: "var(--accent-red)", marginBottom: "12px", fontWeight: 600 }}>
-            {error}
-          </p>
-        )}
+        {error && <p className={styles.errorText}>{error}</p>}
 
-        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+        <div className={styles.actions}>
           <button
             onClick={onClose}
             disabled={exporting}
-            style={{
-              padding: "8px 16px", borderRadius: "8px",
-              border: "1px solid var(--border-light)", background: "transparent",
-              cursor: exporting ? "wait" : "pointer", fontSize: "12px", fontWeight: 600,
-              color: "var(--text-muted)", fontFamily: "inherit",
-            }}
+            className={`${styles.cancelButton} ${exporting ? styles.cancelButtonBusy : styles.cancelButtonNormal}`}
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
             disabled={exporting}
-            style={{
-              padding: "8px 16px", borderRadius: "8px", border: "none",
-              cursor: exporting ? "wait" : "pointer", fontSize: "12px", fontWeight: 600,
-              color: "#fff", fontFamily: "inherit",
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-              display: "flex", alignItems: "center", gap: "6px",
-              opacity: exporting ? 0.7 : 1,
-            }}
+            className={`${styles.exportButton} ${exporting ? styles.exportButtonBusy : styles.exportButtonNormal}`}
           >
             <DownloadIcon /> {exporting ? "Exporting..." : "Export"}
           </button>
