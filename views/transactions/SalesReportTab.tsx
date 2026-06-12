@@ -47,7 +47,7 @@ export default function SalesReportTab({
   const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
   // paymentType can be "ar" in stored data even though the PaymentType union
   // only declares cash/gcash; widen to string for the comparison.
-  const totalAR = saleTransactions.filter((t) => (t.paymentType as string) === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+  const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
   const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
@@ -143,7 +143,7 @@ export default function SalesReportTab({
               <div>
                 <div className={styles.rowLabel}>Accounts Receivable</div>
                 <div className={styles.rowSub}>
-                  {saleTransactions.filter((t) => (t.paymentType as string) === "ar").length} AR sale{saleTransactions.filter((t) => (t.paymentType as string) === "ar").length !== 1 ? "s" : ""}
+                  {saleTransactions.filter((t) => t.paymentType === "ar").length} AR sale{saleTransactions.filter((t) => t.paymentType === "ar").length !== 1 ? "s" : ""}
                 </div>
               </div>
               <span className={`${styles.rowValue} ${totalAR > 0 ? styles.valueOrange : styles.valueDim}`}>
