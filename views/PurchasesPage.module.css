@@ -1,0 +1,284 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.clearButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.addButton {
+  margin-left: auto;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tableCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.dateHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(241, 245, 249, 0.5);
+  border-bottom: 1px solid var(--border);
+}
+
+.dateHeaderTotal {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.editRow {
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.editFields {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.editFieldProduct {
+  flex: 2;
+  min-width: 120px;
+}
+
+.editFieldShort {
+  min-width: 70px;
+}
+
+.editFieldMed {
+  min-width: 90px;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editProductName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.editInput {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: var(--font-mono);
+  width: 100%;
+}
+
+.editTotalValue {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-blue);
+  padding: 4px 0;
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
+  padding: 10px 20px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.productName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.qtyCell {
+  text-align: center;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.unitCostCell {
+  text-align: right;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.totalCostCell {
+  text-align: right;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+}
+
+.grandTotalRow {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+}
+
+.grandTotalLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.grandTotalQty {
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.grandTotalCost {
+  text-align: right;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.emptyState {
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
