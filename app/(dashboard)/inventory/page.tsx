@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
-import InventoryTabPage from "../../../views/InventoryTabPage";
+import InventoryTabPage from "../../../views/inventory/InventoryTabPage";
 
 export default function InventoryRoutePage() {
   const data = useAppData();
