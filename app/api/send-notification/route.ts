@@ -2,7 +2,11 @@ import { Resend } from "resend";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function POST(request) {
+interface SendNotificationBody {
+  recipients?: unknown[];
+}
+
+export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
 
@@ -13,7 +17,7 @@ export async function POST(request) {
     );
   }
 
-  const body = await request.json();
+  const body = (await request.json()) as SendNotificationBody;
   const recipients = Array.isArray(body?.recipients) ? body.recipients : [];
   const cleaned = recipients
     .map((r) => (typeof r === "string" ? r.trim().toLowerCase() : ""))
