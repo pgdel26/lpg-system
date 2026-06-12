@@ -1,0 +1,84 @@
+.wrapper {
+  position: relative;
+}
+.selectedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  box-sizing: border-box;
+}
+.selectedName {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.clearButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 0 2px;
+  font-family: inherit;
+}
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+  max-height: 180px;
+  overflow-y: auto;
+}
+.option {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+}
+.option:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+.optionSelected {
+  background: rgba(59, 130, 246, 0.08);
+}
+.optionSelected:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+.optionName {
+  font-weight: 600;
+}
+.optionPhone {
+  color: var(--text-dim);
+  margin-left: 6px;
+}
+.empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
