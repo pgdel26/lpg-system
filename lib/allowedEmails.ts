@@ -4,12 +4,12 @@
 // access the app. Addresses are case-insensitive.
 // ============================================================
 
-export const ALLOWED_EMAILS = [
+export const ALLOWED_EMAILS: string[] = [
   "patgdeleon@gmail.com",
   "ma.gloriadeleon@yahoo.com"
 ];
 
-export function isEmailAllowed(email) {
+export function isEmailAllowed(email: string | null | undefined): boolean {
   if (!email) return false;
   return ALLOWED_EMAILS.map((e) => e.toLowerCase()).includes(email.toLowerCase());
 }
