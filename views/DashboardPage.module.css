@@ -1,0 +1,283 @@
+/* Quick Actions */
+.quickActions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.addSaleButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.viewInventoryButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+/* Net Sales hero */
+.heroCard {
+  margin-bottom: 16px;
+}
+
+.heroInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.heroAmount {
+  font-size: 34px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #16a34a;
+  line-height: 1.1;
+}
+
+.heroSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.heroBreakdowns {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+/* breakdown chip */
+.chipLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+/* chip value color is data-driven — inline handles color */
+.chipValue {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.chipCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Stat cards grid */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Shared stat labels and values */
+.statLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.statSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+/* Expenses card value */
+.expensesValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #f97316;
+}
+
+/* A/R card value */
+.arValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #ef4444;
+}
+
+/* Cashier card */
+.cashierName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.cashierBadge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6366f1;
+  margin-left: 6px;
+}
+
+.noCashier {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.crewList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.crewChip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+/* Recent Activity */
+.activitySection {
+  margin-bottom: 0;
+}
+
+.activitySectionLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.activityEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
+
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.activityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.activityRowBorder {
+  border-bottom: 1px solid var(--border);
+}
+
+.activityLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* bg/color are data-driven per activity type — inline handles those two props */
+.activityBadge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.activityDesc {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.activityRight {
+  text-align: right;
+}
+
+/* color is data-driven (positive = green, negative = red) — inline handles color */
+.activityAmount {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.activityDate {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Active Pricebook card */
+.pricebookCard {
+  margin-top: 16px;
+}
+
+.pricebookInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pricebookName {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.pricebookRight {
+  text-align: right;
+}
+
+.pricebookEffectiveLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.pricebookEffectiveDate {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
