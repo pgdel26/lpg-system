@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
+
 import TransactionsPage from "../../../views/transactions/TransactionsPage";
 import SaleModal from "../../../components/SaleModal";
 import SwapModal from "../../../components/SwapModal";
 import RefundModal from "../../../components/RefundModal";
+
 import type { RecordRefundInput } from "../../../lib/hooks/useRefundsData";
 import type { RecordSaleInput } from "../../../lib/hooks/useSalesData";
 
