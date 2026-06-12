@@ -26,7 +26,9 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 
 ## Directory map
 
-- `app/page.tsx` — top-level shell; auth gate + `AppDataProvider`, then `Dashboard` (local UI state + routing between views via `activePage`). No Firestore access here.
+- `app/page.tsx` — just a redirect to `/sales`.
+- `app/(dashboard)/layout.tsx` — shared dashboard layout: auth gate, `AppDataProvider`, Sidebar, header (title from `ROUTE_TITLES`), and the data-loading gate. Mounts once; persists across navigation.
+- `app/(dashboard)/<route>/page.tsx` — one route per screen (`/sales`, `/pricing`, `/purchases`, `/inventory`, `/customers`, `/receivables`, `/staff`, `/notifications`, `/contact`). Each is a thin client page: calls `useAppData()`, holds that screen's modal UI state, and feeds the existing view component as props. Navigation is `<Link>` + `usePathname()` — there is no `activePage`. (`/notifications` is reachable by URL but intentionally not in the sidebar.)
 - `lib/hooks/*Data.ts` — one hook per domain (products, sales, inventory, …); each owns its Firestore subscription + mutations. `lib/hooks/useAuth.ts` owns auth.
 - `lib/providers/AppDataProvider.tsx` — composes the data hooks, hosts cross-domain effects + toast, exposes `useAppData()`.
 - `app/layout.js` — root layout.
