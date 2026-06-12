@@ -1,9 +1,9 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-let cachedApp;
+let cachedApp: App | undefined;
 
-function getAdminApp() {
+function getAdminApp(): App {
   if (cachedApp) return cachedApp;
   const existing = getApps();
   if (existing.length > 0) {
@@ -16,16 +16,19 @@ function getAdminApp() {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY env var not set.");
   }
 
-  let serviceAccount;
+  let serviceAccount: Record<string, unknown>;
   try {
     const json = Buffer.from(b64, "base64").toString("utf8");
-    serviceAccount = JSON.parse(json);
+    serviceAccount = JSON.parse(json) as Record<string, unknown>;
   } catch (err) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is not valid base64-encoded JSON: " + err.message);
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT_KEY is not valid base64-encoded JSON: " +
+        (err as Error).message,
+    );
   }
 
   cachedApp = initializeApp({
-    credential: cert(serviceAccount),
+    credential: cert(serviceAccount as Parameters<typeof cert>[0]),
   });
   return cachedApp;
 }
