@@ -1,0 +1,143 @@
+.wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.headerRow {
+  border-bottom: 1px solid var(--border);
+}
+
+.stickyTh {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: sticky;
+  left: 0;
+  background: var(--bg-secondary);
+  z-index: 3;
+  min-width: 120px;
+}
+
+.colTh {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.dataRow {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  transition: background 0.1s;
+}
+
+.dataRow:hover {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.stickyTd {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: var(--bg-secondary);
+  z-index: 2;
+  transition: background 0.1s;
+}
+
+.dataRow:hover .stickyTd {
+  background: rgba(226, 232, 240, 0.95);
+}
+
+.calcCell {
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: rgba(241, 245, 249, 0.5);
+}
+
+.sourcedCell {
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.inputCell {
+  padding: 2px 2px;
+}
+
+.cellInput {
+  width: 100%;
+  padding: 4px 4px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.auditInput {
+  width: 100%;
+  padding: 4px 4px;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #22c55e;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.reasonInput {
+  width: 100%;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #22c55e;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.subgroupRow td {
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: rgba(241, 245, 249, 0.5);
+}
