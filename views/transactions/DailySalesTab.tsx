@@ -31,7 +31,7 @@ interface DailySalesTabProps {
 }
 
 // Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Cash | GCash | A/R | GCash Ref | actions
-const SALE_GRID = "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
+const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
 
 export default function DailySalesTab({
   inventoryDate, setInventoryDate,
