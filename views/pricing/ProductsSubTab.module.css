@@ -1,0 +1,266 @@
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.addButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+/* ---- Add product form ---- */
+
+.addForm {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-blue);
+}
+
+.addFormRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.fieldGrow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.fieldFixed {
+  min-width: 140px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+}
+
+.saveButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+/* ---- Product list by category ---- */
+
+.categoryGroup {
+  margin-bottom: 20px;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.categoryDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.categoryName {
+  font-size: 11px;
+}
+
+.categoryCount {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.list {
+  background: var(--bg-card);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.productName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ---- Inline edit row ---- */
+
+.editFields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
+.editNameInput {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editSelect {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.editCustomInput {
+  padding: 4px 8px;
+  border-radius: 6px;
+  width: 100px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editActions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.editSave {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 4px 8px;
+}
+
+.editCancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 4px 8px;
+}
+
+/* ---- Row action buttons ---- */
+
+.rowActions {
+  display: flex;
+  gap: 2px;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: flex;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.iconButtonEdit:hover {
+  color: var(--accent-blue);
+}
+
+.iconButtonDelete:hover {
+  color: #ef4444;
+}

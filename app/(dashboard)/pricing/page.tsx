@@ -1,6 +1,6 @@
 "use client";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
-import ProductsPage from "../../../views/ProductsPage";
+import ProductsPage from "../../../views/pricing/ProductsPage";
 
 export default function PricingRoutePage() {
   const data = useAppData();
