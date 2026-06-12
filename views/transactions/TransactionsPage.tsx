@@ -35,7 +35,7 @@ interface TransactionsPageProps {
   onAddExpense: (description: string, amount: string | number) => Promise<void>;
   onUpdateExpense: UpdateExpenseFn;
   onDeleteExpense: (id: string) => Promise<void>;
-  onNavigate: (page: string) => void;
+  onViewInventory: () => void;
 }
 
 const subTabs = [
@@ -54,7 +54,7 @@ export default function TransactionsPage({
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
-  onNavigate,
+  onViewInventory,
 }: TransactionsPageProps) {
   const [subTab, setSubTab] = useState("report");
   // Inline-edit state is shared across the Sales Report tab (expenses) and the
@@ -210,7 +210,7 @@ export default function TransactionsPage({
             onOpenSaleModal={onOpenSaleModal}
             onOpenSwapModal={onOpenSwapModal}
             onOpenRefundModal={onOpenRefundModal}
-            onNavigate={onNavigate}
+            onViewInventory={onViewInventory}
             onExportFullReport={handleExportFullReport}
             editingId={editingId}
             editData={editData}

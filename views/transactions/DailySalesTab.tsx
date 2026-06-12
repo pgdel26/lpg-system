@@ -19,7 +19,7 @@ interface DailySalesTabProps {
   onOpenSaleModal: () => void;
   onOpenSwapModal: () => void;
   onOpenRefundModal: () => void;
-  onNavigate: (page: string) => void;
+  onViewInventory: () => void;
   onExportFullReport: () => void;
   // Shared inline-edit state (owned by parent)
   editingId: string | null;
@@ -39,7 +39,7 @@ export default function DailySalesTab({
   totalRevenue, swapTotal, refundTotal, grandTotal,
   saleTypeLabel,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
-  onNavigate, onExportFullReport,
+  onViewInventory, onExportFullReport,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -63,7 +63,7 @@ export default function DailySalesTab({
           <button onClick={() => onOpenSaleModal()} className={styles.primaryButton}>
             <PlusIcon /> Add Sale
           </button>
-          <button onClick={() => onNavigate("inventory")} className={styles.primaryButton}>
+          <button onClick={onViewInventory} className={styles.primaryButton}>
             View Inventory
           </button>
           <button
