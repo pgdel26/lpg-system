@@ -1,6 +1,81 @@
 import * as XLSX from "xlsx-js-style";
 
-const saleTypeLabel = (section) => {
+// Local interfaces for report data shapes (admin SDK plain objects)
+
+interface ReportSaleTransaction {
+  id?: string;
+  invoice?: string;
+  customerName?: string;
+  product?: string;
+  saleSection?: string;
+  quantity?: number;
+  srp?: number;
+  discount?: number;
+  totalAmount?: number;
+  finalPrice?: number;
+  paymentType?: string;
+  createdAt?: { seconds?: number; _seconds?: number };
+}
+
+interface ReportSwap {
+  id?: string;
+  customerName?: string;
+  productFrom?: string;
+  productTo?: string;
+  price?: number;
+}
+
+interface ReportRefundItem {
+  product?: string;
+  qty?: number;
+}
+
+interface ReportRefund {
+  id?: string;
+  invoice?: string;
+  customerName?: string;
+  items?: ReportRefundItem[];
+  totalRefund?: number;
+}
+
+interface ReportExpense {
+  id?: string;
+  description?: string;
+  amount?: number;
+}
+
+interface ReportStaff {
+  id?: string;
+  name?: string;
+  role?: string;
+}
+
+interface ReportDailyReport {
+  cashier?: string | null;
+  staff?: string[];
+  actualCashRemit?: string | number | null;
+}
+
+interface ReportArTransaction {
+  id?: string;
+  arCollected?: boolean;
+  collectedDate?: string;
+  collectionMethod?: string;
+  totalAmount?: number;
+}
+
+export interface SalesReportInput {
+  date: string;
+  saleTransactions?: ReportSaleTransaction[];
+  swaps?: ReportSwap[];
+  refunds?: ReportRefund[];
+  expenses?: ReportExpense[];
+  staff?: ReportStaff[];
+  dailyReport?: ReportDailyReport;
+  arTransactions?: ReportArTransaction[];
+}
+
+const saleTypeLabel = (section: string): string => {
   if (section === "cylinderWithRefill") return "Full Cylinder";
   if (section === "refill") return "Refill";
   if (section === "accessories") return "Accessories";
@@ -16,7 +91,7 @@ export function buildSalesReportWorkbook({
   staff = [],
   dailyReport = { cashier: null, staff: [] },
   arTransactions = [],
-}) {
+}: SalesReportInput): XLSX.WorkBook {
   const sorted = [...saleTransactions].sort((a, b) => {
     const invA = (a.invoice || "").toLowerCase();
     const invB = (b.invoice || "").toLowerCase();
@@ -43,29 +118,29 @@ export function buildSalesReportWorkbook({
   );
   const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
   const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
-  const actual = parseFloat(dailyReport?.actualCashRemit) || 0;
+  const actual = parseFloat(String(dailyReport?.actualCashRemit ?? "")) || 0;
   const diff = actual - expectedCashRemit;
   const cashierName = dailyReport?.cashier
     ? (staff.find((s) => s.id === dailyReport.cashier)?.name || "")
     : "";
   const assignedStaff = (dailyReport?.staff || [])
     .map((id) => staff.find((s) => s.id === id))
-    .filter(Boolean);
+    .filter((s): s is ReportStaff => s !== undefined);
   const hasCashOnHand = dailyReport?.actualCashRemit != null && dailyReport?.actualCashRemit !== "";
 
-  const boldSz = (sz) => ({ font: { bold: true, sz } });
-  const sectionHeader = { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "left" } };
-  const tableHeader = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "E2E8F0" } }, border: { bottom: { style: "thin", color: { rgb: "94A3B8" } } } };
-  const totalRowStyle = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "F1F5F9" } }, border: { top: { style: "thin", color: { rgb: "94A3B8" } } } };
+  const boldSz = (sz: number): Record<string, unknown> => ({ font: { bold: true, sz } });
+  const sectionHeader: Record<string, unknown> = { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "left" } };
+  const tableHeader: Record<string, unknown> = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "E2E8F0" } }, border: { bottom: { style: "thin", color: { rgb: "94A3B8" } } } };
+  const totalRowStyle: Record<string, unknown> = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "F1F5F9" } }, border: { top: { style: "thin", color: { rgb: "94A3B8" } } } };
   const numFmt = "#,##0.00";
 
-  const sectionRows = [];
-  const tableHeaderRows = [];
-  const totalRows = [];
+  const sectionRows: number[] = [];
+  const tableHeaderRows: number[] = [];
+  const totalRows: number[] = [];
 
-  const data = [];
-  const merges = [];
-  let r;
+  const data: unknown[][] = [];
+  const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+  let r: number;
 
   data.push(["DAILY SALES REPORT"]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
@@ -147,7 +222,7 @@ export function buildSalesReportWorkbook({
     sorted.forEach((t) => {
       data.push([
         t.invoice || "", t.customerName || "", t.product || "",
-        saleTypeLabel(t.saleSection), t.quantity || 1, t.srp || 0,
+        saleTypeLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
         t.discount || 0, t.totalAmount || t.finalPrice || 0,
         t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR",
       ]);
@@ -184,7 +259,7 @@ export function buildSalesReportWorkbook({
     { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
   ];
 
-  const range = XLSX.utils.decode_range(ws["!ref"]);
+  const range = XLSX.utils.decode_range(ws["!ref"] as string);
   for (let R = range.s.r; R <= range.e.r; R++) {
     for (let C = range.s.c; C <= range.e.c; C++) {
       const addr = XLSX.utils.encode_cell({ r: R, c: C });
