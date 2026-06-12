@@ -1,14 +1,19 @@
 import { useState } from "react";
+
 import ConfirmModal from "../../components/ConfirmModal";
 import SalesReportTab from "./SalesReportTab";
 import DailySalesTab from "./DailySalesTab";
 import RefundsPage from "./RefundsPage";
+
 import { exportFullReport } from "./transactionsExport";
+
 import type {
   EditData, PendingDelete, DailyReportWithCash, RefundItemInput,
   UpdateSaleFn, UpdateSwapFn, UpdateRefundFn, UpdateExpenseFn,
 } from "./transactionsTypes";
+
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
+
 import styles from "./TransactionsPage.module.css";
 
 interface TransactionsPageProps {
@@ -202,7 +207,6 @@ export default function TransactionsPage({
             sorted={sorted}
             swaps={swaps}
             refunds={refunds}
-            totalRevenue={totalRevenue}
             swapTotal={swapTotal}
             refundTotal={refundTotal}
             grandTotal={grandTotal}

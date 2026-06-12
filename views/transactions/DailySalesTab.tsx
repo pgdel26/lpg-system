@@ -11,7 +11,6 @@ interface DailySalesTabProps {
   sorted: SaleTransaction[];
   swaps: Swap[];
   refunds: Refund[];
-  totalRevenue: number;
   swapTotal: number;
   refundTotal: number;
   grandTotal: number;
@@ -31,18 +30,29 @@ interface DailySalesTabProps {
   setPendingDelete: (d: PendingDelete | null) => void;
 }
 
-const SALE_GRID = "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.7fr 1fr 52px";
+// Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Cash | GCash | A/R | GCash Ref | actions
+const SALE_GRID = "36px 1fr 1.2fr 1.2fr 0.8fr 0.5fr 0.8fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
 
 export default function DailySalesTab({
   inventoryDate, setInventoryDate,
   sorted, swaps, refunds,
-  totalRevenue, swapTotal, refundTotal, grandTotal,
+  swapTotal, refundTotal, grandTotal,
   saleTypeLabel,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
   onViewInventory, onExportFullReport,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+
+  // Which breakdown column a sale's amount belongs in. Anything that isn't
+  // cash or gcash lands under A/R, matching the old payment-badge fallback.
+  const payColOf = (t: SaleTransaction) =>
+    t.paymentType === "cash" ? "cash" : t.paymentType === "gcash" ? "gcash" : "ar";
+  const amountOf = (t: SaleTransaction) => t.totalAmount || t.finalPrice || 0;
+
+  const cashTotal = sorted.filter((t) => payColOf(t) === "cash").reduce((s, t) => s + amountOf(t), 0);
+  const gcashTotal = sorted.filter((t) => payColOf(t) === "gcash").reduce((s, t) => s + amountOf(t), 0);
+  const arTotal = sorted.filter((t) => payColOf(t) === "ar").reduce((s, t) => s + amountOf(t), 0);
 
   return (
     <div>
@@ -97,8 +107,9 @@ export default function DailySalesTab({
               <span className={styles.alignCenter}>Qty</span>
               <span className={styles.alignRight}>SRP</span>
               <span className={styles.alignRight}>Disc.</span>
-              <span className={styles.alignRight}>Final</span>
-              <span className={styles.alignCenter}>Pay</span>
+              <span className={styles.alignRight}>Cash</span>
+              <span className={styles.alignRight}>GCash</span>
+              <span className={styles.alignRight}>A/R</span>
               <span>GCash Ref No</span>
               <span />
             </div>
@@ -160,11 +171,14 @@ export default function DailySalesTab({
                   <span className={`${styles.discCell} ${t.discount > 0 ? styles.discActive : styles.discDim}`}>
                     {t.discount > 0 ? `-${fmt(t.discount)}` : "—"}
                   </span>
-                  <span className={styles.finalCell}>{fmt(t.totalAmount || t.finalPrice || 0)}</span>
-                  <span className={styles.alignCenter}>
-                    <span className={`${styles.payBadge} ${t.paymentType === "cash" ? styles.payCash : t.paymentType === "gcash" ? styles.payGcash : styles.payAr}`}>
-                      {t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR"}
-                    </span>
+                  <span className={payColOf(t) === "cash" ? `${styles.amountCell} ${styles.amountCash}` : styles.amountOff}>
+                    {payColOf(t) === "cash" ? fmt(amountOf(t)) : "—"}
+                  </span>
+                  <span className={payColOf(t) === "gcash" ? `${styles.amountCell} ${styles.amountGcash}` : styles.amountOff}>
+                    {payColOf(t) === "gcash" ? fmt(amountOf(t)) : "—"}
+                  </span>
+                  <span className={payColOf(t) === "ar" ? `${styles.amountCell} ${styles.amountAr}` : styles.amountOff}>
+                    {payColOf(t) === "ar" ? fmt(amountOf(t)) : "—"}
                   </span>
                   <span className={`${styles.gcashCell} ${t.gcashRef ? styles.gcashOn : styles.gcashOff}`}>
                     {t.gcashRef || "—"}
@@ -184,10 +198,12 @@ export default function DailySalesTab({
             )}
 
             {sorted.length > 0 && (
-              <div className={styles.totalRow}>
-                <span /><span /><span /><span /><span /><span />
+              <div className={styles.totalRow} style={{ gridTemplateColumns: SALE_GRID }}>
+                <span /><span /><span /><span /><span /><span /><span />
                 <span className={styles.totalRowLabel}>Total</span>
-                <span className={styles.totalRowValue}>{fmt(totalRevenue)}</span>
+                <span className={`${styles.totalRowValue} ${styles.amountCash}`}>{fmt(cashTotal)}</span>
+                <span className={`${styles.totalRowValue} ${styles.amountGcash}`}>{fmt(gcashTotal)}</span>
+                <span className={`${styles.totalRowValue} ${styles.amountAr}`}>{fmt(arTotal)}</span>
                 <span /><span />
               </div>
             )}
