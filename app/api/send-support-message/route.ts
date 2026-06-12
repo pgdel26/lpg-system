@@ -2,7 +2,13 @@ import { Resend } from "resend";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function POST(request) {
+interface SendSupportMessageBody {
+  subject?: unknown;
+  message?: unknown;
+  fromEmail?: unknown;
+}
+
+export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   const supportTo = process.env.SUPPORT_RECIPIENT_EMAIL;
@@ -14,7 +20,7 @@ export async function POST(request) {
     );
   }
 
-  const body = await request.json();
+  const body = (await request.json()) as SendSupportMessageBody;
   const subject = typeof body?.subject === "string" ? body.subject.trim() : "";
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   const fromEmail = typeof body?.fromEmail === "string" ? body.fromEmail.trim().toLowerCase() : "";
