@@ -36,7 +36,7 @@ interface DashboardPageProps {
   dailyReport: DailyReport | null;
   expenses: Expense[];
   arTransactions: SaleTransaction[];
-  onNavigate?: (view: string) => void;
+  onViewInventory?: () => void;
   onNewSale?: () => void;
 }
 
@@ -51,7 +51,7 @@ export default function DashboardPage({
   dailyReport,
   expenses,
   arTransactions,
-  onNavigate,
+  onViewInventory,
   onNewSale,
 }: DashboardPageProps) {
   // ─── Today's sales / swaps / refunds ───
@@ -159,8 +159,8 @@ export default function DashboardPage({
             <PlusIcon /> Add Sale
           </button>
         )}
-        {onNavigate && (
-          <button onClick={() => onNavigate("inventory")} className={styles.viewInventoryButton}>
+        {onViewInventory && (
+          <button onClick={onViewInventory} className={styles.viewInventoryButton}>
             <PackageIcon /> View Inventory
           </button>
         )}

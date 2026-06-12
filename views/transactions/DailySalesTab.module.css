@@ -206,36 +206,6 @@
   color: var(--text-dim);
 }
 
-.finalCell {
-  text-align: right;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--accent-gold);
-  font-size: 12px;
-}
-
-.payBadge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.payCash {
-  background: rgba(34, 197, 94, 0.1);
-  color: var(--accent-green);
-}
-
-.payGcash {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--accent-blue);
-}
-
-.payAr {
-  background: rgba(245, 158, 66, 0.1);
-  color: var(--accent-orange);
-}
-
 .gcashCell {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -275,7 +245,6 @@
 
 .totalRow {
   display: grid;
-  grid-template-columns: 36px 1fr 1.2fr 1.2fr 0.8fr 0.8fr 0.7fr 0.8fr 0.7fr 52px;
   padding: 10px 14px;
   border-top: 1px solid var(--border);
   background: rgba(241, 245, 249, 0.5);
@@ -728,4 +697,47 @@
   font-family: var(--font-mono);
   font-weight: 700;
   color: #f87171;
+}
+
+/* ---- Payment breakdown columns (Cash / GCash / A/R) ---- */
+.amountCell {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.amountOff {
+  text-align: right;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.amountCash { color: var(--accent-green); }
+.amountGcash { color: var(--accent-blue); }
+.amountAr { color: var(--accent-orange); }
+
+/* ---- Scrollable table (vertical: rows only; horizontal: whole table) ---- */
+.tableCard {
+  /* horizontal scroll container: header, body, and totals scroll together */
+  overflow-x: auto;
+}
+
+.tableInner {
+  /* guaranteed column breathing room; below this width the card scrolls sideways */
+  min-width: 1150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.refCol {
+  /* visual gap between the A/R amount and the GCash ref number */
+  padding-left: 16px;
+}
+
+.tableBody {
+  overflow-y: auto;
+  max-height: 60vh;
+  /* keep header/body column alignment stable when the scrollbar appears */
+  scrollbar-gutter: stable;
 }

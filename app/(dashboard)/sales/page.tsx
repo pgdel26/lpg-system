@@ -2,25 +2,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
+
 import TransactionsPage from "../../../views/transactions/TransactionsPage";
 import SaleModal from "../../../components/SaleModal";
 import SwapModal from "../../../components/SwapModal";
 import RefundModal from "../../../components/RefundModal";
+
 import type { RecordRefundInput } from "../../../lib/hooks/useRefundsData";
 import type { RecordSaleInput } from "../../../lib/hooks/useSalesData";
-
-// Page-id → route map (mirrors the old activePage string identifiers).
-const ROUTE_FOR: Record<string, string> = {
-  transactions: "/sales",
-  purchases: "/purchases",
-  inventory: "/inventory",
-  products: "/pricing",
-  customers: "/customers",
-  receivables: "/receivables",
-  staff: "/staff",
-  notifications: "/notifications",
-  contact: "/contact",
-};
 
 export default function SalesPage() {
   const router = useRouter();
@@ -161,10 +150,7 @@ export default function SalesPage() {
       <TransactionsPage
         inventoryDate={data.inventoryDate}
         setInventoryDate={data.setInventoryDate}
-        onNavigate={(page: string) => {
-          const route = ROUTE_FOR[page];
-          if (route) router.push(route);
-        }}
+        onViewInventory={() => router.push("/inventory")}
         saleTransactions={data.saleTransactions}
         swaps={data.swaps}
         refunds={data.refunds}

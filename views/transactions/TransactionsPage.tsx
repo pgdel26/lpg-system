@@ -1,14 +1,19 @@
 import { useState } from "react";
+
 import ConfirmModal from "../../components/ConfirmModal";
 import SalesReportTab from "./SalesReportTab";
 import DailySalesTab from "./DailySalesTab";
 import RefundsPage from "./RefundsPage";
+
 import { exportFullReport } from "./transactionsExport";
+
 import type {
   EditData, PendingDelete, DailyReportWithCash, RefundItemInput,
   UpdateSaleFn, UpdateSwapFn, UpdateRefundFn, UpdateExpenseFn,
 } from "./transactionsTypes";
+
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
+
 import styles from "./TransactionsPage.module.css";
 
 interface TransactionsPageProps {
@@ -35,7 +40,7 @@ interface TransactionsPageProps {
   onAddExpense: (description: string, amount: string | number) => Promise<void>;
   onUpdateExpense: UpdateExpenseFn;
   onDeleteExpense: (id: string) => Promise<void>;
-  onNavigate: (page: string) => void;
+  onViewInventory: () => void;
 }
 
 const subTabs = [
@@ -54,7 +59,7 @@ export default function TransactionsPage({
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
-  onNavigate,
+  onViewInventory,
 }: TransactionsPageProps) {
   const [subTab, setSubTab] = useState("report");
   // Inline-edit state is shared across the Sales Report tab (expenses) and the
@@ -202,7 +207,6 @@ export default function TransactionsPage({
             sorted={sorted}
             swaps={swaps}
             refunds={refunds}
-            totalRevenue={totalRevenue}
             swapTotal={swapTotal}
             refundTotal={refundTotal}
             grandTotal={grandTotal}
@@ -210,7 +214,7 @@ export default function TransactionsPage({
             onOpenSaleModal={onOpenSaleModal}
             onOpenSwapModal={onOpenSwapModal}
             onOpenRefundModal={onOpenRefundModal}
-            onNavigate={onNavigate}
+            onViewInventory={onViewInventory}
             onExportFullReport={handleExportFullReport}
             editingId={editingId}
             editData={editData}
