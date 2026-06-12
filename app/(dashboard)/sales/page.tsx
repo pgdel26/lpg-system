@@ -7,6 +7,7 @@ import SaleModal from "../../../components/SaleModal";
 import SwapModal from "../../../components/SwapModal";
 import RefundModal from "../../../components/RefundModal";
 import type { RecordRefundInput } from "../../../lib/hooks/useRefundsData";
+import type { RecordSaleInput } from "../../../lib/hooks/useSalesData";
 
 // Page-id → route map (mirrors the old activePage string identifiers).
 const ROUTE_FOR: Record<string, string> = {
@@ -83,7 +84,7 @@ export default function SalesPage() {
 
   // ---- Record-mutation wrappers ----
   const handleRecordSale = async (
-    items: Array<{ section: string; product: string; qty: string | number }>,
+    items: RecordSaleInput["items"],
     globalDiscount: number,
     saleDate: string,
     deliveryCharge = 0,
