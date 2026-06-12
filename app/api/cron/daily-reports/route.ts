@@ -1,12 +1,17 @@
 import * as XLSX from "xlsx-js-style";
 import { Resend } from "resend";
 import { getAdminDb } from "../../../../lib/firebaseAdmin";
-import { buildSalesReportWorkbook } from "../../../../lib/reports/salesReport";
+import { buildSalesReportWorkbook, SalesReportInput } from "../../../../lib/reports/salesReport";
 import { today } from "../../../../lib/utils";
+import type { firestore } from "firebase-admin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request) {
+interface NotificationRecipient {
+  email?: string;
+}
+
+export async function GET(request: Request): Promise<Response> {
   const authHeader = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
@@ -20,11 +25,11 @@ export async function GET(request) {
 
   const date = today();
 
-  let db;
+  let db: firestore.Firestore;
   try {
     db = getAdminDb();
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: (err as Error).message }, { status: 500 });
   }
 
   try {
@@ -42,27 +47,31 @@ export async function GET(request) {
       db.collection("settings").doc("notifications").get(),
     ]);
 
-    const recipients = settingsSnap.exists
-      ? (settingsSnap.data().recipients || []).map((r) => r.email).filter(Boolean)
+    const recipients: string[] = settingsSnap.exists
+      ? ((settingsSnap.data()?.recipients ?? []) as NotificationRecipient[])
+          .map((r) => r.email ?? "")
+          .filter(Boolean)
       : [];
 
     if (recipients.length === 0) {
       return Response.json({ ok: true, date, skipped: "no recipients configured" });
     }
 
-    const data = {
+    const data: SalesReportInput = {
       date,
       saleTransactions: salesSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       swaps: swapsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       refunds: refundsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       expenses: expensesSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
       staff: staffSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      dailyReport: dailyReportSnap.exists ? dailyReportSnap.data() : { cashier: null, staff: [] },
+      dailyReport: dailyReportSnap.exists
+        ? (dailyReportSnap.data() as SalesReportInput["dailyReport"])
+        : { cashier: null, staff: [] },
       arTransactions: arSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
     };
 
     const wb = buildSalesReportWorkbook(data);
-    const salesBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const salesBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 
     const resend = new Resend(apiKey);
     const { data: emailData, error } = await resend.emails.send({
@@ -87,6 +96,6 @@ export async function GET(request) {
     });
   } catch (err) {
     console.error("Daily reports cron error:", err);
-    return Response.json({ error: err.message || "Cron failed" }, { status: 500 });
+    return Response.json({ error: (err as Error).message || "Cron failed" }, { status: 500 });
   }
 }
