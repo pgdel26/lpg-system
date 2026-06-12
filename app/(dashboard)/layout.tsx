@@ -7,6 +7,7 @@ import { auth } from "../../lib/firebase";
 import LoginPage from "../../components/LoginPage";
 import Sidebar from "../../components/Sidebar";
 import { LoadingIcon, MenuIcon } from "../../components/Icons";
+import styles from "./layout.module.css";
 
 const ROUTE_TITLES: Record<string, string> = {
   "/sales": "Sales",
@@ -25,7 +26,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (authLoading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}>
+      <div className={styles.authLoading}>
         <LoadingIcon />
       </div>
     );
@@ -57,59 +58,44 @@ function DashboardChrome({
   const title = ROUTE_TITLES[pathname] || "";
 
   return (
-    <div style={{ minHeight: "100vh", position: "relative" }}>
+    <div className={styles.root}>
       {/* Ambient glows */}
-      <div style={{ position: "fixed", top: "-200px", right: "-200px", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(37,99,235,0.04) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <div style={{ position: "fixed", bottom: "-300px", left: "-200px", width: "700px", height: "700px", background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div className={styles.glowTop} />
+      <div className={styles.glowBottom} />
 
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
 
-      <div style={{ marginLeft: `${sidebarWidth}px`, transition: "margin-left 0.25s ease", minHeight: "100vh" }}>
+      <div className={styles.contentArea} style={{ marginLeft: `${sidebarWidth}px` }}>
         {/* Header */}
-        <header style={{
-          padding: "16px 24px", borderBottom: "none",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, zIndex: 30,
-          backdropFilter: "blur(20px)", background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <header className={styles.header}>
+          <div className={styles.headerLeft}>
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "rgba(255,255,255,0.8)", display: "flex", padding: "4px",
-              }}
+              className={styles.menuButton}
             >
               <MenuIcon />
             </button>
-            <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#fff" }}>
+            <h2 className={styles.pageTitle}>
               {title}
             </h2>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", fontFamily: "var(--font-mono)" }}>
+          <div className={styles.headerRight}>
+            <div className={styles.dateText}>
               {new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </div>
             {/* User info + logout */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className={styles.userRow}>
               {authUser.photoURL && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={authUser.photoURL}
                   alt={authUser.displayName || ""}
-                  style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)" }}
+                  className={styles.avatar}
                 />
               )}
               <button
                 onClick={onLogout}
-                style={{
-                  padding: "5px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.2)",
-                  cursor: "pointer", background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.7)", fontSize: "11px", fontWeight: 600,
-                  fontFamily: "inherit", transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                className={styles.signOutButton}
               >
                 Sign out
               </button>
@@ -117,11 +103,11 @@ function DashboardChrome({
           </div>
         </header>
 
-        <main style={{ padding: "20px 24px" }}>
+        <main className={styles.main}>
           {data.loading ? (
-            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}>
+            <div className={styles.loadingGate}>
               <LoadingIcon />
-              <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Connecting to Firebase...</p>
+              <p className={styles.loadingText}>Connecting to Firebase...</p>
             </div>
           ) : (
             children
