@@ -45,8 +45,6 @@ export default function SalesReportTab({
   const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
-  // paymentType can be "ar" in stored data even though the PaymentType union
-  // only declares cash/gcash; widen to string for the comparison.
   const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");

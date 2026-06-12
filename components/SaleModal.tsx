@@ -344,8 +344,7 @@ export default function SaleModal({
                   type="date"
                   value={checkDate}
                   onChange={(e) => setCheckDate(e.target.value)}
-                  className={styles.monoInput}
-                  style={{ marginTop: "4px" }}
+                  className={`${styles.monoInput} ${styles.arInput}`}
                 />
               </div>
               <div className={styles.arCol}>
@@ -355,8 +354,7 @@ export default function SaleModal({
                   value={checkAmount}
                   onChange={(e) => setCheckAmount(e.target.value)}
                   placeholder="0"
-                  className={styles.monoInput}
-                  style={{ marginTop: "4px" }}
+                  className={`${styles.monoInput} ${styles.arInput}`}
                 />
               </div>
             </div>
