@@ -98,6 +98,7 @@ export default function DailySalesTab({
         <div className={styles.tableCol}>
           <h3 className={styles.tableHeading}>Sales</h3>
           <div className={`${styles.card} ${styles.tableCard}`}>
+            <div className={styles.tableInner}>
             <div className={styles.tableHeader} style={{ gridTemplateColumns: SALE_GRID }}>
               <span>#</span>
               <span>Invoice</span>
@@ -110,7 +111,7 @@ export default function DailySalesTab({
               <span className={styles.alignRight}>Cash</span>
               <span className={styles.alignRight}>GCash</span>
               <span className={styles.alignRight}>A/R</span>
-              <span>GCash Ref No</span>
+              <span className={styles.refCol}>GCash Ref No</span>
               <span />
             </div>
 
@@ -181,7 +182,7 @@ export default function DailySalesTab({
                   <span className={payColOf(t) === "ar" ? `${styles.amountCell} ${styles.amountAr}` : styles.amountOff}>
                     {payColOf(t) === "ar" ? fmt(amountOf(t)) : "—"}
                   </span>
-                  <span className={`${styles.gcashCell} ${t.gcashRef ? styles.gcashOn : styles.gcashOff}`}>
+                  <span className={`${styles.gcashCell} ${styles.refCol} ${t.gcashRef ? styles.gcashOn : styles.gcashOff}`}>
                     {t.gcashRef || "—"}
                   </span>
                   <div className={styles.rowActions}>
@@ -209,6 +210,7 @@ export default function DailySalesTab({
                 <span /><span />
               </div>
             )}
+            </div>
           </div>
         </div>
 

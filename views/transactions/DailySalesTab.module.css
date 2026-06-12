@@ -717,10 +717,22 @@
 .amountGcash { color: var(--accent-blue); }
 .amountAr { color: var(--accent-orange); }
 
-/* ---- Scrollable table body (header + totals stay pinned outside it) ---- */
+/* ---- Scrollable table (vertical: rows only; horizontal: whole table) ---- */
 .tableCard {
+  /* horizontal scroll container: header, body, and totals scroll together */
+  overflow-x: auto;
+}
+
+.tableInner {
+  /* guaranteed column breathing room; below this width the card scrolls sideways */
+  min-width: 1150px;
   display: flex;
   flex-direction: column;
+}
+
+.refCol {
+  /* visual gap between the A/R amount and the GCash ref number */
+  padding-left: 16px;
 }
 
 .tableBody {
