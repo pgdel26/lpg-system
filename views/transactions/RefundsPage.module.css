@@ -1,0 +1,391 @@
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.defectiveCheckbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.checkboxText {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.checkboxTextActive {
+  color: #f87171;
+}
+
+.clearButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.group {
+  margin-bottom: 16px;
+}
+
+.groupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+.groupDate {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.groupTotal {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #f87171;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr 2fr 0.7fr 1fr 0.8fr 0.8fr 56px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr 2fr 0.7fr 1fr 0.8fr 0.8fr 56px;
+  padding: 10px 14px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+}
+
+.cellStrong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.cellSecondary {
+  color: var(--text-secondary);
+}
+
+.cellItems {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.cellDefective {
+  font-size: 11px;
+}
+
+.defectiveYes {
+  color: #f87171;
+  font-weight: 700;
+}
+
+.defectiveNo {
+  color: var(--text-dim);
+}
+
+.cellStatus {
+  font-size: 10px;
+}
+
+.statusBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.statusPending {
+  background: rgba(245, 158, 66, 0.1);
+  color: var(--accent-orange);
+}
+
+.statusReplaced {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--accent-green);
+}
+
+.statusNotDefective {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+}
+
+.statusMixed {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-muted);
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.cellReason {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.cellAmount {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+/* ---- Inline edit row ---- */
+
+.editRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.editTopFields {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.editFieldShrink {
+  flex: 0 0 auto;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editInput {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editInputInvoice {
+  width: 100px;
+  display: block;
+}
+
+.editInputCustomer {
+  width: 140px;
+  display: block;
+}
+
+.editInputReason {
+  width: 160px;
+  display: block;
+}
+
+.editInputMono {
+  font-family: var(--font-mono);
+}
+
+.editInputValue {
+  width: 70px;
+}
+
+.editItem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.6);
+}
+
+.editItemLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.editItemValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pesoSign {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.defectiveLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.defectiveCheckboxSmall {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.defectiveText {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.defectiveTextOn {
+  color: #f87171;
+}
+
+.defectStatusSelect {
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 10px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.editFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.editTotal {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.empty {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
