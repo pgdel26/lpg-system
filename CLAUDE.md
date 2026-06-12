@@ -18,15 +18,17 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 
 ## Stack and conventions
 
-- **Framework:** Next.js 16 (App Router), React 19. No TypeScript anywhere — do not introduce it.
-- **Styling:** Inline `style={{}}` objects are the house style. Do not add Tailwind class usage (Tailwind is installed but not used this way), CSS modules, or styled-components.
-- **Data:** Firebase / Firestore. All subscriptions and mutations live in `app/page.js`. Pages in `views/` receive data and handlers as props — they do not touch Firestore directly.
+- **Framework:** Next.js 16 (App Router), React 19. **TypeScript** is used — new code is `.ts`/`.tsx`. The domain model lives in `lib/types.ts`. Some `views/` are still `.js` and are being migrated incrementally (`allowJs` is on).
+- **Styling:** Inline `style={{}}` objects are the house style. Do not add Tailwind class usage (Tailwind is installed but not used this way), CSS modules, or styled-components. (CSS Modules migration is a planned future sub-project — see `docs/superpowers/specs/`.)
+- **Data:** Firebase / Firestore. All subscriptions and mutations live in **`lib/hooks/*Data.ts`** (one hook per domain), composed by **`lib/providers/AppDataProvider.tsx`** and consumed via the **`useAppData()`** hook. Auth lives in `lib/hooks/useAuth.ts`. Pages/views receive data and handlers and do not touch Firestore directly. Cross-domain effects (e.g. the inventory auto-save that reacts to sales/swaps/refunds/purchases) live in the provider.
 - **No test framework.** Verification is lint + build + manual in the dev server. Don't scaffold Jest/Vitest unless the user asks.
 - **No commit co-author footers on solo commits** (the user is the only contributor).
 
 ## Directory map
 
-- `app/page.js` — top-level page; Firestore subscriptions, mutation handlers, routing between views.
+- `app/page.tsx` — top-level shell; auth gate + `AppDataProvider`, then `Dashboard` (local UI state + routing between views via `activePage`). No Firestore access here.
+- `lib/hooks/*Data.ts` — one hook per domain (products, sales, inventory, …); each owns its Firestore subscription + mutations. `lib/hooks/useAuth.ts` owns auth.
+- `lib/providers/AppDataProvider.tsx` — composes the data hooks, hosts cross-domain effects + toast, exposes `useAppData()`.
 - `app/layout.js` — root layout.
 - `views/` — page-level components (DashboardPage, ProductsPage, etc.).
 - `components/` — reusable UI (SaleModal, CustomerSearch, ConfirmModal, Icons, Toast, LoginPage).
@@ -38,10 +40,9 @@ Don't skip this even for small changes. If a change is trivial (typo, formatting
 
 Don't fumble these — the Product Owner agent's file has the full domain, but at minimum:
 
-- **Products** have a `category` field. The two categories with first-class pricing support are `cylinder` (two prices: full + refill) and `accessories` (single SRP). Other categories exist (e.g., `cylinder_deposit`, `borrowed`) and must not be silently ignored.
+- **Products** have a `category` field. The two categories with first-class pricing support are `cylinder` (two prices: full + refill) and `accessories` (single SRP). Other categories exist (e.g., `cylinder_deposit`) and must not be silently ignored.
 - **Pricebooks** have states: `active` (at most one), `draft` (at most one), deactivated (historical, immutable). Active is what sales price against.
 - **Sales** accept cash or GCash (Philippine mobile wallet). GCash ref number is optional.
-- **Borrowed cylinders** are tracked separately — never mix with regular inventory.
 
 ## Known hotspot: hardcoded category filters
 
