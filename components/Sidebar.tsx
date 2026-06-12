@@ -1,52 +1,68 @@
 import React, { useState } from "react";
-import { BriefcaseIcon, PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, MailIcon, PhoneIcon } from "./Icons";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, PhoneIcon } from "./Icons";
 
-export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const pathname = usePathname();
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [accountingOpen, setAccountingOpen] = useState(true);
 
-  const operationsChildren = [
-    { id: "transactions", label: "Sales", icon: <ListIcon /> },
-    { id: "inventory", label: "Inventory", icon: <PackageIcon /> },
-    { id: "products", label: "Products & Pricing", icon: <TagIcon /> },
+  const operationsChildren: NavItem[] = [
+    { href: "/sales", label: "Sales", icon: <ListIcon /> },
+    { href: "/inventory", label: "Inventory", icon: <PackageIcon /> },
+    { href: "/pricing", label: "Products & Pricing", icon: <TagIcon /> },
   ];
 
-  const accountingChildren = [
-    { id: "receivables", label: "Accounts Receivable", icon: <DollarIcon /> },
-    { id: "purchases", label: "Purchases", icon: <CartIcon /> },
+  const accountingChildren: NavItem[] = [
+    { href: "/receivables", label: "Accounts Receivable", icon: <DollarIcon /> },
+    { href: "/purchases", label: "Purchases", icon: <CartIcon /> },
   ];
 
-  const operationsIds = operationsChildren.map((c) => c.id);
-  const accountingIds = accountingChildren.map((c) => c.id);
-  const isOperationsActive = operationsIds.includes(activePage);
-  const isAccountingActive = accountingIds.includes(activePage);
+  const operationsHrefs = operationsChildren.map((c) => c.href);
+  const accountingHrefs = accountingChildren.map((c) => c.href);
+  const isOperationsActive = operationsHrefs.includes(pathname);
+  const isAccountingActive = accountingHrefs.includes(pathname);
 
-  const renderNavButton = (item, indent) => (
-    <button
-      key={item.id}
-      onClick={() => onNavigate(item.id)}
+  const renderNavLink = (item: NavItem, indent: boolean) => (
+    <Link
+      key={item.href}
+      href={item.href}
       style={{
         width: "100%", display: "flex", alignItems: "center",
         gap: "12px",
         padding: collapsed ? "10px 0" : `10px ${indent ? "14px" : "14px"}`,
         paddingLeft: collapsed ? undefined : indent ? "36px" : "14px",
         justifyContent: collapsed ? "center" : "flex-start",
-        borderRadius: "10px", border: "none", cursor: "pointer",
+        borderRadius: "10px", cursor: "pointer",
         fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
-        background: activePage === item.id ? "rgba(255,255,255,0.15)" : "transparent",
-        color: activePage === item.id ? "#fff" : "rgba(255,255,255,0.6)",
+        background: pathname === item.href ? "rgba(255,255,255,0.15)" : "transparent",
+        color: pathname === item.href ? "#fff" : "rgba(255,255,255,0.6)",
         transition: "all 0.15s", marginBottom: "2px",
+        textDecoration: "none",
       }}
       title={collapsed ? item.label : undefined}
     >
       <span style={{ flexShrink: 0, display: "flex" }}>{item.icon}</span>
       {!collapsed && <span>{item.label}</span>}
-    </button>
+    </Link>
   );
 
-  const renderGroup = (label, icon, isOpen, setIsOpen, children, isActive) => (
+  const renderGroup = (
+    label: string,
+    isOpen: boolean,
+    setIsOpen: (v: boolean) => void,
+    children: NavItem[],
+    isActive: boolean,
+  ) => (
     collapsed ? (
-      children.map((item) => renderNavButton(item, false))
+      children.map((item) => renderNavLink(item, false))
     ) : (
       <>
         <button
@@ -71,7 +87,7 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
             <ChevronDownIcon />
           </span>
         </button>
-        {isOpen && children.map((item) => renderNavButton(item, true))}
+        {isOpen && children.map((item) => renderNavLink(item, true))}
       </>
     )
   );
@@ -87,15 +103,16 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
       transition: "width 0.25s ease",
     }}>
       {/* Logo */}
-      <button
-        onClick={() => onNavigate("transactions")}
+      <Link
+        href="/sales"
         style={{
           padding: collapsed ? "16px 10px" : "16px 18px",
           borderBottom: "1px solid rgba(255,255,255,0.12)",
           display: "flex", alignItems: "center", gap: "10px",
           minHeight: "64px",
-          background: "none", border: "none", cursor: "pointer",
+          background: "none",
           width: "100%", textAlign: "left",
+          textDecoration: "none",
         }}
         title="Dashboard"
       >
@@ -117,12 +134,12 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
             </p>
           </div>
         )}
-      </button>
+      </Link>
 
       {/* Nav */}
       <nav style={{ padding: "12px 8px", flex: 1 }}>
         {/* Operations group */}
-        {renderGroup("Operations", <BriefcaseIcon />, operationsOpen, setOperationsOpen, operationsChildren, isOperationsActive)}
+        {renderGroup("Operations", operationsOpen, setOperationsOpen, operationsChildren, isOperationsActive)}
 
         {/* Divider */}
         {!collapsed && (
@@ -130,7 +147,7 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
         )}
 
         {/* Accounting group */}
-        {renderGroup("Accounting", <DollarIcon />, accountingOpen, setAccountingOpen, accountingChildren, isAccountingActive)}
+        {renderGroup("Accounting", accountingOpen, setAccountingOpen, accountingChildren, isAccountingActive)}
 
         {/* Divider */}
         {!collapsed && (
@@ -138,16 +155,16 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
         )}
 
         {/* Customers */}
-        {renderNavButton({ id: "customers", label: "Customers", icon: <UsersIcon /> }, false)}
+        {renderNavLink({ href: "/customers", label: "Customers", icon: <UsersIcon /> }, false)}
 
         {/* Staff */}
-        {renderNavButton({ id: "staff", label: "Staff", icon: <UserIcon /> }, false)}
+        {renderNavLink({ href: "/staff", label: "Staff", icon: <UserIcon /> }, false)}
 
         {/* Notifications — hidden until cron job is wired up */}
-        {/* {renderNavButton({ id: "notifications", label: "Notifications", icon: <MailIcon /> }, false)} */}
+        {/* {renderNavLink({ href: "/notifications", label: "Notifications", icon: <MailIcon /> }, false)} */}
 
         {/* Contact Us */}
-        {renderNavButton({ id: "contact", label: "Contact Us", icon: <PhoneIcon /> }, false)}
+        {renderNavLink({ href: "/contact", label: "Contact Us", icon: <PhoneIcon /> }, false)}
       </nav>
 
       {/* Collapse toggle */}
