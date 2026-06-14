@@ -41,10 +41,11 @@ export default function SalesReportTab({
 
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
+  const totalDelivery = saleTransactions.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
   const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
   const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
-  const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
+  const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
   const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
   const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
@@ -87,6 +88,19 @@ export default function SalesReportTab({
                 </div>
               </div>
               <span className={`${styles.rowValue} ${styles.valueGreen}`}>{fmt(grossSales)}</span>
+            </div>
+
+            {/* Delivery Charge row */}
+            <div className={styles.breakdownRow}>
+              <div>
+                <div className={styles.rowLabel}>Delivery Charge</div>
+                <div className={styles.rowSub}>
+                  {saleTransactions.filter((t) => t.deliveryCharge > 0).length} delivery{saleTransactions.filter((t) => t.deliveryCharge > 0).length !== 1 ? " sales" : " sale"}
+                </div>
+              </div>
+              <span className={`${styles.rowValue} ${totalDelivery > 0 ? styles.valueGreen : styles.valueDim}`}>
+                {totalDelivery > 0 ? `+ ${fmt(totalDelivery)}` : fmt(0)}
+              </span>
             </div>
 
             {/* Discount row */}

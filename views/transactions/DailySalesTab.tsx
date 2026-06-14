@@ -30,8 +30,8 @@ interface DailySalesTabProps {
   setPendingDelete: (d: PendingDelete | null) => void;
 }
 
-// Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Cash | GCash | A/R | GCash Ref | actions
-const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
+// Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Delivery | Cash | GCash | A/R | GCash Ref | actions
+const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
 
 export default function DailySalesTab({
   inventoryDate, setInventoryDate,
@@ -50,7 +50,10 @@ export default function DailySalesTab({
     t.paymentType === "cash" ? "cash" : t.paymentType === "gcash" ? "gcash" : "ar";
   const amountOf = (t: SaleTransaction) => t.totalAmount || t.finalPrice || 0;
 
-  const cashTotal = sorted.filter((t) => payColOf(t) === "cash").reduce((s, t) => s + amountOf(t), 0);
+  // Money-by-channel: swaps come in as cash, refunds are cash paid out. Folding
+  // both into the Cash column makes Cash + GCash + A/R reconcile to the grand total.
+  const cashTotal = sorted.filter((t) => payColOf(t) === "cash").reduce((s, t) => s + amountOf(t), 0)
+    + swapTotal - refundTotal;
   const gcashTotal = sorted.filter((t) => payColOf(t) === "gcash").reduce((s, t) => s + amountOf(t), 0);
   const arTotal = sorted.filter((t) => payColOf(t) === "ar").reduce((s, t) => s + amountOf(t), 0);
 
@@ -108,6 +111,7 @@ export default function DailySalesTab({
               <span className={styles.alignCenter}>Qty</span>
               <span className={styles.alignRight}>SRP</span>
               <span className={styles.alignRight}>Disc.</span>
+              <span className={styles.alignRight}>Delivery</span>
               <span className={styles.alignRight}>Cash</span>
               <span className={styles.alignRight}>GCash</span>
               <span className={styles.alignRight}>A/R</span>
@@ -173,6 +177,9 @@ export default function DailySalesTab({
                   <span className={`${styles.discCell} ${t.discount > 0 ? styles.discActive : styles.discDim}`}>
                     {t.discount > 0 ? `-${fmt(t.discount)}` : "—"}
                   </span>
+                  <span className={`${styles.discCell} ${t.deliveryCharge > 0 ? styles.deliveryActive : styles.discDim}`}>
+                    {t.deliveryCharge > 0 ? `+${fmt(t.deliveryCharge)}` : "—"}
+                  </span>
                   <span className={payColOf(t) === "cash" ? `${styles.amountCell} ${styles.amountCash}` : styles.amountOff}>
                     {payColOf(t) === "cash" ? fmt(amountOf(t)) : "—"}
                   </span>
@@ -204,10 +211,19 @@ export default function DailySalesTab({
               <div className={styles.totalRow} style={{ gridTemplateColumns: SALE_GRID }}>
                 <span /><span /><span /><span /><span /><span /><span />
                 <span className={styles.totalRowLabel}>Total</span>
+                <span />
                 <span className={`${styles.totalRowValue} ${styles.amountCash}`}>{fmt(cashTotal)}</span>
                 <span className={`${styles.totalRowValue} ${styles.amountGcash}`}>{fmt(gcashTotal)}</span>
                 <span className={`${styles.totalRowValue} ${styles.amountAr}`}>{fmt(arTotal)}</span>
                 <span /><span />
+              </div>
+            )}
+            {sorted.length > 0 && (swapTotal > 0 || refundTotal > 0) && (
+              <div className={styles.cashAdjustNote}>
+                Cash includes
+                {swapTotal > 0 ? ` +${fmt(swapTotal)} swaps` : ""}
+                {swapTotal > 0 && refundTotal > 0 ? "," : ""}
+                {refundTotal > 0 ? ` −${fmt(refundTotal)} refunds` : ""}
               </div>
             )}
             </div>
