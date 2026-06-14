@@ -11,9 +11,11 @@ interface ReportSaleTransaction {
   quantity?: number;
   srp?: number;
   discount?: number;
+  deliveryCharge?: number;
   totalAmount?: number;
   finalPrice?: number;
   paymentType?: string;
+  gcashRef?: string;
   createdAt?: { seconds?: number; _seconds?: number };
 }
 
@@ -103,10 +105,11 @@ export function buildSalesReportWorkbook({
 
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
+  const totalDelivery = saleTransactions.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
   const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
   const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = refunds.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
-  const netSales = grossSales - totalDiscount - totalExpenses - totalRefunds;
+  const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
   const totalAR = saleTransactions
     .filter((t) => t.paymentType === "ar")
     .reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
@@ -143,15 +146,15 @@ export function buildSalesReportWorkbook({
   let r: number;
 
   data.push(["DAILY SALES REPORT"]);
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } });
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 11 } });
   data.push([`Date: ${date}`]);
-  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } });
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 11 } });
   data.push([]);
 
   r = data.length;
   data.push(["STAFF ON DUTY"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
   r = data.length;
   data.push(["Role", "Name"]);
   tableHeaderRows.push(r);
@@ -165,11 +168,12 @@ export function buildSalesReportWorkbook({
   r = data.length;
   data.push(["SALES DAILY BREAKDOWN"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
   r = data.length;
   data.push(["", "Amount"]);
   tableHeaderRows.push(r);
   data.push(["Gross Sales", grossSales]);
+  data.push(["Delivery Charge", totalDelivery > 0 ? totalDelivery : 0]);
   data.push(["Discounts", totalDiscount > 0 ? -totalDiscount : 0]);
   data.push(["Expenses", totalExpenses > 0 ? -totalExpenses : 0]);
   data.push(["Refunds", totalRefunds > 0 ? -totalRefunds : 0]);
@@ -195,7 +199,7 @@ export function buildSalesReportWorkbook({
   r = data.length;
   data.push(["EXPENSES"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
   if (expenses.length > 0) {
     r = data.length;
     data.push(["Description", "Amount"]);
@@ -214,49 +218,62 @@ export function buildSalesReportWorkbook({
   r = data.length;
   data.push(["DAILY SALES"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
   if (sorted.length > 0 || swaps.length > 0 || refunds.length > 0) {
     r = data.length;
-    data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Total", "Payment"]);
+    data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Delivery", "Cash", "GCash", "A/R", "GCash Ref No"]);
     tableHeaderRows.push(r);
+    // Route each sale's amount into the column matching its payment type.
+    // Anything that isn't cash or gcash lands under A/R, mirroring the
+    // payColOf rule in DailySalesTab.
     sorted.forEach((t) => {
+      const amt = t.totalAmount || t.finalPrice || 0;
       data.push([
         t.invoice || "", t.customerName || "", t.product || "",
         saleTypeLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
-        t.discount || 0, t.totalAmount || t.finalPrice || 0,
-        t.paymentType === "cash" ? "Cash" : t.paymentType === "gcash" ? "GCash" : "AR",
+        t.discount || 0, t.deliveryCharge || 0,
+        t.paymentType === "cash" ? amt : "",
+        t.paymentType === "gcash" ? amt : "",
+        t.paymentType !== "cash" && t.paymentType !== "gcash" ? amt : "",
+        t.gcashRef || "",
       ]);
     });
+    // Swaps are settled in cash → Cash column.
     swaps.forEach((s) => {
       data.push([
         "", s.customerName || "", `${s.productFrom} → ${s.productTo}`,
-        "Swap", 1, s.price || 0, 0, s.price || 0, "Cash",
+        "Swap", 1, s.price || 0, 0, "", s.price || 0, "", "", "",
       ]);
     });
+    // Refunds are cash paid out of the drawer → Cash column (negative).
     refunds.forEach((rf) => {
       data.push([
         rf.invoice || "", rf.customerName || "",
         (rf.items || []).map((it) => it.product).join(", "),
         "Refund", (rf.items || []).reduce((sum, it) => sum + (it.qty || 0), 0),
-        "", "", -(rf.totalRefund || 0), "",
+        "", "", "", -(rf.totalRefund || 0), "", "", "",
       ]);
     });
+    // Money-by-channel: Cash = cash sales + swaps − refunds; GCash = gcash
+    // sales; A/R = ar sales. The three reconcile to the day's grand total.
     const salesTotalDiscount = sorted.reduce((sum, t) => sum + (t.discount || 0), 0);
-    const salesTotalAmount = sorted.reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0)
+    const cashTotal = sorted.filter((t) => t.paymentType === "cash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0)
       + swaps.reduce((sum, s) => sum + (s.price || 0), 0)
       - refunds.reduce((sum, rf) => sum + (rf.totalRefund || 0), 0);
+    const gcashTotal = sorted.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+    const arTotal = sorted.filter((t) => t.paymentType !== "cash" && t.paymentType !== "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
     r = data.length;
-    data.push(["", "", "", "", "", "", salesTotalDiscount, salesTotalAmount, ""]);
+    data.push(["", "", "", "", "", "", salesTotalDiscount, "", cashTotal, gcashTotal, arTotal, ""]);
     totalRows.push(r);
   } else {
-    data.push(["No sales recorded.", "", "", "", "", "", "", "", ""]);
+    data.push(["No sales recorded.", "", "", "", "", "", "", "", "", "", "", ""]);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 22 }, { wch: 20 }, { wch: 24 }, { wch: 14 },
-    { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+    { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
   ];
 
   const range = XLSX.utils.decode_range(ws["!ref"] as string);
