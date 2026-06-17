@@ -1,3 +1,4 @@
+import { categoryColor } from "../../lib/utils";
 import type {
   ProductMap,
   PriceMap,
@@ -62,16 +63,10 @@ export function buildCategoryMeta(products: ProductMap): CategoryMeta {
   allCategories.forEach((cat) => {
     if (!categoryLabels[cat]) categoryLabels[cat] = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
-  const categoryColorDefaults: Record<string, string> = { cylinder: "#f59e42", accessories: "#22c55e" };
-  const extraColors = ["#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#06b6d4", "#84cc16"];
-  const categoryColors: Record<string, string> = { ...categoryColorDefaults };
-  let colorIdx = 0;
-  allCategories.forEach((cat) => {
-    if (!categoryColors[cat]) {
-      categoryColors[cat] = extraColors[colorIdx % extraColors.length];
-      colorIdx++;
-    }
-  });
+  // Canonical, name-derived colors shared with the Inventory sections
+  // (lib/utils.categoryColor) so a category is the same color on every screen.
+  const categoryColors: Record<string, string> = {};
+  allCategories.forEach((cat) => { categoryColors[cat] = categoryColor(cat); });
 
   // Categories shown in pricebook modals: only those with products, ordered
   // cylinder → accessories → other categories alphabetically.

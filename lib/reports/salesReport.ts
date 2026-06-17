@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx-js-style";
+import { titleCaseCategory } from "../utils";
 
 // Local interfaces for report data shapes (admin SDK plain objects)
 
@@ -80,8 +81,9 @@ export interface SalesReportInput {
 const saleTypeLabel = (section: string): string => {
   if (section === "cylinderWithRefill") return "Full Cylinder";
   if (section === "refill") return "Refill";
-  if (section === "accessories") return "Accessories";
-  return section;
+  // Single-price categories (accessories + any future one) use the category key
+  // as their section; title-case it for display.
+  return titleCaseCategory(section);
 };
 
 export function buildSalesReportWorkbook({

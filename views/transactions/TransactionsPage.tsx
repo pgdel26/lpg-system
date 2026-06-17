@@ -6,6 +6,7 @@ import DailySalesTab from "./DailySalesTab";
 import RefundsPage from "./RefundsPage";
 
 import { exportFullReport } from "./transactionsExport";
+import { titleCaseCategory } from "../../lib/utils";
 
 import type {
   EditData, PendingDelete, DailyReportWithCash, RefundItemInput,
@@ -71,8 +72,8 @@ export default function TransactionsPage({
   const saleTypeLabel = (section: string) => {
     if (section === "cylinderWithRefill") return "Full Cylinder";
     if (section === "refill") return "Refill";
-    if (section === "accessories") return "Accessories";
-    return section;
+    // Single-price categories use the category key as their section.
+    return titleCaseCategory(section);
   };
 
   const sorted = [...saleTransactions].sort((a, b) => {

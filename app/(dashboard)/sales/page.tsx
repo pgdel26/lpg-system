@@ -229,7 +229,7 @@ export default function SalesPage() {
           saleTransactions={data.saleTransactions}
           customers={data.customers}
           cylinderProducts={data.cylinderProducts}
-          allAccessoryProducts={data.allAccessoryProducts}
+          singlePriceCategories={data.singlePriceCategories}
           error={refundModalError}
           onClose={() => setRefundModalOpen(false)}
           onSubmit={handleRecordRefund}

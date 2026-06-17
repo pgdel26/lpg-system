@@ -6,7 +6,13 @@ import { db } from "../firebase";
 import {
   buildInventorySections, buildSalesSections, buildPurchaseSections, PRODUCT_SEED_DATA,
 } from "../constants";
+import type { SinglePriceCategory } from "../constants";
+import { categoryColor } from "../utils";
 import type { Product, ProductMap, ProductCategory } from "../types";
+
+// Categories that are not sold/tracked anywhere (deprecated). Mirrors the list
+// in views/pricing/pricingCategories.ts; keep the two in sync.
+const HIDDEN_CATEGORIES = ["borrowed"];
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
@@ -14,8 +20,7 @@ export interface UseProductsData {
   products: ProductMap;
   loading: boolean;
   cylinderProducts: string[];
-  accessoryGroups: { label: string; products: string[] }[];
-  allAccessoryProducts: string[];
+  singlePriceCategories: SinglePriceCategory[];
   inventorySections: ReturnType<typeof buildInventorySections>;
   salesSections: ReturnType<typeof buildSalesSections>;
   purchaseSections: ReturnType<typeof buildPurchaseSections>;
@@ -69,36 +74,51 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
       .map(([, p]) => p.name),
     [products]);
 
-  const accessoryGroups = useMemo(() => {
-    const accessories = Object.entries(products)
-      .filter(([, p]) => p.category === "accessories")
-      .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
-      .map(([, p]) => p.name);
-    const regulators = accessories.filter((n) => n.includes("REGULATOR"));
-    const others = accessories.filter((n) => !n.includes("REGULATOR"));
-    return [
-      { label: "REGULATOR", products: regulators },
-      { label: "OTHERS", products: others },
-    ];
+  // All single-price categories (accessories + any future category like it),
+  // ordered accessories-first then alphabetically. This is the generalized input
+  // that drives Sales / Purchases / Inventory — replacing the old hardcoded
+  // "accessories" branch so a new single-price category appears everywhere.
+  const singlePriceCategories = useMemo<SinglePriceCategory[]>(() => {
+    const byCategory: Record<string, { name: string; sortOrder: number }[]> = {};
+    for (const p of Object.values(products)) {
+      if (p.category === "cylinder" || HIDDEN_CATEGORIES.includes(p.category)) continue;
+      (byCategory[p.category] ||= []).push({ name: p.name, sortOrder: p.sortOrder || 0 });
+    }
+    const orderedCats = Object.keys(byCategory).sort((a, b) => {
+      if (a === "accessories") return -1;
+      if (b === "accessories") return 1;
+      return a.localeCompare(b);
+    });
+    return orderedCats.map((cat) => {
+      const names = byCategory[cat]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((x) => x.name);
+      const label = cat === "accessories" ? "ACCESSORIES" : cat.replace(/_/g, " ").toUpperCase();
+      const color = categoryColor(cat);
+      // accessories keeps its REGULATOR / OTHERS display split; others stay flat.
+      const subgroups = cat === "accessories"
+        ? [
+            { label: "REGULATOR", products: names.filter((n) => n.includes("REGULATOR")) },
+            { label: "OTHERS", products: names.filter((n) => !n.includes("REGULATOR")) },
+          ]
+        : undefined;
+      return { category: cat, label, products: names, color, subgroups };
+    });
   }, [products]);
 
-  const allAccessoryProducts = useMemo(() =>
-    accessoryGroups.flatMap((g) => g.products),
-    [accessoryGroups]);
-
   const inventorySections = useMemo(
-    () => buildInventorySections(cylinderProducts, accessoryGroups),
-    [cylinderProducts, accessoryGroups],
+    () => buildInventorySections(cylinderProducts, singlePriceCategories),
+    [cylinderProducts, singlePriceCategories],
   );
 
   const salesSections = useMemo(
-    () => buildSalesSections(cylinderProducts, accessoryGroups),
-    [cylinderProducts, accessoryGroups],
+    () => buildSalesSections(cylinderProducts, singlePriceCategories),
+    [cylinderProducts, singlePriceCategories],
   );
 
   const purchaseSections = useMemo(
-    () => buildPurchaseSections(cylinderProducts, accessoryGroups),
-    [cylinderProducts, accessoryGroups],
+    () => buildPurchaseSections(cylinderProducts, singlePriceCategories),
+    [cylinderProducts, singlePriceCategories],
   );
 
   // ---- Handlers — setToast replaced with onToast ----
@@ -143,8 +163,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
     products,
     loading,
     cylinderProducts,
-    accessoryGroups,
-    allAccessoryProducts,
+    singlePriceCategories,
     inventorySections,
     salesSections,
     purchaseSections,

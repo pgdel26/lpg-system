@@ -169,9 +169,11 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
             }
             if (col.field === "beg") {
               const begVal = mergedRow[col.field as keyof InventoryCell];
+              // Show the actual number, including a real 0; "—" only when there's
+              // genuinely no beginning entry (null / "" / undefined).
               return (
                 <td key={col.field} className={styles.sourcedCell} title="Beginning inventory">
-                  {begVal != null && begVal !== "" && begVal !== 0 ? String(begVal) : "—"}
+                  {begVal != null && begVal !== "" ? String(begVal) : "—"}
                 </td>
               );
             }

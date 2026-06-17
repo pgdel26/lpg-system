@@ -49,9 +49,10 @@ export function useInventoryData(
   useEffect(() => { inventorySectionsRef.current = inventorySections; }, [inventorySections]);
 
   // ---- FIREBASE: Daily inventory listener ----
-  // Section keys are stable ("full", "empty", "accessories") regardless of product list
+  // Section keys come from the live section list ("full", "empty", + one per
+  // single-price category), so a new category gets its own daily-inventory doc.
   useEffect(() => {
-    const sectionKeys = ["full", "empty", "accessories"];
+    const sectionKeys = inventorySections.map((s) => s.key);
     const unsubscribers = sectionKeys.map((sectionKey) => {
       const docId = `${inventoryDate}_${sectionKey}`;
       return onSnapshot(doc(db, "dailyInventory", docId), (snapshot) => {
@@ -69,12 +70,12 @@ export function useInventoryData(
       });
     });
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, [inventoryDate]);
+  }, [inventoryDate, inventorySections]);
 
   // ---- Client-side BEG fallback: use previous day's saved END if BEG is missing ----
   useEffect(() => {
     begFallbackRanRef.current = null;
-    const sectionKeys = ["full", "empty", "accessories"];
+    const sectionKeys = inventorySections.map((s) => s.key);
     const prevDate = (() => {
       const d = new Date(inventoryDate + "T00:00:00+08:00");
       d.setDate(d.getDate() - 1);
@@ -123,7 +124,7 @@ export function useInventoryData(
       }
     }, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [inventoryDate]);
+  }, [inventoryDate, inventorySections]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((
@@ -189,7 +190,7 @@ export function useInventoryData(
   // This handler is the manual trigger: it overwrites the viewed date's BEG for
   // every product with the prior day's END, then persists each section.
   const handleFixBeginning = useCallback(async () => {
-    const sectionKeys = ["full", "empty", "accessories"];
+    const sectionKeys = inventorySectionsRef.current.map((s) => s.key);
     const prevDate = (() => {
       const d = new Date(inventoryDate + "T00:00:00+08:00");
       d.setDate(d.getDate() - 1);

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { XIcon, PlusIcon } from "./Icons";
-import { fmt } from "../lib/utils";
+import { fmt, titleCaseCategory } from "../lib/utils";
 import CustomerSearch from "./CustomerSearch";
 import styles from "./RefundModal.module.css";
 import type { Customer, SaleTransaction } from "../lib/types";
+import type { SinglePriceCategory } from "../lib/constants";
 import type { RecordRefundInput } from "../lib/hooks/useRefundsData";
 
 type RefundItem = RecordRefundInput["items"][number];
@@ -19,7 +20,7 @@ interface RefundModalProps {
   saleTransactions: SaleTransaction[];
   customers: Customer[];
   cylinderProducts: string[];
-  allAccessoryProducts: string[];
+  singlePriceCategories: SinglePriceCategory[];
   error: string;
   onClose: () => void;
   onSubmit: (input: RecordRefundInput) => void;
@@ -29,15 +30,21 @@ export default function RefundModal({
   saleTransactions,
   customers,
   cylinderProducts,
-  allAccessoryProducts,
+  singlePriceCategories,
   error,
   onClose, onSubmit,
 }: RefundModalProps) {
+  // Cylinder refunds split into empty/full; each single-price category (accessories
+  // + any future one) gets its own refund section keyed by category.
   const refundSections = useMemo(() => [
     { key: "emptyCylinder", label: "Empty Cylinder", products: cylinderProducts },
     { key: "fullCylinder", label: "Full Cylinder", products: cylinderProducts },
-    { key: "accessories", label: "Accessories", products: allAccessoryProducts },
-  ], [cylinderProducts, allAccessoryProducts]);
+    ...singlePriceCategories.map((c) => ({
+      key: c.category,
+      label: titleCaseCategory(c.category),
+      products: c.products,
+    })),
+  ], [cylinderProducts, singlePriceCategories]);
 
   const getProductsForSection = (sectionKey: string): string[] => {
     const sec = refundSections.find((s) => s.key === sectionKey);
@@ -100,10 +107,12 @@ export default function RefundModal({
     );
   }, [uniqueInvoices, invoiceSearch]);
 
-  // Map sale sections to refund sections
+  // Map sale sections to refund sections. The two cylinder sale sections collapse
+  // to the full-cylinder refund section; every single-price category sale section
+  // (accessories + any future one) maps to its own same-keyed refund section.
   const mapSaleToRefund = (saleSection: string): string => {
-    if (saleSection === "accessories") return "accessories";
-    return "fullCylinder"; // cylinderWithRefill or refill → full cylinder by default
+    if (saleSection === "cylinderWithRefill" || saleSection === "refill") return "fullCylinder";
+    return saleSection;
   };
 
   // When user selects an invoice, auto-fill everything

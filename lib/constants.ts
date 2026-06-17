@@ -13,6 +13,28 @@ export interface AccessoryGroup {
   products: string[];
 }
 
+/**
+ * A single-price product category (one SRP per unit, no refill) — accessories
+ * and any future category like it. This generalizes what used to be a hardcoded
+ * "accessories" branch in every section builder, so a new single-price category
+ * flows through Sales / Purchases / Inventory automatically.
+ *
+ * `subgroups` is only set for `accessories` (its REGULATOR / OTHERS split); other
+ * categories carry a flat `products` list.
+ */
+export interface SinglePriceCategory {
+  /** The product `category` field value, e.g. "accessories", "stove". */
+  category: string;
+  /** Display label for section headers, e.g. "ACCESSORIES". */
+  label: string;
+  /** Flattened product names in this category, sortOrder-ordered. */
+  products: string[];
+  /** Inventory section color. */
+  color: string;
+  /** Display subgroups (accessories only). */
+  subgroups?: AccessoryGroup[];
+}
+
 // ---------------------------------------------------------------------------
 // Inventory section types
 // ---------------------------------------------------------------------------
@@ -48,7 +70,7 @@ export interface SectionColumn {
   source?: { section: string; field: string };
 }
 
-/** A resolved inventory section (full, empty, or accessories). */
+/** A resolved inventory section (full, empty, or a single-price category). */
 export interface InventorySection {
   key: string;
   label: string;
@@ -57,7 +79,7 @@ export interface InventorySection {
   columns: SectionColumn[];
   /** Compute the END value for a product row. */
   calcEnd: (r: Partial<InventoryCell>) => number;
-  /** Present on the accessories section only. */
+  /** Display subgroups (e.g. accessories' REGULATOR / OTHERS). */
   subgroups?: AccessoryGroup[];
 }
 
@@ -65,26 +87,26 @@ export interface InventorySection {
 // Sales / purchase section types
 // ---------------------------------------------------------------------------
 
-/** A sales section (cylinderWithRefill | refill | accessories). */
+/** A sales section (cylinderWithRefill | refill | a single-price category). */
 export interface SalesSection {
   key: string;
   label: string;
-  /** Present on cylinder sections; absent on the accessories section. */
+  /** A flat product list; absent when the section uses `subgroups` instead. */
   products?: string[];
   productCategory: string;
   srpField: string;
-  /** Present on the accessories section only. */
+  /** Display subgroups (e.g. accessories' REGULATOR / OTHERS). */
   subgroups?: AccessoryGroup[];
 }
 
-/** A purchase section (cylinderWithRefill | refill | accessories). */
+/** A purchase section (cylinderWithRefill | refill | a single-price category). */
 export interface PurchaseSection {
   key: string;
   label: string;
-  /** Present on cylinder sections; absent on the accessories section. */
+  /** A flat product list; absent when the section uses `subgroups` instead. */
   products?: string[];
   productCategory: string;
-  /** Present on the accessories section only. */
+  /** Display subgroups (e.g. accessories' REGULATOR / OTHERS). */
   subgroups?: AccessoryGroup[];
 }
 
@@ -105,9 +127,8 @@ export interface ProductSeedEntry {
 // ---------------------------------------------------------------------------
 export function buildInventorySections(
   cylinderProducts: string[],
-  accessoryGroups: AccessoryGroup[],
+  singlePriceCategories: SinglePriceCategory[],
 ): InventorySection[] {
-  const allAccessories = accessoryGroups.flatMap((g) => g.products);
   return [
     {
       key: "full",
@@ -151,16 +172,21 @@ export function buildInventorySections(
         (r.beg || 0) - (r.toPlanta || 0) + (r.refillIn || 0) +
         (r.swapIn || 0) + (r.returned || 0),
     },
-    {
-      key: "accessories",
-      label: "ACCESSORIES",
-      products: allAccessories,
-      color: "#22c55e",
-      subgroups: accessoryGroups.filter((g) => g.products.length > 0),
+    // One section per single-price category (accessories + any future category).
+    // Columns reference the category key so the cross-domain inventory engine in
+    // AppDataProvider routes that category's sales/purchases automatically.
+    ...singlePriceCategories.map((cat): InventorySection => ({
+      key: cat.category,
+      label: cat.label,
+      products: cat.products,
+      color: cat.color,
+      ...(cat.subgroups
+        ? { subgroups: cat.subgroups.filter((g) => g.products.length > 0) }
+        : {}),
       columns: [
         { field: "beg", label: "BEG" },
-        { field: "delivery", label: "DELIVERY", purchaseSource: "accessories" },
-        { field: "sold", label: "SOLD", salesSource: "accessories" },
+        { field: "delivery", label: "DELIVERY", purchaseSource: cat.category },
+        { field: "sold", label: "SOLD", salesSource: cat.category },
         { field: "defective", label: "DEFECTIVE" },
         { field: "end", label: "END", calc: true },
         { field: "aud", label: "AUDIT", auditSource: true },
@@ -169,14 +195,14 @@ export function buildInventorySections(
       ],
       calcEnd: (r) =>
         (r.beg || 0) + (r.delivery || 0) - (r.sold || 0) - (r.defective || 0),
-    },
+    })),
   ];
 }
 
 // Sales sections — matches spreadsheet columns A-D
 export function buildSalesSections(
   cylinderProducts: string[],
-  accessoryGroups: AccessoryGroup[],
+  singlePriceCategories: SinglePriceCategory[],
 ): SalesSection[] {
   return [
     {
@@ -193,20 +219,24 @@ export function buildSalesSections(
       productCategory: "cylinder",
       srpField: "srpRefill",
     },
-    {
-      key: "accessories",
-      label: "ACCESSORIES",
-      subgroups: accessoryGroups.filter((g) => g.products.length > 0),
-      productCategory: "accessories",
+    // One single-price section per category. Accessories keeps its subgroups;
+    // other categories expose a flat `products` list. SaleModal reads either.
+    ...singlePriceCategories.map((cat): SalesSection => ({
+      key: cat.category,
+      label: cat.label,
+      productCategory: cat.category,
       srpField: "srp",
-    },
+      ...(cat.subgroups
+        ? { subgroups: cat.subgroups.filter((g) => g.products.length > 0) }
+        : { products: cat.products }),
+    })),
   ];
 }
 
 // Purchase sections — mirrors sales sections for the buying side
 export function buildPurchaseSections(
   cylinderProducts: string[],
-  accessoryGroups: AccessoryGroup[],
+  singlePriceCategories: SinglePriceCategory[],
 ): PurchaseSection[] {
   return [
     {
@@ -221,12 +251,14 @@ export function buildPurchaseSections(
       products: cylinderProducts,
       productCategory: "cylinder",
     },
-    {
-      key: "accessories",
-      label: "ACCESSORIES",
-      subgroups: accessoryGroups.filter((g) => g.products.length > 0),
-      productCategory: "accessories",
-    },
+    ...singlePriceCategories.map((cat): PurchaseSection => ({
+      key: cat.category,
+      label: cat.label,
+      productCategory: cat.category,
+      ...(cat.subgroups
+        ? { subgroups: cat.subgroups.filter((g) => g.products.length > 0) }
+        : { products: cat.products }),
+    })),
   ];
 }
 
