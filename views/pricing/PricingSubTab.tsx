@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { today } from "../../lib/utils";
-import { PlusIcon, XIcon, EditIcon, TrashIcon } from "../../components/Icons";
+import { XIcon, EditIcon, TrashIcon } from "../../components/Icons";
 import ConfirmModal from "../../components/ConfirmModal";
 import PriceSections from "./PriceTables";
 import { buildDefaultPrices } from "./pricingCategories";
@@ -22,10 +22,12 @@ interface PricingSubTabProps {
   pricebooks: Pricebook[];
   activePricebook: Pricebook | null;
   meta: CategoryMeta;
+  approverEmail: string;
   onCreatePricebook: CreatePricebookFn;
   onUpdatePricebook: UpdatePricebookFn;
   onActivatePricebook: ActivatePricebookFn;
   onDeletePricebook: DeletePricebookFn;
+  onSaveApproverEmail: (email: string) => Promise<void>;
 }
 
 export default function PricingSubTab({
@@ -33,12 +35,17 @@ export default function PricingSubTab({
   pricebooks,
   activePricebook,
   meta,
+  approverEmail,
   onCreatePricebook,
   onUpdatePricebook,
   onActivatePricebook,
   onDeletePricebook,
+  onSaveApproverEmail,
 }: PricingSubTabProps) {
   const [creating, setCreating] = useState(false);
+  const [approverModal, setApproverModal] = useState(false);
+  const [approverInput, setApproverInput] = useState("");
+  const [approverSaving, setApproverSaving] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEffectiveDate, setNewEffectiveDate] = useState(today());
   const [newPrices, setNewPrices] = useState<PriceMap>({});
@@ -66,6 +73,23 @@ export default function PricingSubTab({
     setDraftName(draftPricebook.name || "");
     setDraftDate(draftPricebook.effectiveDate || "");
   }
+
+  const openApproverModal = () => {
+    setApproverInput(approverEmail);
+    setApproverModal(true);
+  };
+
+  const handleSaveApprover = async () => {
+    const email = approverInput.trim();
+    if (!email) return;
+    setApproverSaving(true);
+    try {
+      await onSaveApproverEmail(email);
+      setApproverModal(false);
+    } finally {
+      setApproverSaving(false);
+    }
+  };
 
   const openCreateModal = () => {
     const defaultName = new Date().toLocaleDateString("en-PH", { month: "long", year: "numeric" });
@@ -153,11 +177,16 @@ export default function PricingSubTab({
                 Effective from {activePricebook.effectiveDate}
               </p>
             </div>
-            {!draftPricebook && (
-              <button onClick={openCreateModal} className={styles.primaryButton}>
-                <PlusIcon /> New Pricebook
+            <div className={styles.buttonGroup}>
+              {!draftPricebook && (
+                <button onClick={openCreateModal} className={styles.groupBtn}>
+                  New Pricebook
+                </button>
+              )}
+              <button onClick={openApproverModal} className={styles.groupBtn}>
+                {approverEmail ? approverEmail : "Set Approver"}
               </button>
-            )}
+            </div>
           </div>
 
           <PriceSections prices={activePricebook.prices as PriceMap} meta={meta} />
@@ -170,11 +199,16 @@ export default function PricingSubTab({
           <p className={styles.emptyText}>
             No active pricebook. {!draftPricebook ? "Create one to set your product prices." : "Activate a draft pricebook below."}
           </p>
-          {!draftPricebook && (
-            <button onClick={openCreateModal} className={styles.emptyButton}>
-              <PlusIcon /> Create Pricebook
+          <div className={styles.buttonGroup} style={{ justifyContent: "center" }}>
+            {!draftPricebook && (
+              <button onClick={openCreateModal} className={styles.groupBtn}>
+                Create Pricebook
+              </button>
+            )}
+            <button onClick={openApproverModal} className={styles.groupBtn}>
+              {approverEmail ? approverEmail : "Set Approver"}
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -391,6 +425,45 @@ export default function PricingSubTab({
           }}
           onCancel={() => setPendingDiscardDraft(null)}
         />
+      )}
+
+      {/* Set Approver Modal */}
+      {approverModal && (
+        <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) setApproverModal(false); }}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Set Pricing Approver</h3>
+              <button onClick={() => setApproverModal(false)} className={styles.closeButton}>
+                <XIcon />
+              </button>
+            </div>
+            <p className={styles.approverHint}>
+              The approver&apos;s email will be associated with pricing changes for records and notifications.
+            </p>
+            <label className={`${styles.label} ${styles.fieldLabel}`}>Email address</label>
+            <input
+              className={styles.textInput}
+              type="email"
+              placeholder="approver@example.com"
+              value={approverInput}
+              onChange={(e) => setApproverInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSaveApprover()}
+              autoFocus
+            />
+            <div className={styles.modalActions}>
+              <button onClick={() => setApproverModal(false)} className={styles.modalCancel}>
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveApprover}
+                className={styles.modalSaveBlue}
+                disabled={!approverInput.trim() || approverSaving}
+              >
+                {approverSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

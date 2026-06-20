@@ -74,6 +74,51 @@
   margin-left: 16px;
 }
 
+.buttonGroup {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Unified style for every button inside a .buttonGroup */
+.groupBtn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.buttonGroup > .groupBtn:first-child {
+  border-radius: 8px 0 0 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.buttonGroup > .groupBtn:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+/* When only one button remains (e.g. no draft so New Pricebook is hidden) */
+.buttonGroup > .groupBtn:only-child {
+  border-radius: 8px;
+}
+
+.approverHint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
 .primaryButton {
   padding: 8px 14px;
   border-radius: 8px;

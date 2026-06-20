@@ -19,6 +19,7 @@ interface ProductsPageProps {
   products: ProductMap;
   pricebooks: Pricebook[];
   activePricebook: Pricebook | null;
+  approverEmail: string;
   onCreatePricebook: CreatePricebookFn;
   onUpdatePricebook: UpdatePricebookFn;
   onActivatePricebook: ActivatePricebookFn;
@@ -26,6 +27,7 @@ interface ProductsPageProps {
   onAddProduct: AddProductFn;
   onUpdateProduct: UpdateProductFn;
   onDeleteProduct: DeleteProductFn;
+  onSaveApproverEmail: (email: string) => Promise<void>;
 }
 
 const subTabs = [
@@ -34,9 +36,9 @@ const subTabs = [
 ];
 
 export default function ProductsPage({
-  products, pricebooks, activePricebook,
+  products, pricebooks, activePricebook, approverEmail,
   onCreatePricebook, onUpdatePricebook, onActivatePricebook, onDeletePricebook,
-  onAddProduct, onUpdateProduct, onDeleteProduct,
+  onAddProduct, onUpdateProduct, onDeleteProduct, onSaveApproverEmail,
 }: ProductsPageProps) {
   const [subTab, setSubTab] = useState("pricing");
 
@@ -47,7 +49,6 @@ export default function ProductsPage({
 
   return (
     <div className="animate-fade">
-      {/* Sub-tabs */}
       <div className={styles.subTabs}>
         {subTabs.map((tab) => {
           const isActive = subTab === tab.key;
@@ -79,10 +80,12 @@ export default function ProductsPage({
             pricebooks={pricebooks}
             activePricebook={activePricebook}
             meta={meta}
+            approverEmail={approverEmail}
             onCreatePricebook={onCreatePricebook}
             onUpdatePricebook={onUpdatePricebook}
             onActivatePricebook={onActivatePricebook}
             onDeletePricebook={onDeletePricebook}
+            onSaveApproverEmail={onSaveApproverEmail}
           />
         )}
       </div>
