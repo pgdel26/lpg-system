@@ -36,7 +36,7 @@ export interface CategoryMeta {
   categoryColors: Record<string, string>;
   // Categories shown in pricebook modals, ordered cylinder → accessories → others.
   pricebookCategories: string[];
-  // Product names within a category, ordered by sortOrder.
+  // Product names within a category, alphabetically ordered.
   productNamesInCategory: (cat: string) => string[];
 }
 

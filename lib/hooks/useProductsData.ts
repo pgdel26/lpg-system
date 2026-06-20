@@ -59,7 +59,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
         const key = `${p.category}_${p.name}`;
         await setDoc(doc(db, "products", key), {
           category: p.category, name: p.name, srp: p.srp,
-          srpRefill: p.srpRefill, sortOrder: i,
+          srpRefill: p.srpRefill,
           createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
         });
       }
@@ -71,7 +71,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
   const cylinderProducts = useMemo(() =>
     Object.entries(products)
       .filter(([, p]) => p.category === "cylinder")
-      .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
+      .sort((a, b) => a[1].name.localeCompare(b[1].name))
       .map(([, p]) => p.name),
     [products]);
 
@@ -80,10 +80,10 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
   // that drives Sales / Purchases / Inventory — replacing the old hardcoded
   // "accessories" branch so a new single-price category appears everywhere.
   const singlePriceCategories = useMemo<SinglePriceCategory[]>(() => {
-    const byCategory: Record<string, { name: string; sortOrder: number }[]> = {};
+    const byCategory: Record<string, string[]> = {};
     for (const p of Object.values(products)) {
       if (p.category === "cylinder" || HIDDEN_CATEGORIES.includes(p.category)) continue;
-      (byCategory[p.category] ||= []).push({ name: p.name, sortOrder: p.sortOrder || 0 });
+      (byCategory[p.category] ||= []).push(p.name);
     }
     const orderedCats = Object.keys(byCategory).sort((a, b) => {
       if (a === "accessories") return -1;
@@ -91,9 +91,7 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
       return a.localeCompare(b);
     });
     return orderedCats.map((cat) => {
-      const names = byCategory[cat]
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((x) => x.name);
+      const names = byCategory[cat].slice().sort((a, b) => a.localeCompare(b));
       const label = cat === "accessories" ? "ACCESSORIES" : cat.replace(/_/g, " ").toUpperCase();
       const color = categoryColor(cat);
       // accessories keeps its REGULATOR / OTHERS display split; others stay flat.
@@ -126,17 +124,16 @@ export function useProductsData(onToast: ToastFn): UseProductsData {
   const addProduct = useCallback(async (category: ProductCategory, name: string) => {
     try {
       const key = `${category}_${name}`;
-      const sortOrder = Object.keys(products).length;
       await setDoc(doc(db, "products", key), {
         category, name, srp: 0, srpRefill: category === "cylinder" ? 0 : null,
-        sortOrder, createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+        createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
       });
       onToast({ type: "success", message: `Product "${name}" added.` });
     } catch (error) {
       console.error("Add product error:", error);
       onToast({ type: "error", message: "Failed to add product." });
     }
-  }, [products, onToast]);
+  }, [onToast]);
 
   const updateProduct = useCallback(async (productKey: string, updates: Partial<Product>) => {
     try {

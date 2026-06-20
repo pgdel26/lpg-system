@@ -136,7 +136,7 @@ export default function ProductsSubTab({
 
       {/* Product list by category */}
       {allCategories.map((cat) => {
-        const items = (productsByCategory[cat] || []).slice().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        const items = (productsByCategory[cat] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
         if (items.length === 0) return null;
         return (
           <div key={cat} className={styles.categoryGroup}>

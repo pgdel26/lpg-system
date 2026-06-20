@@ -37,7 +37,7 @@ export function buildDefaultPrices(products: ProductMap): PriceMap {
 export function productNamesInCategory(products: ProductMap, cat: string): string[] {
   return Object.entries(products)
     .filter(([, p]) => p.category === cat)
-    .sort((a, b) => (a[1].sortOrder || 0) - (b[1].sortOrder || 0))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
     .map(([, p]) => p.name);
 }
 

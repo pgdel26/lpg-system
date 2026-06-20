@@ -27,7 +27,7 @@ export interface SinglePriceCategory {
   category: string;
   /** Display label for section headers, e.g. "ACCESSORIES". */
   label: string;
-  /** Flattened product names in this category, sortOrder-ordered. */
+  /** Flattened product names in this category, alphabetically ordered. */
   products: string[];
   /** Inventory section color. */
   color: string;

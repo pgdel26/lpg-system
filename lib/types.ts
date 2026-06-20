@@ -15,7 +15,6 @@ export interface Product {
   name: string;
   srp: number;
   srpRefill: number | null; // null for non-cylinder
-  sortOrder: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
