@@ -48,11 +48,17 @@ export function useInventoryData(
   useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
   useEffect(() => { inventorySectionsRef.current = inventorySections; }, [inventorySections]);
 
+  // Stable string dep: changes only when the set of section keys changes (e.g. a
+  // new category added to Firestore), NOT on every products snapshot. Prevents
+  // listener churn caused by inventorySections getting a new reference on each
+  // products snapshot even when the category structure is unchanged.
+  const sectionKeysString = inventorySections.map((s) => s.key).join(",");
+
   // ---- FIREBASE: Daily inventory listener ----
   // Section keys come from the live section list ("full", "empty", + one per
   // single-price category), so a new category gets its own daily-inventory doc.
   useEffect(() => {
-    const sectionKeys = inventorySections.map((s) => s.key);
+    const sectionKeys = sectionKeysString ? sectionKeysString.split(",") : [];
     const unsubscribers = sectionKeys.map((sectionKey) => {
       const docId = `${inventoryDate}_${sectionKey}`;
       return onSnapshot(doc(db, "dailyInventory", docId), (snapshot) => {
@@ -70,12 +76,12 @@ export function useInventoryData(
       });
     });
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, [inventoryDate, inventorySections]);
+  }, [inventoryDate, sectionKeysString]);
 
   // ---- Client-side BEG fallback: use previous day's saved END if BEG is missing ----
   useEffect(() => {
     begFallbackRanRef.current = null;
-    const sectionKeys = inventorySections.map((s) => s.key);
+    const sectionKeys = sectionKeysString ? sectionKeysString.split(",") : [];
     const prevDate = (() => {
       const d = new Date(inventoryDate + "T00:00:00+08:00");
       d.setDate(d.getDate() - 1);
@@ -86,7 +92,7 @@ export function useInventoryData(
     const timer = setTimeout(async () => {
       if (cancelled) return;
       const inv = inventoryRef.current;
-      const isBegPresent = (beg: unknown) => beg != null && beg !== "" && beg !== 0;
+      const isBegPresent = (beg: unknown) => beg != null && beg !== "";
       const hasBeg = sectionKeys.some((sk) =>
         Object.values(inv[sk] || {}).some((row) => isBegPresent(row.beg))
       );
@@ -124,7 +130,7 @@ export function useInventoryData(
       }
     }, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [inventoryDate, inventorySections]);
+  }, [inventoryDate, sectionKeysString]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((

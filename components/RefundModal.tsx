@@ -112,7 +112,8 @@ export default function RefundModal({
   // (accessories + any future one) maps to its own same-keyed refund section.
   const mapSaleToRefund = (saleSection: string): string => {
     if (saleSection === "cylinderWithRefill" || saleSection === "refill") return "fullCylinder";
-    return saleSection;
+    if (refundSections.some((s) => s.key === saleSection)) return saleSection;
+    return "fullCylinder";
   };
 
   // When user selects an invoice, auto-fill everything

@@ -213,12 +213,14 @@ export function AppDataProvider({
   // a full re-save of every section to keep END current in the DB for reports.
   // 2000ms debounce + cleanup matches page.js exactly.
   const saveSection = inventory.saveSection;
-  const inventorySections = products.inventorySections;
+  // Stable string dep: only changes when the category structure changes, not on
+  // every products snapshot. Prevents the auto-save timer from being re-armed
+  // (and writing all section docs) on unrelated product field updates.
+  const inventorySectionKeysString = products.inventorySections.map((s) => s.key).join(",");
   useEffect(() => {
+    const sectionKeys = inventorySectionKeysString.split(",").filter(Boolean);
     const timer = setTimeout(() => {
-      for (const section of inventorySections) {
-        saveSection(section.key);
-      }
+      sectionKeys.forEach((key) => saveSection(key));
     }, 2000);
     return () => clearTimeout(timer);
   }, [
@@ -227,7 +229,7 @@ export function AppDataProvider({
     swaps.swaps,
     dateRefunds,
     saveSection,
-    inventorySections,
+    inventorySectionKeysString,
   ]);
 
   // Compose the single context value. `...inventory` carries resolvedInventoryRef

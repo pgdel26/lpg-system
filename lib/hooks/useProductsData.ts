@@ -10,9 +10,10 @@ import type { SinglePriceCategory } from "../constants";
 import { categoryColor } from "../utils";
 import type { Product, ProductMap, ProductCategory } from "../types";
 
-// Categories that are not sold/tracked anywhere (deprecated). Mirrors the list
-// in views/pricing/pricingCategories.ts; keep the two in sync.
-const HIDDEN_CATEGORIES = ["borrowed"];
+// Categories excluded from Sales / Purchases / Inventory. Note: this is NOT
+// the same list as pricingCategories.ts's hiddenCategories (which controls
+// pricebook modals). cylinder_deposit should be priceable but not sellable.
+const HIDDEN_CATEGORIES = ["borrowed", "cylinder_deposit"];
 
 type ToastFn = (t: { type: string; message: string }) => void;
 

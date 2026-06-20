@@ -1,4 +1,4 @@
-import { categoryColor } from "../../lib/utils";
+import { categoryColor, titleCaseCategory } from "../../lib/utils";
 import type {
   ProductMap,
   PriceMap,
@@ -61,7 +61,7 @@ export function buildCategoryMeta(products: ProductMap): CategoryMeta {
   const allCategories = Object.keys({ ...defaultCategories, ...productsByCategory });
   const categoryLabels: Record<string, string> = { ...defaultCategories };
   allCategories.forEach((cat) => {
-    if (!categoryLabels[cat]) categoryLabels[cat] = cat.charAt(0).toUpperCase() + cat.slice(1);
+    if (!categoryLabels[cat]) categoryLabels[cat] = titleCaseCategory(cat);
   });
   // Canonical, name-derived colors shared with the Inventory sections
   // (lib/utils.categoryColor) so a category is the same color on every screen.
