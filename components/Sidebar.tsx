@@ -143,8 +143,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
         </div>
         {!collapsed && (
           <div className={styles.logoText}>
-            <h1 className={styles.logoTitle}>PILI GASUL</h1>
-            <p className={styles.logoSub}>Tracker</p>
+            <h1 className={styles.logoTitle}>TANK TRACKER</h1>
           </div>
         )}
       </Link>

@@ -19,7 +19,6 @@ interface ProductsPageProps {
   products: ProductMap;
   pricebooks: Pricebook[];
   activePricebook: Pricebook | null;
-  approverEmail: string;
   onCreatePricebook: CreatePricebookFn;
   onUpdatePricebook: UpdatePricebookFn;
   onActivatePricebook: ActivatePricebookFn;
@@ -27,7 +26,6 @@ interface ProductsPageProps {
   onAddProduct: AddProductFn;
   onUpdateProduct: UpdateProductFn;
   onDeleteProduct: DeleteProductFn;
-  onSaveApproverEmail: (email: string) => Promise<void>;
 }
 
 const subTabs = [
@@ -36,9 +34,9 @@ const subTabs = [
 ];
 
 export default function ProductsPage({
-  products, pricebooks, activePricebook, approverEmail,
+  products, pricebooks, activePricebook,
   onCreatePricebook, onUpdatePricebook, onActivatePricebook, onDeletePricebook,
-  onAddProduct, onUpdateProduct, onDeleteProduct, onSaveApproverEmail,
+  onAddProduct, onUpdateProduct, onDeleteProduct,
 }: ProductsPageProps) {
   const [subTab, setSubTab] = useState("pricing");
 
@@ -80,12 +78,10 @@ export default function ProductsPage({
             pricebooks={pricebooks}
             activePricebook={activePricebook}
             meta={meta}
-            approverEmail={approverEmail}
             onCreatePricebook={onCreatePricebook}
             onUpdatePricebook={onUpdatePricebook}
             onActivatePricebook={onActivatePricebook}
             onDeletePricebook={onDeletePricebook}
-            onSaveApproverEmail={onSaveApproverEmail}
           />
         )}
       </div>
