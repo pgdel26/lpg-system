@@ -2,7 +2,9 @@
 import React, {
   createContext, useContext, useCallback, useState, useEffect, useMemo,
 } from "react";
+import { useParams } from "next/navigation";
 import Toast from "../../components/Toast";
+import { DEFAULT_BRANCH_ID } from "../constants";
 import { useProductsData, type UseProductsData } from "../hooks/useProductsData";
 import { usePricebooksData, type UsePricebooksData } from "../hooks/usePricebooksData";
 import { useInventoryData, type UseInventoryData } from "../hooks/useInventoryData";
@@ -15,6 +17,7 @@ import { useExpensesData, type UseExpensesData } from "../hooks/useExpensesData"
 import { useStaffData, type UseStaffData } from "../hooks/useStaffData";
 import { useNotificationsData, type UseNotificationsData } from "../hooks/useNotificationsData";
 import { useReceivablesData, type UseReceivablesData } from "../hooks/useReceivablesData";
+import { useBranchesData, type UseBranchesData } from "../hooks/useBranchesData";
 import type { InventoryState, Refund } from "../types";
 
 // The composed context value: the union of every domain hook's return shape.
@@ -24,7 +27,8 @@ import type { InventoryState, Refund } from "../types";
 export interface AppData extends
   UseProductsData, UsePricebooksData, UseInventoryData, UseCustomersData,
   UseSalesData, UseSwapsData, UsePurchasesData, UseRefundsData,
-  UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData {
+  UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData,
+  UseBranchesData {
   // Cross-domain derived values computed in the provider (not owned by any
   // single hook). resolvedInventory merges raw inventory + movements; refunds
   // is allRefunds filtered to the viewed date (page.js passed this as `refunds`).
@@ -58,12 +62,21 @@ export function AppDataProvider({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // ---- Active outlet ----
+  // Comes from the URL (/[branch]/sales, /[branch]/inventory, /[branch]/purchases).
+  // Routes outside a [branch] segment (e.g. /customers, /income-statement) get no
+  // branch param — DEFAULT_BRANCH_ID is a harmless fallback there since none of
+  // those screens read branch-scoped data.
+  const routeParams = useParams<{ branch?: string }>();
+  const branch = routeParams.branch || DEFAULT_BRANCH_ID;
+
   // ---- Compose the 12 domain hooks in dependency order ----
   const products = useProductsData(onToast);
   const pricebooks = usePricebooksData(onToast);
-  const inventory = useInventoryData(products.inventorySections, onToast);
+  const inventory = useInventoryData(branch, products.inventorySections, onToast);
   const customers = useCustomersData(onToast);
   const sales = useSalesData({
+    branch,
     salesSections: products.salesSections,
     activePricebook: pricebooks.activePricebook,
     inventoryDate: inventory.inventoryDate,
@@ -71,6 +84,7 @@ export function AppDataProvider({
     onToast,
   });
   const swaps = useSwapsData({
+    branch,
     inventoryDate: inventory.inventoryDate,
     findOrCreateCustomer: customers.findOrCreateCustomer,
     onToast,
@@ -80,16 +94,19 @@ export function AppDataProvider({
     onToast,
   });
   const refunds = useRefundsData({
+    branch,
     inventoryDate: inventory.inventoryDate,
     onToast,
   });
   const expenses = useExpensesData({
+    branch,
     inventoryDate: inventory.inventoryDate,
     onToast,
   });
-  const staff = useStaffData(inventory.inventoryDate, onToast);
+  const staff = useStaffData(branch, inventory.inventoryDate, onToast);
   const notifications = useNotificationsData(currentUserEmail, onToast);
   const receivables = useReceivablesData(onToast);
+  const branches = useBranchesData();
 
   // ---- Cross-domain effect 1: resolved inventory ----
   // Relocated verbatim from app/page.js. This computation merges raw inventory
@@ -105,9 +122,12 @@ export function AppDataProvider({
     const resolved: InventoryState = {};
 
     // Aggregate purchase quantities for current date: { [purchaseSection]: { [product]: totalQty } }
+    // Purchases aren't a separate screen per outlet, but each doc still carries
+    // a branch tag — filter by it here so one outlet's PURCHASES column doesn't
+    // pick up stock bought for the other.
     const purchaseCounts: Record<string, Record<string, number>> = {};
     purchases.purchaseTransactions
-      .filter((t) => t.date === inventory.inventoryDate)
+      .filter((t) => t.date === inventory.inventoryDate && t.branch === branch)
       .forEach((t) => {
         if (!purchaseCounts[t.purchaseSection]) purchaseCounts[t.purchaseSection] = {};
         purchaseCounts[t.purchaseSection][t.product] =
@@ -194,6 +214,7 @@ export function AppDataProvider({
     swaps.swaps,
     dateRefunds,
     inventory.inventoryDate,
+    branch,
     products.inventorySections,
     products.cylinderProducts,
   ]);
@@ -249,6 +270,7 @@ export function AppDataProvider({
     ...staff,
     ...notifications,
     ...receivables,
+    ...branches,
     resolvedInventory,
     refunds: dateRefunds,
   };

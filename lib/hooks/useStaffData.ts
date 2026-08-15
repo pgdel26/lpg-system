@@ -17,11 +17,26 @@ export interface UseStaffData {
   updateDailyStaff: (data: DailyReport) => Promise<void>;
 }
 
-export function useStaffData(inventoryDate: string, onToast: ToastFn): UseStaffData {
+export function useStaffData(branch: string, inventoryDate: string, onToast: ToastFn): UseStaffData {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [dailyReport, setDailyStaff] = useState<DailyReport>({ cashier: null, staff: [] });
 
+  // ---- Branch-switch safety ----
+  // Without this, switching outlets leaves the previous branch's cashier/
+  // duty assignment on screen until the new listener's first snapshot
+  // arrives. React's documented "adjust state during render" pattern
+  // (tracked via useState, not a ref) clears it immediately. Only
+  // dailyReport is branch-scoped — the staff roster itself is shared.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setDailyStaff({ cashier: null, staff: [] });
+  }
+
   // ---- FIREBASE: Staff listener ----
+  // Shared roster across both outlets — staff float between branches, so this
+  // is deliberately NOT branch-scoped (only the daily cashier/duty assignment
+  // below is, since each outlet remits separately).
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
@@ -35,10 +50,10 @@ export function useStaffData(inventoryDate: string, onToast: ToastFn): UseStaffD
     return () => unsub();
   }, []);
 
-  // ---- FIREBASE: Daily staff assignment listener (by date) ----
+  // ---- FIREBASE: Daily staff assignment listener (by date + branch) ----
   useEffect(() => {
     const unsub = onSnapshot(
-      doc(db, "dailyReport", inventoryDate),
+      doc(db, "dailyReport", `${inventoryDate}_${branch}`),
       (snapshot) => {
         if (snapshot.exists()) {
           setDailyStaff(snapshot.data() as DailyReport);
@@ -48,7 +63,7 @@ export function useStaffData(inventoryDate: string, onToast: ToastFn): UseStaffD
       }
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, branch]);
 
   // ---- Handlers — setToast replaced with onToast ----
   const addStaff = useCallback(async (name: string, role: string, phone: string) => {
@@ -92,12 +107,12 @@ export function useStaffData(inventoryDate: string, onToast: ToastFn): UseStaffD
 
   const updateDailyStaff = useCallback(async (data: DailyReport) => {
     try {
-      await setDoc(doc(db, "dailyReport", inventoryDate), data);
+      await setDoc(doc(db, "dailyReport", `${inventoryDate}_${branch}`), data);
     } catch (error) {
       console.error("Update daily staff error:", error);
       onToast({ type: "error", message: "Failed to update daily staff." });
     }
-  }, [inventoryDate, onToast]);
+  }, [inventoryDate, branch, onToast]);
 
   return {
     staff,

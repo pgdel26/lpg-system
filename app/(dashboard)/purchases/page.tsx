@@ -37,9 +37,11 @@ export default function PurchasesRoutePage() {
     <>
       <PurchasesPage
         purchaseTransactions={data.purchaseTransactions}
+        branches={data.branches}
         onOpenPurchaseModal={handleOpenPurchaseModal}
         onUpdatePurchase={data.updatePurchase}
         onDeletePurchase={data.deletePurchase}
+        onDeleteTransfer={data.deleteTransfer}
       />
 
       {purchaseModalOpen && (

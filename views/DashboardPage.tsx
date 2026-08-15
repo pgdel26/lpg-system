@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
 import { fmt } from "../lib/utils";
+import { paymentSplit } from "../lib/payments";
+import { customerKey } from "../lib/hooks/useCustomersData";
 import { PlusIcon, PackageIcon } from "../components/Icons";
 import type {
   SaleTransaction,
@@ -92,18 +94,23 @@ export default function DashboardPage({
   }, [staff, dailyReport]);
 
   // ─── Pending A/R (all outstanding as of today) + biggest account ───
+  // Uses paymentSplit().ar (not totalAmount) and customerKey() (not a raw
+  // name compare) so this agrees with Receivables/TopDebtorsChart on both
+  // the split-payment rule and the "same customer" identity rule — see
+  // lib/payments.ts and lib/hooks/useCustomersData.ts.
   const arPending = useMemo(() => {
     const open = (arTransactions || []).filter((t) => !t.arCollected);
-    const total = open.reduce((s, t) => s + (t.totalAmount || 0), 0);
-    const byAccount: Record<string, number> = {};
+    let total = 0;
+    const byAccount = new Map<string, { name: string; amount: number }>();
     for (const t of open) {
-      const name = t.customerName || "Unknown";
-      byAccount[name] = (byAccount[name] || 0) + (t.totalAmount || 0);
+      const arAmount = paymentSplit(t).ar;
+      total += arAmount;
+      const key = customerKey(t.customerName || "Unknown");
+      const entry = byAccount.get(key) || { name: t.customerName || "Unknown", amount: 0 };
+      entry.amount += arAmount;
+      byAccount.set(key, entry);
     }
-    const biggest =
-      Object.entries(byAccount)
-        .map(([name, amount]) => ({ name, amount }))
-        .sort((a, b) => b.amount - a.amount)[0] || null;
+    const biggest = Array.from(byAccount.values()).sort((a, b) => b.amount - a.amount)[0] || null;
     return { total, count: open.length, biggest };
   }, [arTransactions]);
 

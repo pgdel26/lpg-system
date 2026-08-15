@@ -1,0 +1,660 @@
+<title>TankTracker — Database Schema</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #f7f4ee;
+    --surface: #fffdf9;
+    --ink: #23201b;
+    --ink-muted: #6f6858;
+    --ink-faint: #9c9484;
+    --rule: #ddd5c5;
+    --rule-strong: #c7bda8;
+    --accent: #3b5b74;
+    --accent-soft: rgba(59, 91, 116, 0.1);
+    --accent-warm: #b85c2e;
+    --accent-warm-soft: rgba(184, 92, 46, 0.12);
+    --mono-bg: #eee8da;
+    --shadow: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181b;
+      --surface: #1a1f23;
+      --ink: #e9e5db;
+      --ink-muted: #a49d8d;
+      --ink-faint: #736c5d;
+      --rule: #2c3238;
+      --rule-strong: #3a424a;
+      --accent: #8bb0c9;
+      --accent-soft: rgba(139, 176, 201, 0.12);
+      --accent-warm: #dd9260;
+      --accent-warm-soft: rgba(221, 146, 96, 0.14);
+      --mono-bg: #232a30;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14181b;
+    --surface: #1a1f23;
+    --ink: #e9e5db;
+    --ink-muted: #a49d8d;
+    --ink-faint: #736c5d;
+    --rule: #2c3238;
+    --rule-strong: #3a424a;
+    --accent: #8bb0c9;
+    --accent-soft: rgba(139, 176, 201, 0.12);
+    --accent-warm: #dd9260;
+    --accent-warm-soft: rgba(221, 146, 96, 0.14);
+    --mono-bg: #232a30;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f7f4ee;
+    --surface: #fffdf9;
+    --ink: #23201b;
+    --ink-muted: #6f6858;
+    --ink-faint: #9c9484;
+    --rule: #ddd5c5;
+    --rule-strong: #c7bda8;
+    --accent: #3b5b74;
+    --accent-soft: rgba(59, 91, 116, 0.1);
+    --accent-warm: #b85c2e;
+    --accent-warm-soft: rgba(184, 92, 46, 0.12);
+    --mono-bg: #eee8da;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .display {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    text-wrap: balance;
+  }
+
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+  }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding-bottom: 2.25rem;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 2.25rem;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1.title {
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .subtitle {
+    color: var(--ink-muted);
+    max-width: 62ch;
+    font-size: 1.02rem;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+    margin-top: 0.4rem;
+  }
+  .meta-row span { white-space: nowrap; }
+
+  /* ---------- Quick nav ---------- */
+  nav.jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.4rem;
+  }
+  nav.jump a {
+    font-size: 0.8rem;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.32rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 3px;
+    background: var(--surface);
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  nav.jump a:hover, nav.jump a:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+    outline: none;
+  }
+
+  /* ---------- Legend callout ---------- */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 3rem;
+    font-size: 0.9rem;
+  }
+  .legend h3 {
+    grid-column: 1 / -1;
+    margin: 0 0 0.2rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-weight: 600;
+  }
+  .legend-item { display: flex; gap: 0.55rem; align-items: baseline; }
+  .legend-item p { margin: 0; color: var(--ink-muted); }
+  .legend-item strong { color: var(--ink); }
+
+  .badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-top: 0.1rem;
+  }
+  .badge.required { background: var(--ink); color: var(--bg); }
+  .badge.optional { border: 1.5px solid var(--ink-faint); color: transparent; }
+  .badge.computed { background: var(--accent-warm-soft); color: var(--accent-warm); font-family: "Iowan Old Style", Georgia, serif; font-style: italic; }
+
+  /* ---------- Group sections ---------- */
+  .group {
+    margin-bottom: 3.4rem;
+    scroll-margin-top: 1.5rem;
+  }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--rule-strong);
+    padding-bottom: 0.6rem;
+    margin-bottom: 1.5rem;
+  }
+  .group-head .num { color: var(--accent); font-size: 0.85rem; }
+  h2.group-title {
+    font-size: 1.35rem;
+    margin: 0;
+    font-weight: 500;
+  }
+  .group-desc {
+    color: var(--ink-muted);
+    font-size: 0.92rem;
+    margin: -0.9rem 0 1.4rem;
+    max-width: 66ch;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 1.4rem;
+    align-items: start;
+  }
+
+  /* ---------- Collection card ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--ink);
+  }
+  .card-head {
+    padding: 0.9rem 1.1rem 0.8rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .card-name {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .card-desc {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    margin-top: 0.3rem;
+  }
+  .doc-id {
+    display: inline-block;
+    margin-top: 0.55rem;
+    font-size: 0.76rem;
+    background: var(--mono-bg);
+    color: var(--ink);
+    padding: 0.18rem 0.5rem;
+    border-radius: 3px;
+  }
+  .doc-id .lbl { color: var(--ink-faint); margin-right: 0.4rem; font-family: -apple-system, sans-serif; }
+
+  table.fields {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+  table.fields th {
+    text-align: left;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 0.5rem 1.1rem 0.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.fields td {
+    padding: 0.42rem 1.1rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  table.fields tr:last-child td { border-bottom: none; }
+  table.fields td.fname { color: var(--ink); white-space: nowrap; }
+  table.fields td.ftype { color: var(--accent); white-space: nowrap; }
+  table.fields td.fnote { color: var(--ink-muted); }
+  table.fields td.fbadge { width: 1.6rem; }
+
+  .card-foot {
+    padding: 0.7rem 1.1rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    border-top: 1px solid var(--rule);
+    background: var(--accent-soft);
+  }
+  .card-foot .arrow { color: var(--accent); }
+
+  .card.subshape .card-head { background: var(--accent-warm-soft); }
+
+  /* ---------- Callout / aside ---------- */
+  .aside {
+    margin-top: 1.1rem;
+    font-size: 0.86rem;
+    color: var(--ink-muted);
+    border-left: 3px solid var(--accent-warm);
+    padding: 0.5rem 0 0.5rem 0.9rem;
+  }
+  .aside strong { color: var(--ink); }
+
+  footer.notes {
+    margin-top: 3rem;
+    padding-top: 1.6rem;
+    border-top: 2px solid var(--ink);
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+  }
+  footer.notes h3 {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.7rem;
+  }
+  footer.notes ul { margin: 0; padding-left: 1.2rem; }
+  footer.notes li { margin-bottom: 0.5rem; }
+
+  a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 2.2rem 1.1rem 4rem; }
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">TankTracker · Firestore</div>
+    <h1 class="title display">Database Schema Reference</h1>
+    <p class="subtitle">Every collection, document-ID pattern, and field currently read or written by the app, grouped the way the business itself is organized — catalog, people, daily transactions, the operations ledger, and settings.</p>
+    <div class="meta-row">
+      <span>13 collections / singleton docs</span>
+      <span>·</span>
+      <span>No schema enforcement — Firestore is schemaless; this reflects what the code actually writes</span>
+      <span>·</span>
+      <span>As of 2026-07-13</span>
+    </div>
+    <nav class="jump" aria-label="Jump to section">
+      <a href="#catalog">Catalog &amp; Pricing</a>
+      <a href="#people">People</a>
+      <a href="#transactions">Daily Transactions</a>
+      <a href="#ledger">Operations Ledger</a>
+      <a href="#settings">Settings</a>
+    </nav>
+  </header>
+
+  <div class="legend">
+    <h3>How to read a card</h3>
+    <div class="legend-item">
+      <span class="badge required" aria-hidden="true"></span>
+      <p><strong>Filled dot</strong> — always present on every doc.</p>
+    </div>
+    <div class="legend-item">
+      <span class="badge optional" aria-hidden="true"></span>
+      <p><strong>Open ring</strong> — optional; absent, not just empty, until set.</p>
+    </div>
+    <div class="legend-item">
+      <span class="badge computed" aria-hidden="true">ƒ</span>
+      <p><strong>ƒ mark</strong> — derived client-side and persisted, like a formula field written back to the record rather than recalculated on read.</p>
+    </div>
+    <div class="legend-item" style="grid-column: 1 / -1; border-top: 1px solid var(--rule); padding-top: 0.8rem; margin-top: 0.2rem;">
+      <p><strong>Doc-ID chip</strong> — two strategies are in play: <code>auto</code> means Firestore assigns a random ID (<code>addDoc</code>); anything else is a deterministic key the app builds itself (<code>setDoc</code>), so writes to the same logical entity always land on the same doc.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <section class="group" id="catalog">
+    <div class="group-head"><h2 class="group-title display">Catalog &amp; Pricing</h2></div>
+    <p class="group-desc">What's sold, and at what price. <code>category</code> is an open string, not an enum — <code>cylinder</code> and <code>accessories</code> get first-class treatment (two prices vs. one), everything else is treated as "one more single-price category" and flows through automatically.</p>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">products</div>
+          <div class="card-desc">One doc per sellable/priceable item.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>${category}_${name}</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">category</td><td class="ftype">string</td><td class="fnote">cylinder · accessories · cylinder_deposit · borrowed (deprecated) · any future category</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">name</td><td class="ftype">string</td><td class="fnote">display name, e.g. "11KG PASAK"</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">srp</td><td class="ftype">number</td><td class="fnote">list price — full price for cylinders, only price for single-price categories</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">srpRefill</td><td class="ftype">number | null</td><td class="fnote">refill price; null for anything that isn't category "cylinder"</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">createdAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">updatedAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+        </table>
+        <div class="card-foot">Doc id is the join key <span class="arrow">→</span> pricebooks.prices, and the string other records copy as <code>productCategory</code>/<code>product</code>.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">pricebooks</div>
+          <div class="card-desc">A dated price sheet. At most one is <code>active</code> at a time; that's the one sales price against.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">name</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">effectiveDate</td><td class="ftype">string</td><td class="fnote">YYYY-MM-DD</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">prices</td><td class="ftype">map</td><td class="fnote">keyed by product doc id → <code>{cylinder, refill}</code> or <code>{srp}</code></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">status</td><td class="ftype">string</td><td class="fnote">active · draft · inactive — "at most one active" is app logic, not a Firestore rule</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">createdAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">updatedAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">activatedAt</td><td class="ftype">Timestamp</td><td class="fnote">set on activation, never on draft creation</td></tr>
+        </table>
+        <div class="card-foot">Ordered by <code>effectiveDate desc</code>; active pricebook's id is snapshotted onto each sale as <code>pricebookId</code>.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="group" id="people">
+    <div class="group-head"><h2 class="group-title display">People</h2></div>
+    <p class="group-desc">Who the business sells to and who works there.</p>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">customers</div>
+          <div class="card-desc">De-duplicated by phone number at write time.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">name</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">phone</td><td class="ftype">string</td><td class="fnote">matched against on "new customer" entry to reuse an existing record</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">createdAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+        </table>
+        <div class="card-foot">Referenced by <code>customerId</code> from saleTransactions, swaps, and refunds — deleting a customer cascades to all three.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">staff</div>
+          <div class="card-desc">Roster of employees.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">name</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">role</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">phone</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">createdAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+        </table>
+        <div class="card-foot">Names surface in <span style="font-family: ui-monospace, monospace;">dailyReport</span>'s cashier/staff assignment for a given day.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="group" id="transactions">
+    <div class="group-head"><h2 class="group-title display">Daily Transactions</h2></div>
+    <p class="group-desc">Every money- or stock-moving event. All five are <strong>denormalized</strong> on purpose: each doc copies the product name, category, and customer name as plain strings at the moment it's recorded, rather than only holding an id. Renaming a product or customer later does not rewrite history.</p>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">saleTransactions</div>
+          <div class="card-desc">One doc per <em>line item</em>, not per checkout — a 3-item sale writes 3 docs sharing one <code>invoice</code>.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">saleSection</td><td class="ftype">string</td><td class="fnote">cylinderWithRefill · refill · a single-price category key</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">product</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">productCategory</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">srp</td><td class="ftype">number</td><td class="fnote">price pulled from the active pricebook at sale time</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">discount</td><td class="ftype">number</td><td class="fnote">this line's share of a global discount, proportionally split</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">deliveryCharge</td><td class="ftype">number</td><td class="fnote">only ever non-zero on the sale's first line item</td></tr>
+          <tr><td class="fbadge"><span class="badge computed">ƒ</span></td><td class="fname">finalPrice</td><td class="ftype">number</td><td class="fnote">= srp, kept as its own field</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">quantity</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge computed">ƒ</span></td><td class="fname">totalAmount</td><td class="ftype">number</td><td class="fnote">srp × qty − discount + delivery, floored at 0</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">invoice</td><td class="ftype">string</td><td class="fnote">groups line items into one sale</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">customerId / customerName</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">paymentType</td><td class="ftype">string</td><td class="fnote">cash · gcash · ar</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">pricebookId</td><td class="ftype">string | null</td><td class="fnote">snapshot of which pricebook priced this line</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">checkDate, checkAmount</td><td class="ftype">string, number</td><td class="fnote">check-payment detail</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">gcashRef</td><td class="ftype">string</td><td class="fnote">13-digit GCash reference, when provided</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">arCollected, collectedDate, collectionMethod</td><td class="ftype">boolean, string, string</td><td class="fnote">written later by Receivables when an AR sale gets paid</td></tr>
+        </table>
+        <div class="card-foot">Also queried directly by <code>paymentType == "ar"</code> for the Receivables screen — same collection, no separate table.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">purchases</div>
+          <div class="card-desc">Stock bought in — one doc per line item.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">purchaseSection</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">product / productCategory</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">quantity</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">unitCost</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge computed">ƒ</span></td><td class="fname">totalCost</td><td class="ftype">number</td><td class="fnote">= quantity × unitCost</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">refunds</div>
+          <div class="card-desc">One doc per refund event; items live in an embedded array, not separate docs.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">invoice</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">customerId / customerName</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">items</td><td class="ftype">array&lt;map&gt;</td><td class="fnote">each: section, product, qty, value, defective, defectStatus</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">totalRefund</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">reason</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
+        </table>
+        <div class="card-foot">Non-defective refunds count toward inventory RETURN/RETURNED columns; defective ones don't.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">swaps</div>
+          <div class="card-desc">Trade an empty cylinder for a full one (utang-na-tangke exchange, distinct from a sale).</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">productFrom / productTo</td><td class="ftype">string</td><td class="fnote">what came in / what went out</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">price</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">customerId / customerName</td><td class="ftype">string</td><td class="fnote">blank when no customer attached</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">expenses</div>
+          <div class="card-desc">Day-to-day cash outlay, offsets Net Sales in the daily report.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>auto</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">description</td><td class="ftype">string</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">amount</td><td class="ftype">number</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
+        </table>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="group" id="ledger">
+    <div class="group-head"><h2 class="group-title display">Operations Ledger</h2></div>
+    <p class="group-desc">The daily count sheet — one row per product, rolled up per section, per calendar day.</p>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">dailyInventory</div>
+          <div class="card-desc">The BEG/END count grid, one doc per section per day.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>${date}_${sectionKey}</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date</td><td class="ftype">string</td><td class="fnote">YYYY-MM-DD</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">section</td><td class="ftype">string</td><td class="fnote">full · empty · one per single-price category</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">items</td><td class="ftype">map</td><td class="fnote">product name → cell (shape below)</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">updatedAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+        </table>
+        <div class="aside" style="margin: 0 1.1rem 1rem;"><strong>A stored <code>0</code> is a real value.</strong> Presence is checked with <code>beg != null &amp;&amp; beg !== ""</code> — an absent cell (never counted yet) is <code>undefined</code>, not zero. Get this backwards and the previous day's carry-forward silently overwrites a legitimate zero count.</div>
+        <table class="fields" style="margin: 0 0 0.4rem;">
+          <tr><th colspan="4">items[product] cell — fields present depend on section type</th></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">beg</td><td class="ftype">number</td><td class="fnote">all sections — beginning count, usually carried from yesterday's end</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">planta, sold, refillSales, swap, returns</td><td class="ftype">number</td><td class="fnote">full-cylinder section only</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">toPlanta, refillIn, swapIn, returned</td><td class="ftype">number</td><td class="fnote">empty section only</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">delivery, sold, defective</td><td class="ftype">number</td><td class="fnote">single-price sections (accessories, etc.)</td></tr>
+          <tr><td class="fbadge"><span class="badge computed">ƒ</span></td><td class="fname">end</td><td class="ftype">number</td><td class="fnote">computed per section's formula, then persisted for reporting</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">aud, audReason</td><td class="ftype">number, string</td><td class="fnote">manual audit count + reason; cleared with <code>deleteField()</code> so a cleared value is truly absent, never a lingering empty string</td></tr>
+          <tr><td class="fbadge"><span class="badge computed">ƒ</span></td><td class="fname">var</td><td class="ftype">number</td><td class="fnote">audit − end, the discrepancy column</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">dailyReport</div>
+          <div class="card-desc">Who was on shift for a given day.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>${date}</code></div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">cashier</td><td class="ftype">string | null</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">staff</td><td class="ftype">array&lt;string&gt;</td><td class="fnote">names on shift that day</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="group" id="settings">
+    <div class="group-head"><h2 class="group-title display">Settings</h2></div>
+    <p class="group-desc">App-wide configuration — not per-day, not per-product. Both live as single fixed-id documents inside a <code>settings</code> collection rather than getting a collection each.</p>
+    <div class="cards">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">settings / pricing</div>
+          <div class="card-desc">Who has to sign off before a draft pricebook goes active.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>pricing</code> (fixed)</div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">approverEmail</td><td class="ftype">string</td><td class="fnote">not yet wired to any notification send</td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">updatedAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-name">settings / notifications</div>
+          <div class="card-desc">Who gets emailed on notification events.</div>
+          <div class="doc-id"><span class="lbl">doc id</span><code>notifications</code> (fixed)</div>
+        </div>
+        <table class="fields">
+          <tr><th></th><th>field</th><th>type</th><th>notes</th></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">recipients</td><td class="ftype">array&lt;map&gt;</td><td class="fnote">each: <code>{ email, addedAt }</code></td></tr>
+          <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">updatedAt</td><td class="ftype">Timestamp</td><td class="fnote"></td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">updatedBy</td><td class="ftype">string</td><td class="fnote">email of whoever last edited the list</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="notes">
+    <h3>Worth knowing before you query any of this</h3>
+    <ul>
+      <li><strong>Login access isn't in the database at all.</strong> The allow-list lives in code (<code>lib/allowedEmails.ts</code>), not Firestore — there's no <code>users</code> collection to check.</li>
+      <li><strong>Nothing here is a real foreign key.</strong> Firestore has no join/referential-integrity concept, so ids like <code>customerId</code> or <code>pricebookId</code> are trusted, app-maintained pointers — a stale one won't be caught by the database itself.</li>
+      <li><strong><code>category</code> is intentionally open-ended.</strong> Sales, Purchases, Inventory, and Refunds all derive their sections from whatever categories currently exist in <code>products</code>, rather than a hardcoded list — the fix for a recurring class of bug where a new category quietly disappeared from one screen but not another.</li>
+    </ul>
+  </footer>
+
+</div>

@@ -241,54 +241,135 @@
   justify-content: center;
 }
 
-/* Payment type toggle */
-.paymentToggle {
-  display: flex;
-  gap: 0;
+/* Split payment editor */
+.splitEditor {
   border-radius: 10px;
-  overflow: hidden;
   border: 1px solid var(--border-light);
+  padding: 10px;
+  background: rgba(241, 245, 249, 0.4);
 }
 
-/* Each button's background/color/shadow are runtime-dynamic (vary per payment option) */
-.paymentButton {
-  flex: 1;
-  padding: 9px 0;
-  border: none;
-  cursor: pointer;
+.splitCheckRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.splitCheckLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  font-family: inherit;
-  transition: all 0.15s ease;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
 }
 
-.paymentButtonDivider {
-  border-right: 1px solid var(--border-light);
+.splitCheckbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent-blue);
 }
 
-/* GCash panel */
-.gcashPanel {
-  margin-bottom: 14px;
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(59, 130, 246, 0.06);
-  border: 1px solid rgba(59, 130, 246, 0.15);
+.splitRow {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 8px;
+  margin-bottom: 8px;
 }
 
-.gcashLabel {
-  font-size: 11px;
-  color: #3b82f6;
-  display: block;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.splitRowMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.splitRowMethodLabel {
+  width: 52px;
+  flex-shrink: 0;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.gcashHint {
-  font-size: 10px;
+.splitAmountGroup {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border-light);
+}
+
+.pesoSign {
+  font-size: 11px;
   color: var(--text-dim);
-  margin-top: 4px;
-  display: block;
+}
+
+.splitAmountInput {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: var(--font-mono);
+  text-align: right;
+  min-width: 0;
+}
+
+.splitGcashRefInput {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: var(--font-mono);
+  box-sizing: border-box;
+}
+
+.remainingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.remainingUnder {
+  background: rgba(245, 158, 66, 0.1);
+  color: var(--accent-orange);
+}
+
+.remainingOver {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.putOnAccountButton {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: rgba(245, 158, 66, 0.15);
+  color: var(--accent-orange);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
 }
 
 /* AR (post-dated check) panel */

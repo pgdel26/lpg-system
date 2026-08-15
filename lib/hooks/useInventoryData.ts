@@ -28,6 +28,7 @@ export interface UseInventoryData {
 }
 
 export function useInventoryData(
+  branch: string,
   inventorySections: ReturnType<typeof buildInventorySections>,
   onToast: ToastFn,
 ): UseInventoryData {
@@ -44,6 +45,31 @@ export function useInventoryData(
   // Used by BEG-fallback effect to avoid re-running for the same date
   const begFallbackRanRef = useRef<string | null>(null);
 
+  // ---- Branch-switch safety ----
+  // Switching outlets must never let a stale debounced save (armed while
+  // viewing the other branch) land in the new branch's docs.
+  //
+  // State reset uses React's documented "adjust state during render" pattern
+  // (tracked via useState, not a ref — this lint config forbids ref access
+  // during render) so the reset lands before the new branch's UI ever paints,
+  // instead of one render late.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setInventory({});
+  }
+
+  // Clearing pending per-section save timers is a real side effect (calling
+  // clearTimeout, an external API), so it belongs in an effect rather than
+  // render — unlike the state reset above, there's no setState call here for
+  // set-state-in-effect to flag. saveSection's own empty-rawItems guard means
+  // even a timer that slips through writes nothing once state is cleared, but
+  // clearing timers outright is the harder guarantee.
+  useEffect(() => {
+    Object.values(saveTimerRef.current).forEach(clearTimeout);
+    saveTimerRef.current = {};
+  }, [branch]);
+
   // ---- Ref-sync effects ----
   useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
   useEffect(() => { inventorySectionsRef.current = inventorySections; }, [inventorySections]);
@@ -57,10 +83,11 @@ export function useInventoryData(
   // ---- FIREBASE: Daily inventory listener ----
   // Section keys come from the live section list ("full", "empty", + one per
   // single-price category), so a new category gets its own daily-inventory doc.
+  // Doc ID includes branch so PILI and CADLAN never share a document.
   useEffect(() => {
     const sectionKeys = sectionKeysString ? sectionKeysString.split(",") : [];
     const unsubscribers = sectionKeys.map((sectionKey) => {
-      const docId = `${inventoryDate}_${sectionKey}`;
+      const docId = `${inventoryDate}_${branch}_${sectionKey}`;
       return onSnapshot(doc(db, "dailyInventory", docId), (snapshot) => {
         if (snapshot.exists()) {
           setInventory((prev) => ({
@@ -76,7 +103,7 @@ export function useInventoryData(
       });
     });
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, [inventoryDate, sectionKeysString]);
+  }, [inventoryDate, branch, sectionKeysString]);
 
   // ---- Client-side BEG fallback: use previous day's saved END if BEG is missing ----
   useEffect(() => {
@@ -102,7 +129,7 @@ export function useInventoryData(
         // Fetch previous day's inventory docs — they already have `end` saved
         const prevItems: InventoryState = {};
         for (const sk of sectionKeys) {
-          const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${sk}`));
+          const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${branch}_${sk}`));
           prevItems[sk] = snap.exists() ? (snap.data().items || {}) : {};
         }
         if (cancelled) return;
@@ -130,7 +157,7 @@ export function useInventoryData(
       }
     }, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [inventoryDate, sectionKeysString]);
+  }, [inventoryDate, branch, sectionKeysString]);
 
   // ---- Update a single inventory cell (local state, debounced save) ----
   const handleInventoryChange = useCallback((
@@ -158,7 +185,7 @@ export function useInventoryData(
       clearTimeout(saveTimerRef.current[sectionKey]);
     }
     saveTimerRef.current[sectionKey] = setTimeout(async () => {
-      const docId = `${inventoryDate}_${sectionKey}`;
+      const docId = `${inventoryDate}_${branch}_${sectionKey}`;
       const rawItems = inventoryRef.current[sectionKey] || {};
       const resolvedItems = resolvedInventoryRef.current[sectionKey] || {};
       // Skip saving if raw inventory is empty and no BEG exists (avoids writing stale data to a new day)
@@ -181,7 +208,7 @@ export function useInventoryData(
       }
       try {
         await setDoc(doc(db, "dailyInventory", docId), {
-          date: inventoryDate, section: sectionKey,
+          date: inventoryDate, section: sectionKey, branch,
           items, updatedAt: Timestamp.now(),
         }, { merge: true });
       } catch (error) {
@@ -189,7 +216,7 @@ export function useInventoryData(
         onToast({ type: "error", message: "Failed to save. Check connection." });
       }
     }, 500);
-  }, [inventoryDate, onToast]);
+  }, [inventoryDate, branch, onToast]);
 
   // ---- Manually re-pull BEG from the previous day's saved END ----
   // The auto-fallback (see effect above) only fires when BEG is entirely missing.
@@ -205,7 +232,7 @@ export function useInventoryData(
     try {
       const prevItems: InventoryState = {};
       for (const sk of sectionKeys) {
-        const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${sk}`));
+        const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${branch}_${sk}`));
         prevItems[sk] = snap.exists() ? (snap.data().items || {}) : {};
       }
       const hasAnyPrev = sectionKeys.some((sk) => Object.keys(prevItems[sk]).length > 0);
@@ -233,7 +260,7 @@ export function useInventoryData(
       console.error("Fix beginning error:", err);
       onToast({ type: "error", message: "Failed to fix beginning inventory." });
     }
-  }, [inventoryDate, saveSection, onToast]);
+  }, [inventoryDate, branch, saveSection, onToast]);
 
   // ---- Cleanup: clear all pending per-section save timers on unmount ----
   // (The debounced "save all" timer lives in AppDataProvider, which clears its own.)

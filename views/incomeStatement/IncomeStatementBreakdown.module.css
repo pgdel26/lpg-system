@@ -1,0 +1,198 @@
+.card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cardHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.cardHeaderRow .cardTitle {
+  border-bottom: none;
+}
+
+.toggleButton {
+  margin-right: 16px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.cardNote {
+  padding: 0 20px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.rowEmpty {
+  padding: 16px 20px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.rowLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rowSub {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.rowValue {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.valueGreen {
+  color: var(--accent-green);
+}
+
+.valueRed {
+  color: var(--accent-red);
+}
+
+.valueDim {
+  color: var(--text-dim);
+}
+
+.subTotalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: rgba(241, 245, 249, 0.5);
+  border-bottom: 1px solid var(--border);
+}
+
+.subTotalLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.subTotalValue {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: rgba(241, 245, 249, 0.5);
+  border-top: 1px solid var(--border);
+}
+
+.totalLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.totalValue {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.transferMemoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 20px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.grossProfitBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.marginBadge {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.marginFootnote {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.operatingResultBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  margin-bottom: 16px;
+}
+
+.operatingResultLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.operatingResultValue {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}

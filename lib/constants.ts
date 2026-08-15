@@ -3,6 +3,12 @@
 // ============================================================
 import type { InventoryCell } from "./types";
 
+// The outlet entry points (root redirect, logo link) land on when no branch
+// is specified. Not a business-logic branch comparison — just the one
+// bootstrapping value every multi-outlet app needs. The branch *list* itself
+// stays fully data-driven (see the `branches` collection / useBranchesData).
+export const DEFAULT_BRANCH_ID = "pili";
+
 // ---------------------------------------------------------------------------
 // Shared building-block types
 // ---------------------------------------------------------------------------

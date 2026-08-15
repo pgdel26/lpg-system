@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { fmt } from "../lib/utils";
+import { paymentSplit } from "../lib/payments";
 import { EditIcon, TrashIcon, XIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
+import TopDebtorsChart from "./TopDebtorsChart";
 import type { SaleTransaction } from "../lib/types";
 import styles from "./ReceivablesPage.module.css";
 
@@ -12,6 +14,16 @@ interface EditData {
   totalAmount: number;
   paymentType: string;
 }
+
+// Renders this many rows at a time — the AR history only ever grows, and
+// rendering every row on every visit gets slower as it does.
+const ROWS_PER_PAGE = 50;
+
+// Bare "YYYY-MM-DD" strings must be parsed with an explicit local-midnight
+// time component — new Date("YYYY-MM-DD") parses as UTC and can render as
+// the wrong calendar day depending on the browser's timezone.
+const formatDateShort = (dateStr: string): string =>
+  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
 interface ReceivablesPageProps {
   arTransactions: SaleTransaction[];
@@ -24,6 +36,8 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending"); // "all", "pending", "collected"
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
   const [pendingCollect, setPendingCollect] = useState<SaleTransaction | null>(null);
   const [collectionMethod, setCollectionMethod] = useState("cash");
   const [pendingDelete, setPendingDelete] = useState<SaleTransaction | null>(null);
@@ -36,36 +50,39 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
     if (filterTo) list = list.filter((t) => t.date <= filterTo);
     if (statusFilter === "pending") list = list.filter((t) => !t.arCollected);
     if (statusFilter === "collected") list = list.filter((t) => t.arCollected);
+    if (customerFilter.trim()) {
+      const q = customerFilter.trim().toLowerCase();
+      list = list.filter((t) => (t.customerName || "").toLowerCase().includes(q));
+    }
     list.sort((a, b) => {
-      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      const dir = dateSortDir === "asc" ? 1 : -1;
+      if (a.date !== b.date) return dir * a.date.localeCompare(b.date);
       const tA = a.createdAt?.seconds || 0;
       const tB = b.createdAt?.seconds || 0;
-      return tB - tA;
+      return dir * (tA - tB);
     });
     return list;
-  }, [arTransactions, filterFrom, filterTo, statusFilter]);
+  }, [arTransactions, filterFrom, filterTo, statusFilter, customerFilter, dateSortDir]);
 
-  // Group by date
-  const grouped = useMemo(() => {
-    const groups: { date: string; items: SaleTransaction[] }[] = [];
-    let currentDate: string | null = null;
-    for (const t of filtered) {
-      if (t.date !== currentDate) {
-        currentDate = t.date;
-        groups.push({ date: t.date, items: [] });
-      }
-      groups[groups.length - 1].items.push(t);
-    }
-    return groups;
-  }, [filtered]);
+  // Lazy-load the rendered list: only the current window of rows is in the
+  // DOM. Resets whenever the filters/sort change so a new view doesn't
+  // inherit a stale scroll depth — done during render (React's documented
+  // pattern for "adjusting state when a prop changes"), not in an effect,
+  // so the stale-count frame never paints.
+  const filterKey = `${filterFrom}|${filterTo}|${statusFilter}|${customerFilter}|${dateSortDir}`;
+  const [visibleRowCount, setVisibleRowCount] = useState(ROWS_PER_PAGE);
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (filterKey !== lastFilterKey) {
+    setLastFilterKey(filterKey);
+    setVisibleRowCount(ROWS_PER_PAGE);
+  }
+  const visibleRows = filtered.slice(0, visibleRowCount);
+  const hasMoreRows = filtered.length > visibleRowCount;
 
+  // The AR portion only, not the doc's full line total — a partially-AR sale
+  // (see lib/payments.ts) must only count what's actually owed as receivable.
   const totalPending = useMemo(() =>
-    arTransactions.filter((t) => !t.arCollected).reduce((sum, t) => sum + (t.totalAmount || 0), 0),
-    [arTransactions]
-  );
-
-  const totalCollected = useMemo(() =>
-    arTransactions.filter((t) => t.arCollected).reduce((sum, t) => sum + (t.totalAmount || 0), 0),
+    arTransactions.filter((t) => !t.arCollected).reduce((sum, t) => sum + paymentSplit(t).ar, 0),
     [arTransactions]
   );
 
@@ -94,16 +111,10 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
 
   return (
     <div className="animate-fade">
-      {/* Summary cards */}
-      <div className={styles.summaryCards}>
-        <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Total Pending</div>
-          <div className={styles.summaryValueRed}>{fmt(totalPending)}</div>
-        </div>
-        <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Total Collected</div>
-          <div className={styles.summaryValueGreen}>{fmt(totalCollected)}</div>
-        </div>
+      {/* Summary */}
+      <div className={styles.summaryCard}>
+        <div className={styles.summaryLabel}>Total Pending (All Outlets)</div>
+        <div className={styles.summaryValueRed}>{fmt(totalPending)}</div>
       </div>
 
       {/* Filters */}
@@ -119,19 +130,23 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
           <option value="pending">Pending</option>
           <option value="collected">Collected</option>
         </select>
+        <input type="text" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
+          placeholder="Filter by customer..." className={styles.filterInput} />
       </div>
 
-      {/* AR list grouped by date */}
-      {grouped.length > 0 ? grouped.map((group) => (
-        <div key={group.date} className={styles.dateGroup}>
-          <div className={styles.dateGroupLabel}>
-            {new Date(group.date + "T00:00:00").toLocaleDateString("en-PH", {
-              weekday: "short", year: "numeric", month: "short", day: "numeric",
-            })}
-          </div>
+      <div className={styles.pageLayout}>
+        <div className={styles.mainColumn}>
+          {/* AR table */}
+          {filtered.length > 0 ? (
           <div className={styles.tableCard}>
             {/* Header */}
             <div className={styles.tableHeader}>
+              <button
+                onClick={() => setDateSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                className={styles.sortableHeader}
+              >
+                Date {dateSortDir === "asc" ? "\u25b2" : "\u25bc"}
+              </button>
               <span>Invoice</span>
               <span>Customer</span>
               <span>Product</span>
@@ -141,8 +156,13 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
               <span className={styles.alignCenter}>Actions</span>
             </div>
 
-            {group.items.map((t) => (
-              editingId === t.id ? (
+            {visibleRows.map((t) => {
+              // A doc with a payments array can't be safely inline-edited —
+              // changing discount/total/paymentType would desync it from
+              // the per-row payment allocation. Delete and re-record instead.
+              const isSplitPayment = (t.payments?.length ?? 0) > 0;
+              const arAmount = paymentSplit(t).ar;
+              return editingId === t.id ? (
                 <div key={t.id} className={styles.editRow}>
                   <div className={styles.editFields}>
                     <div className={styles.editFieldFlex}>
@@ -176,6 +196,9 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                 </div>
               ) : (
                 <div key={t.id} className={styles.tableRow}>
+                  <span className={styles.dateCell}>
+                    {formatDateShort(t.date)}
+                  </span>
                   <span className={styles.invoiceCell}>
                     {t.invoice || "\u2014"}
                   </span>
@@ -187,7 +210,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                     {t.quantity > 1 && <span className={styles.qtyHint}> x{t.quantity}</span>}
                   </span>
                   <span className={styles.amountCell}>
-                    {fmt(t.totalAmount)}
+                    {fmt(arAmount)}
                   </span>
                   <span className={styles.checkCell}>
                     {t.checkDate ? (
@@ -211,25 +234,47 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                     )}
                   </div>
                   <div className={styles.actionsCell}>
-                    <button onClick={() => startEdit(t)} className={styles.iconButton} title="Edit">
-                      <EditIcon />
-                    </button>
+                    {isSplitPayment ? (
+                      <button
+                        disabled
+                        className={`${styles.iconButton} ${styles.iconButtonDisabled}`}
+                        title="Split payment — delete and re-record to change"
+                      >
+                        <EditIcon />
+                      </button>
+                    ) : (
+                      <button onClick={() => startEdit(t)} className={styles.iconButton} title="Edit">
+                        <EditIcon />
+                      </button>
+                    )}
                     <button onClick={() => setPendingDelete(t)} className={styles.iconButton} title="Delete">
                       <TrashIcon />
                     </button>
                   </div>
                 </div>
-              )
-            ))}
+              );
+            })}
           </div>
-        </div>
-      )) : (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyStateText}>
-            No accounts receivable found.
+        ) : (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateText}>
+              No accounts receivable found.
+            </div>
           </div>
+        )}
+
+        {hasMoreRows && (
+          <button
+            onClick={() => setVisibleRowCount((n) => n + ROWS_PER_PAGE)}
+            className={styles.loadMoreButton}
+          >
+            Load More
+          </button>
+        )}
         </div>
-      )}
+
+        <TopDebtorsChart arTransactions={arTransactions} />
+      </div>
 
       {pendingCollect && (
         <div
@@ -250,7 +295,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
             </div>
 
             <p className={styles.modalBody}>
-              Mark {fmt(pendingCollect.totalAmount)} from &quot;{pendingCollect.customerName || "Unknown"}&quot; (Invoice: {pendingCollect.invoice || "N/A"}) as collected?
+              Mark {fmt(paymentSplit(pendingCollect).ar)} from &quot;{pendingCollect.customerName || "Unknown"}&quot; (Invoice: {pendingCollect.invoice || "N/A"}) as collected?
             </p>
 
             <div className={styles.paymentMethodSection}>
@@ -299,7 +344,13 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
       {pendingDelete && (
         <ConfirmModal
           title="Delete AR Transaction"
-          message={`Delete ${fmt(pendingDelete.totalAmount)} from "${pendingDelete.customerName || "Unknown"}" (Invoice: ${pendingDelete.invoice || "N/A"})? This cannot be undone.`}
+          message={
+            pendingDelete.payments
+              // Split-payment sale: deleting removes the WHOLE doc (cash/GCash portions
+              // included), not just the AR slice shown on this page — say so explicitly.
+              ? `Delete this ${fmt(pendingDelete.totalAmount)} sale (${fmt(paymentSplit(pendingDelete).ar)} outstanding A/R)? This removes the whole sale from ${pendingDelete.date}'s totals, not just the receivable. This cannot be undone.`
+              : `Delete ${fmt(paymentSplit(pendingDelete).ar)} from "${pendingDelete.customerName || "Unknown"}" (Invoice: ${pendingDelete.invoice || "N/A"})? This cannot be undone.`
+          }
           confirmLabel="Delete"
           onConfirm={() => { onDeleteSale(pendingDelete.id); setPendingDelete(null); }}
           onCancel={() => setPendingDelete(null)}

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx-js-style";
 import { titleCaseCategory } from "../utils";
+import { paymentSplit } from "../payments";
 
 // Local interfaces for report data shapes (admin SDK plain objects)
 
@@ -16,6 +17,7 @@ interface ReportSaleTransaction {
   totalAmount?: number;
   finalPrice?: number;
   paymentType?: string;
+  payments?: Array<{ method?: string; amount?: number }>;
   gcashRef?: string;
   createdAt?: { seconds?: number; _seconds?: number };
 }
@@ -65,6 +67,9 @@ interface ReportArTransaction {
   collectedDate?: string;
   collectionMethod?: string;
   totalAmount?: number;
+  finalPrice?: number;
+  paymentType?: string;
+  payments?: Array<{ method?: string; amount?: number }>;
 }
 
 export interface SalesReportInput {
@@ -112,16 +117,19 @@ export function buildSalesReportWorkbook({
   const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = refunds.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
-  const totalAR = saleTransactions
-    .filter((t) => t.paymentType === "ar")
-    .reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-  const totalGCash = saleTransactions
-    .filter((t) => t.paymentType === "gcash")
-    .reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+  // paymentSplit() is the one shared implementation of the channel rule (also
+  // used by DailySalesTab.tsx, SalesReportTab.tsx, ReceivablesPage.tsx,
+  // TopDebtorsChart.tsx) — summing across ALL docs (not filtering by
+  // paymentType first) is what correctly attributes a split-payment sale's
+  // cash/gcash/ar portions instead of booking the whole line to one channel.
+  const totalAR = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
+  const totalGCash = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
   const collectionsForDay = arTransactions.filter(
     (t) => t.arCollected && t.collectedDate === date && t.collectionMethod !== "check"
   );
-  const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+  // The AR portion collected, not the collected doc's full line total — a
+  // partially-AR sale must only credit the drawer for what was actually owed.
+  const totalCollections = collectionsForDay.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
   const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
   const actual = parseFloat(String(dailyReport?.actualCashRemit ?? "")) || 0;
   const diff = actual - expectedCashRemit;
@@ -225,18 +233,18 @@ export function buildSalesReportWorkbook({
     r = data.length;
     data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Delivery", "Cash", "GCash", "A/R", "GCash Ref No"]);
     tableHeaderRows.push(r);
-    // Route each sale's amount into the column matching its payment type.
-    // Anything that isn't cash or gcash lands under A/R, mirroring the
-    // payColOf rule in DailySalesTab.
+    // Route each sale's amount into the columns matching its payment split —
+    // a split-payment sale can populate two or three of Cash/GCash/A/R for
+    // the same row, instead of exactly one.
     sorted.forEach((t) => {
-      const amt = t.totalAmount || t.finalPrice || 0;
+      const split = paymentSplit(t);
       data.push([
         t.invoice || "", t.customerName || "", t.product || "",
         saleTypeLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
         t.discount || 0, t.deliveryCharge || 0,
-        t.paymentType === "cash" ? amt : "",
-        t.paymentType === "gcash" ? amt : "",
-        t.paymentType !== "cash" && t.paymentType !== "gcash" ? amt : "",
+        split.cash > 0 ? split.cash : "",
+        split.gcash > 0 ? split.gcash : "",
+        split.ar > 0 ? split.ar : "",
         t.gcashRef || "",
       ]);
     });
@@ -259,11 +267,11 @@ export function buildSalesReportWorkbook({
     // Money-by-channel: Cash = cash sales + swaps − refunds; GCash = gcash
     // sales; A/R = ar sales. The three reconcile to the day's grand total.
     const salesTotalDiscount = sorted.reduce((sum, t) => sum + (t.discount || 0), 0);
-    const cashTotal = sorted.filter((t) => t.paymentType === "cash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0)
+    const cashTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).cash, 0)
       + swaps.reduce((sum, s) => sum + (s.price || 0), 0)
       - refunds.reduce((sum, rf) => sum + (rf.totalRefund || 0), 0);
-    const gcashTotal = sorted.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-    const arTotal = sorted.filter((t) => t.paymentType !== "cash" && t.paymentType !== "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+    const gcashTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
+    const arTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
     r = data.length;
     data.push(["", "", "", "", "", "", salesTotalDiscount, "", cashTotal, gcashTotal, arTotal, ""]);
     totalRows.push(r);

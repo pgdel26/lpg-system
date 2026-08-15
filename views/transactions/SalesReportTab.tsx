@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fmt, today } from "../../lib/utils";
+import { paymentSplit } from "../../lib/payments";
 import { DownloadIcon, EditIcon, TrashIcon, XIcon } from "../../components/Icons";
 import ExpenseModal from "../../components/ExpenseModal";
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
@@ -46,10 +47,15 @@ export default function SalesReportTab({
   const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
-  const totalAR = saleTransactions.filter((t) => t.paymentType === "ar").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
-  const totalGCash = saleTransactions.filter((t) => t.paymentType === "gcash").reduce((sum, t) => sum + (t.totalAmount || t.finalPrice || 0), 0);
+  // paymentSplit() is the one shared implementation of the channel rule
+  // (also used by DailySalesTab.tsx, salesReport.ts, ReceivablesPage.tsx,
+  // TopDebtorsChart.tsx) — summing across all docs correctly attributes a
+  // split-payment sale's cash/gcash/ar portions instead of one channel only.
+  const totalAR = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
+  const totalGCash = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
   const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
-  const totalCollections = collectionsForDay.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+  // The AR portion collected, not the doc's full line total.
+  const totalCollections = collectionsForDay.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
   const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
 
   return (
@@ -155,7 +161,9 @@ export default function SalesReportTab({
               <div>
                 <div className={styles.rowLabel}>Accounts Receivable</div>
                 <div className={styles.rowSub}>
-                  {saleTransactions.filter((t) => t.paymentType === "ar").length} AR sale{saleTransactions.filter((t) => t.paymentType === "ar").length !== 1 ? "s" : ""}
+                  {/* Count docs with a non-zero AR allocation, not paymentType==="ar" —
+                      a split sale's AR portion must still show up in this count. */}
+                  {saleTransactions.filter((t) => paymentSplit(t).ar > 0).length} AR sale{saleTransactions.filter((t) => paymentSplit(t).ar > 0).length !== 1 ? "s" : ""}
                 </div>
               </div>
               <span className={`${styles.rowValue} ${totalAR > 0 ? styles.valueOrange : styles.valueDim}`}>
@@ -168,7 +176,7 @@ export default function SalesReportTab({
               <div>
                 <div className={styles.rowLabel}>GCash</div>
                 <div className={styles.rowSub}>
-                  {saleTransactions.filter((t) => t.paymentType === "gcash").length} GCash sale{saleTransactions.filter((t) => t.paymentType === "gcash").length !== 1 ? "s" : ""}
+                  {saleTransactions.filter((t) => paymentSplit(t).gcash > 0).length} GCash sale{saleTransactions.filter((t) => paymentSplit(t).gcash > 0).length !== 1 ? "s" : ""}
                 </div>
               </div>
               <span className={`${styles.rowValue} ${totalGCash > 0 ? styles.valueBlue : styles.valueDim}`}>

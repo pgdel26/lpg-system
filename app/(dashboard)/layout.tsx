@@ -7,19 +7,36 @@ import { auth } from "../../lib/firebase";
 import LoginPage from "../../components/LoginPage";
 import Sidebar from "../../components/Sidebar";
 import { LoadingIcon, MenuIcon } from "../../components/Icons";
+import type { Branch } from "../../lib/types";
 import styles from "./layout.module.css";
 
 const ROUTE_TITLES: Record<string, string> = {
-  "/sales": "Sales",
   "/pricing": "Pricing",
   "/purchases": "Purchases",
-  "/inventory": "Inventory",
   "/customers": "Customers",
   "/receivables": "Accounts Receivable",
+  "/income-statement": "Income Statement",
   "/staff": "Staff",
   "/notifications": "Notifications",
   "/contact": "Contact Us",
 };
+
+// /[branch]/sales and /[branch]/inventory carry the outlet name in their
+// title (e.g. "PILI — Sales") since they're not in ROUTE_TITLES above.
+const BRANCH_SUB_TITLES: Record<string, string> = {
+  sales: "Sales",
+  inventory: "Inventory",
+};
+
+function resolveTitle(pathname: string, branches: Branch[]): string {
+  const segments = pathname.split("/").filter(Boolean);
+  const branch = branches.find((b) => b.id === segments[0]);
+  if (branch) {
+    const subTitle = BRANCH_SUB_TITLES[segments[1]];
+    return subTitle ? `${branch.name} — ${subTitle}` : branch.name;
+  }
+  return ROUTE_TITLES[pathname] || "";
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { authUser, authLoading, accessDenied, logout } = useAuth();
@@ -55,7 +72,7 @@ function DashboardChrome({
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarWidth = sidebarCollapsed ? 60 : 250;
-  const title = ROUTE_TITLES[pathname] || "";
+  const title = resolveTitle(pathname, data.branches);
 
   return (
     <div className={styles.root}>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmt, today } from "../../lib/utils";
 import { PlusIcon, EditIcon, TrashIcon, DownloadIcon, ChevronLeftIcon } from "../../components/Icons";
+import { paymentSplit } from "../../lib/payments";
 import type { SaleTransaction, Swap, Refund } from "../../lib/types";
 import type { EditData, PendingDelete } from "./transactionsTypes";
 import styles from "./DailySalesTab.module.css";
@@ -44,18 +45,14 @@ export default function DailySalesTab({
 }: DailySalesTabProps) {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
-  // Which breakdown column a sale's amount belongs in. Anything that isn't
-  // cash or gcash lands under A/R, matching the old payment-badge fallback.
-  const payColOf = (t: SaleTransaction) =>
-    t.paymentType === "cash" ? "cash" : t.paymentType === "gcash" ? "gcash" : "ar";
-  const amountOf = (t: SaleTransaction) => t.totalAmount || t.finalPrice || 0;
-
   // Money-by-channel: swaps come in as cash, refunds are cash paid out. Folding
   // both into the Cash column makes Cash + GCash + A/R reconcile to the grand total.
-  const cashTotal = sorted.filter((t) => payColOf(t) === "cash").reduce((s, t) => s + amountOf(t), 0)
-    + swapTotal - refundTotal;
-  const gcashTotal = sorted.filter((t) => payColOf(t) === "gcash").reduce((s, t) => s + amountOf(t), 0);
-  const arTotal = sorted.filter((t) => payColOf(t) === "ar").reduce((s, t) => s + amountOf(t), 0);
+  // paymentSplit() is the one shared implementation of this rule (also used by
+  // salesReport.ts, SalesReportTab.tsx, ReceivablesPage.tsx, TopDebtorsChart.tsx) —
+  // a split sale can populate more than one of Cash/GCash/A/R for the same row.
+  const cashTotal = sorted.reduce((s, t) => s + paymentSplit(t).cash, 0) + swapTotal - refundTotal;
+  const gcashTotal = sorted.reduce((s, t) => s + paymentSplit(t).gcash, 0);
+  const arTotal = sorted.reduce((s, t) => s + paymentSplit(t).ar, 0);
 
   return (
     <div>
@@ -165,6 +162,12 @@ export default function DailySalesTab({
                 );
               }
 
+              const split = paymentSplit(t);
+              // A sale with a `payments` array can't be safely inline-edited —
+              // changing discount/total/paymentType would desync it from the
+              // per-row payment allocation. Delete and re-record instead.
+              const isSplitPayment = !!t.payments;
+
               return (
                 <div key={t.id} className={styles.saleRow} style={{ gridTemplateColumns: SALE_GRID }}>
                   <span className={styles.indexCell}>{i + 1}</span>
@@ -180,22 +183,33 @@ export default function DailySalesTab({
                   <span className={`${styles.discCell} ${t.deliveryCharge > 0 ? styles.deliveryActive : styles.discDim}`}>
                     {t.deliveryCharge > 0 ? `+${fmt(t.deliveryCharge)}` : "—"}
                   </span>
-                  <span className={payColOf(t) === "cash" ? `${styles.amountCell} ${styles.amountCash}` : styles.amountOff}>
-                    {payColOf(t) === "cash" ? fmt(amountOf(t)) : "—"}
+                  <span className={split.cash > 0 ? `${styles.amountCell} ${styles.amountCash}` : styles.amountOff}>
+                    {split.cash > 0 ? fmt(split.cash) : "—"}
                   </span>
-                  <span className={payColOf(t) === "gcash" ? `${styles.amountCell} ${styles.amountGcash}` : styles.amountOff}>
-                    {payColOf(t) === "gcash" ? fmt(amountOf(t)) : "—"}
+                  <span className={split.gcash > 0 ? `${styles.amountCell} ${styles.amountGcash}` : styles.amountOff}>
+                    {split.gcash > 0 ? fmt(split.gcash) : "—"}
                   </span>
-                  <span className={payColOf(t) === "ar" ? `${styles.amountCell} ${styles.amountAr}` : styles.amountOff}>
-                    {payColOf(t) === "ar" ? fmt(amountOf(t)) : "—"}
+                  <span className={split.ar > 0 ? `${styles.amountCell} ${styles.amountAr}` : styles.amountOff}>
+                    {split.ar > 0 ? fmt(split.ar) : "—"}
                   </span>
                   <span className={`${styles.gcashCell} ${styles.refCol} ${t.gcashRef ? styles.gcashOn : styles.gcashOff}`}>
                     {t.gcashRef || "—"}
                   </span>
                   <div className={styles.rowActions}>
-                    <button onClick={() => startEdit("sale", t)} className={styles.iconButton} title="Edit">
-                      <EditIcon />
-                    </button>
+                    {isSplitPayment ? (
+                      <button
+                        disabled
+                        className={styles.iconButton}
+                        style={{ opacity: 0.3, cursor: "not-allowed" }}
+                        title="Split payment — delete and re-record to change"
+                      >
+                        <EditIcon />
+                      </button>
+                    ) : (
+                      <button onClick={() => startEdit("sale", t)} className={styles.iconButton} title="Edit">
+                        <EditIcon />
+                      </button>
+                    )}
                     <button onClick={() => setPendingDelete({ type: "sale", id: t.id })} className={styles.iconButton} title="Delete">
                       <TrashIcon />
                     </button>

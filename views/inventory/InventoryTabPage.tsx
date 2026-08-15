@@ -1,8 +1,9 @@
 import { useState } from "react";
 import InventorySubTab from "./InventorySubTab";
 import AuditPage from "./AuditPage";
-import type { InventoryState, InventoryCell, Staff } from "../../lib/types";
-import type { InventorySection } from "../../lib/constants";
+import type { InventoryState, InventoryCell, Staff, Branch } from "../../lib/types";
+import type { InventorySection, PurchaseSection } from "../../lib/constants";
+import type { RecordTransferInput } from "../../lib/hooks/usePurchasesData";
 import styles from "./InventoryTabPage.module.css";
 
 interface TotalCylinderRow {
@@ -12,6 +13,10 @@ interface TotalCylinderRow {
 }
 
 interface InventoryTabPageProps {
+  branch: string;
+  branches: Branch[];
+  purchaseSections: PurchaseSection[];
+  onRecordTransfer: (input: RecordTransferInput) => Promise<string | null>;
   inventoryDate: string;
   setInventoryDate: (v: string) => void;
   resolvedInventory: InventoryState;
@@ -30,6 +35,7 @@ const subTabs = [
 ];
 
 export default function InventoryTabPage({
+  branch, branches, purchaseSections, onRecordTransfer,
   inventoryDate, setInventoryDate,
   resolvedInventory, totalCylinderData, inventorySections,
   onInventoryChange, onSaveSection, onFixBeginning,
@@ -58,6 +64,10 @@ export default function InventoryTabPage({
       <div className={styles.card}>
         {subTab === "inventory" && (
           <InventorySubTab
+            branch={branch}
+            branches={branches}
+            purchaseSections={purchaseSections}
+            onRecordTransfer={onRecordTransfer}
             inventoryDate={inventoryDate}
             setInventoryDate={setInventoryDate}
             resolvedInventory={resolvedInventory}
@@ -72,6 +82,7 @@ export default function InventoryTabPage({
 
         {subTab === "audit" && (
           <AuditPage
+            branch={branch}
             inventorySections={inventorySections}
             staff={staff}
           />

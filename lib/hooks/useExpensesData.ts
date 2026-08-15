@@ -8,6 +8,7 @@ import type { Expense } from "../types";
 type ToastFn = (t: { type: string; message: string }) => void;
 
 export interface UseExpensesDataDeps {
+  branch: string;
   inventoryDate: string;
   onToast: ToastFn;
 }
@@ -23,15 +24,30 @@ export interface UseExpensesData {
 }
 
 export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
-  const { inventoryDate, onToast } = deps;
+  const { branch, inventoryDate, onToast } = deps;
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
-  // ---- FIREBASE: Expenses listener (by date) ----
+  // ---- Branch-switch safety ----
+  // Without this, switching outlets leaves the previous branch's data on
+  // screen under the new branch's label until the new listener's first
+  // snapshot arrives. React's documented "adjust state during render"
+  // pattern (tracked via useState, not a ref) clears it immediately.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setExpenses([]);
+  }
+
+  // ---- FIREBASE: Expenses listener (by date + branch) ----
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
-      query(collection(db, "expenses"), where("date", "==", inventoryDate)),
+      query(
+        collection(db, "expenses"),
+        where("date", "==", inventoryDate),
+        where("branch", "==", branch),
+      ),
       (snapshot) => {
         const list: Expense[] = [];
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as Expense));
@@ -40,7 +56,7 @@ export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
       },
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, branch]);
 
   // ---- addExpense ----
   const addExpense = useCallback(async (
@@ -52,6 +68,7 @@ export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
         date: inventoryDate,
         description: description.trim(),
         amount: parseFloat(String(amount)) || 0,
+        branch,
         createdAt: Timestamp.now(),
       });
       onToast({ type: "success", message: "Expense added." });
@@ -59,7 +76,7 @@ export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
       console.error("Add expense error:", error);
       onToast({ type: "error", message: "Failed to add expense." });
     }
-  }, [inventoryDate, onToast]);
+  }, [branch, inventoryDate, onToast]);
 
   // ---- updateExpense ----
   const updateExpense = useCallback(async (

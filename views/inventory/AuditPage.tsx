@@ -26,12 +26,13 @@ interface StaffInfo {
 }
 
 interface AuditPageProps {
+  branch: string;
   inventorySections: InventorySection[];
   staff: Staff[];
 }
 
 export default function AuditPage({
-  inventorySections, staff,
+  branch, inventorySections, staff,
 }: AuditPageProps) {
   const [selectedDate, setSelectedDate] = useState(today());
   const [auditRecords, setAuditRecords] = useState<AuditRecord[]>([]);
@@ -49,7 +50,11 @@ export default function AuditPage({
       setLoading(true);
       setEditingKey(null);
       try {
-        const q = query(collection(db, "dailyInventory"), where("date", "==", selectedDate));
+        const q = query(
+          collection(db, "dailyInventory"),
+          where("date", "==", selectedDate),
+          where("branch", "==", branch),
+        );
         const snap = await getDocs(q);
 
         const records: AuditRecord[] = [];
@@ -84,7 +89,7 @@ export default function AuditPage({
 
         // Fetch staff info for this date
         try {
-          const reportSnap = await getDoc(doc(db, "dailyReport", selectedDate));
+          const reportSnap = await getDoc(doc(db, "dailyReport", `${selectedDate}_${branch}`));
           if (reportSnap.exists()) {
             const reportData = reportSnap.data();
             const staffList = staff || [];
@@ -119,7 +124,7 @@ export default function AuditPage({
 
     fetchAudits();
     return () => { cancelled = true; };
-  }, [selectedDate, inventorySections, staff]);
+  }, [selectedDate, inventorySections, staff, branch]);
 
   const getRecordKey = (rec: AuditRecord) => `${rec.date}_${rec.section}_${rec.product}`;
 
@@ -136,7 +141,7 @@ export default function AuditPage({
   const handleEditSave = async (rec: AuditRecord) => {
     setSaving(true);
     try {
-      const docId = `${rec.date}_${rec.section}`;
+      const docId = `${rec.date}_${branch}_${rec.section}`;
       const audEmpty = editValues.aud === "";
       const newAud = audEmpty ? "" : parseFloat(editValues.aud) || 0;
       // Write via a nested object (object keys are dot-safe) instead of a dotted
@@ -168,7 +173,7 @@ export default function AuditPage({
   const handleDelete = async (rec: AuditRecord) => {
     setSaving(true);
     try {
-      const docId = `${rec.date}_${rec.section}`;
+      const docId = `${rec.date}_${branch}_${rec.section}`;
       const docRef = doc(db, "dailyInventory", docId);
       const snap = await getDoc(docRef);
       if (snap.exists()) {

@@ -9,6 +9,19 @@ export type ProductCategory =
 export type PaymentType = "cash" | "gcash" | "ar";
 export type PricebookStatus = "active" | "draft" | "inactive";
 
+// branches collection — doc ID doubles as the URL/branch slug (e.g. "pili").
+// BranchId is deliberately `string`, not a "pili" | "cadlan" union — a third
+// outlet must be addable via a new doc, not a code change (see safe-category-change,
+// same hardcoded-enum bug class one level up).
+export type BranchId = string;
+
+export interface Branch {
+  id: BranchId;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+}
+
 // products collection — keyed by `${category}_${name}`
 export interface Product {
   category: ProductCategory;
@@ -41,6 +54,15 @@ export interface Customer {
   createdAt: Timestamp;
 }
 
+// A doc's own share of one payment method. Multiple sale docs (one per line
+// item) can each carry a payments array — see lib/payments.ts for how they're
+// summed into Cash/GCash/AR totals for reporting.
+export interface SalePayment {
+  method: PaymentType;
+  amount: number;
+  gcashRef?: string;
+}
+
 // saleTransactions collection (plus AR fields set by handleMarkArCollected)
 export interface SaleTransaction {
   id: string;
@@ -56,9 +78,21 @@ export interface SaleTransaction {
   invoice: string;
   customerId: string;
   customerName: string;
+  // Set to whichever method this doc has the largest allocated amount in
+  // (or "ar" if any AR allocation is present) — existing paymentType==="ar"
+  // queries (Receivables, the cron report) keep working unchanged. The real
+  // per-method breakdown lives in `payments` (see lib/payments.ts).
   paymentType: PaymentType;
   pricebookId: string | null;
   date: string;
+  branch: BranchId;
+  // Shared across every line-item doc written by one recordSale call — the
+  // closest thing to a "sale id" today, since each item is its own doc.
+  saleGroupId?: string;
+  // This doc's share of each payment method; sum(payments[].amount) must
+  // equal totalAmount to the centavo. Absent on pre-split-payment docs —
+  // lib/payments.ts falls back to paymentType/totalAmount for those.
+  payments?: SalePayment[];
   createdAt: Timestamp;
   checkDate?: string;
   checkAmount?: number;
@@ -78,6 +112,18 @@ export interface Purchase {
   unitCost: number;
   totalCost: number;
   date: string;
+  // Purchases aren't a separate screen per outlet, but each doc still carries
+  // which outlet bought the stock so per-outlet Inventory's PURCHASES column
+  // stays accurate.
+  branch: BranchId;
+  // Inter-branch stock transfers are recorded as a same-collection purchase
+  // pair (source: negative quantity, destination: positive), so they flow
+  // through the existing PURCHASES→END math with no new column type. These
+  // fields distinguish them from real supplier purchases in the UI and let
+  // the two docs be merged back into a single displayed row.
+  isTransfer?: boolean;
+  transferBranch?: BranchId;
+  transferGroupId?: string;
   createdAt: Timestamp;
 }
 
@@ -99,6 +145,7 @@ export interface Refund {
   totalRefund: number;
   reason: string;
   date: string;
+  branch: BranchId;
   createdAt: Timestamp;
 }
 
@@ -112,6 +159,7 @@ export interface Swap {
   customerId: string;
   customerName: string;
   date: string;
+  branch: BranchId;
   createdAt: Timestamp;
 }
 
@@ -122,6 +170,7 @@ export interface Expense {
   description: string;
   amount: number;
   date: string;
+  branch: BranchId;
   createdAt: Timestamp;
 }
 

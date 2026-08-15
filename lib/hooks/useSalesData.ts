@@ -4,15 +4,23 @@ import {
   addDoc, updateDoc, deleteDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { getPricebookSrp } from "../utils";
+import { getPricebookSrp, fmt } from "../utils";
 import { buildSalesSections } from "../constants";
-import type { SaleTransaction, Pricebook } from "../types";
+import type { SaleTransaction, Pricebook, PaymentType, SalePayment } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
 // Sales count map: { [saleSection]: { [product]: qty } }
 // This mirrors the shape derived from saleTransactions in page.js.
 export type SalesMap = Record<string, Record<string, number>>;
+
+// One payment leg entered in the modal — for a non-split sale this is a
+// single-entry array; a split sale has up to 3 (one per method).
+export interface RecordSalePaymentInput {
+  method: PaymentType;
+  amount: number | string;
+  gcashRef?: string;
+}
 
 // Input for recordSale. Bundles the line items, sale-level fields, and the
 // customer-selection fields that the modal collects, replacing what used to be
@@ -21,7 +29,8 @@ export interface RecordSaleInput {
   items: Array<{ section: string; product: string; qty: string | number }>;
   globalDiscount: number;
   saleDate: string;
-  paymentType: string;
+  /** Must sum to exactly the sale's grand total (subtotal − discount + delivery). */
+  payments: RecordSalePaymentInput[];
   invoice: string;
   isNewCustomer: boolean;
   selectedCustomerId: string;
@@ -29,10 +38,10 @@ export interface RecordSaleInput {
   newCustomerPhone: string;
   deliveryCharge?: number;
   checkData?: { checkDate: string; checkAmount: number } | null;
-  gcashRef?: string;
 }
 
 export interface UseSalesDataDeps {
+  branch: string;
   salesSections: ReturnType<typeof buildSalesSections>;
   activePricebook: Pricebook | null;
   inventoryDate: string;
@@ -63,11 +72,19 @@ export interface UseSalesData {
    *   - Returns NULL on success. The hook fires the success toast itself; the
    *     caller should close the modal when it sees null.
    *
-   * All validation rules are identical to handleRecordSale in page.js:
+   * Validation rules:
    *   • at least one item
    *   • customer selected or new-customer mode active
    *   • new-customer name non-empty when in new-customer mode
-   *   • GCash ref, if provided, must be exactly 13 digits
+   *   • at least one payment with a positive amount
+   *   • GCash ref, if provided on a payment, must be exactly 13 digits
+   *   • payments must sum to exactly the sale total (subtotal − discount +
+   *     delivery), compared in centavos — no partial/over payment allowed
+   *
+   * Payments are allocated across line items waterfall-style (in payment-row
+   * order) so each line-item doc's own `payments` array sums to that doc's
+   * `totalAmount` — see lib/payments.ts for how these get summed back up for
+   * reporting.
    */
   recordSale: (input: RecordSaleInput) => Promise<string | null>;
   updateSale: (
@@ -85,6 +102,7 @@ export interface UseSalesData {
 
 export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
   const {
+    branch,
     salesSections,
     activePricebook,
     inventoryDate,
@@ -95,13 +113,26 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
   const [saleTransactions, setSaleTransactions] = useState<SaleTransaction[]>([]);
   const [sales, setSales] = useState<SalesMap>({});
 
-  // ---- FIREBASE: Sale transactions listener (by date) ----
+  // ---- Branch-switch safety ----
+  // Without this, switching outlets leaves the previous branch's data on
+  // screen under the new branch's label until the new listener's first
+  // snapshot arrives. React's documented "adjust state during render"
+  // pattern (tracked via useState, not a ref) clears it immediately.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setSaleTransactions([]);
+    setSales({});
+  }
+
+  // ---- FIREBASE: Sale transactions listener (by date + branch) ----
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
       query(
         collection(db, "saleTransactions"),
         where("date", "==", inventoryDate),
+        where("branch", "==", branch),
         orderBy("createdAt", "desc"),
       ),
       (snapshot) => {
@@ -120,7 +151,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       },
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, branch]);
 
   // ---- recordSale ----
   const recordSale = useCallback(async (input: RecordSaleInput): Promise<string | null> => {
@@ -128,7 +159,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       items,
       globalDiscount,
       saleDate,
-      paymentType,
+      payments,
       invoice,
       isNewCustomer,
       selectedCustomerId,
@@ -136,9 +167,8 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       newCustomerPhone,
       deliveryCharge = 0,
       checkData = null,
-      gcashRef = "",
     } = input;
-    // --- Validation (identical rules to handleRecordSale in page.js) ---
+    // --- Validation ---
     if (!items || items.length === 0) {
       return "Please add at least one item.";
     }
@@ -148,8 +178,22 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
     if (isNewCustomer && !newCustomerName.trim()) {
       return "Please enter customer name.";
     }
-    if (paymentType === "gcash" && gcashRef && !/^\d{13}$/.test(gcashRef)) {
-      return "GCash reference number must be exactly 13 digits.";
+
+    const cleanPayments = (payments || [])
+      .map((p) => ({
+        method: p.method,
+        amount: parseFloat(String(p.amount)) || 0,
+        gcashRef: p.gcashRef?.trim() || undefined,
+      }))
+      .filter((p) => p.amount > 0);
+
+    if (cleanPayments.length === 0) {
+      return "Please enter at least one payment.";
+    }
+    for (const p of cleanPayments) {
+      if (p.method === "gcash" && p.gcashRef && !/^\d{13}$/.test(p.gcashRef)) {
+        return "GCash reference number must be exactly 13 digits.";
+      }
     }
 
     try {
@@ -162,6 +206,9 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
       const invoiceTrimmed = invoice.trim();
       const now = Timestamp.now();
+      // Shared across every line-item doc this call writes — the closest
+      // thing to a "sale id" today, since each item is its own doc.
+      const saleGroupId = doc(collection(db, "saleTransactions")).id;
 
       // Calculate subtotal to distribute discount proportionally
       const subtotal = items.reduce((sum, item) => {
@@ -172,8 +219,18 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         return sum + srp * (parseInt(String(item.qty)) || 1);
       }, 0);
 
-      let discountRemaining = globalDiscount || 0;
+      // --- Pass 1: per-line discount/delivery/total (unchanged formula) ---
+      const lineComputations: Array<{
+        item: typeof items[number];
+        saleSec: ReturnType<typeof salesSections.find>;
+        srp: number;
+        qty: number;
+        lineDiscount: number;
+        lineDelivery: number;
+        totalAmount: number;
+      }> = [];
 
+      let discountRemaining = globalDiscount || 0;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const saleSec = salesSections.find((s) => s.key === item.section);
@@ -198,6 +255,62 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         const lineDelivery = i === 0 ? (deliveryCharge || 0) : 0;
         const totalAmount = Math.max(0, lineSubtotal - lineDiscount + lineDelivery);
 
+        lineComputations.push({ item, saleSec, srp, qty, lineDiscount, lineDelivery, totalAmount });
+      }
+
+      // Grand total must match the sum of payments exactly — compare in
+      // centavos (integers) to avoid float drift.
+      const toCentavos = (n: number): number => Math.round(n * 100);
+      const grandTotalCents = lineComputations.reduce((sum, l) => sum + toCentavos(l.totalAmount), 0);
+      const paymentsTotalCents = cleanPayments.reduce((sum, p) => sum + toCentavos(p.amount), 0);
+      if (grandTotalCents !== paymentsTotalCents) {
+        return `Payments must add up to the sale total (${fmt(grandTotalCents / 100)}).`;
+      }
+
+      // --- Pass 2: allocate payments across lines, waterfall in row order ---
+      const fromCentavos = (c: number): number => c / 100;
+      const paymentQueue = cleanPayments.map((p) => ({ ...p, remaining: toCentavos(p.amount) }));
+      const linePayments: SalePayment[][] = lineComputations.map(() => []);
+
+      lineComputations.forEach((line, idx) => {
+        let remainingForLine = toCentavos(line.totalAmount);
+        while (remainingForLine > 0) {
+          const row = paymentQueue.find((p) => p.remaining > 0);
+          if (!row) break; // shouldn't happen — totals validated above
+          const take = Math.min(remainingForLine, row.remaining);
+          if (take <= 0) break;
+          const existing = linePayments[idx].find((lp) => lp.method === row.method);
+          if (existing) {
+            existing.amount += fromCentavos(take);
+          } else {
+            linePayments[idx].push({
+              method: row.method,
+              amount: fromCentavos(take),
+              ...(row.method === "gcash" && row.gcashRef ? { gcashRef: row.gcashRef } : {}),
+            });
+          }
+          row.remaining -= take;
+          remainingForLine -= take;
+        }
+      });
+
+      // paymentType stays the method with the largest allocation on that doc,
+      // or "ar" whenever any AR allocation is present — existing
+      // where("paymentType","==","ar") queries (Receivables, cron report)
+      // keep working unchanged. The real breakdown lives in `payments`.
+      const dominantPaymentType = (linePays: SalePayment[]): PaymentType => {
+        if (linePays.some((p) => p.method === "ar" && p.amount > 0)) return "ar";
+        if (linePays.length === 0) return "cash";
+        return linePays.reduce((best, p) => (p.amount > best.amount ? p : best)).method;
+      };
+
+      for (let i = 0; i < lineComputations.length; i++) {
+        const { item, saleSec, srp, qty, lineDiscount, lineDelivery, totalAmount } = lineComputations[i];
+        if (!saleSec) continue;
+        const linePays = linePayments[i];
+        const paymentType = dominantPaymentType(linePays);
+        const lineGcashRef = linePays.find((p) => p.method === "gcash" && p.gcashRef)?.gcashRef;
+
         await addDoc(collection(db, "saleTransactions"), {
           saleSection: item.section,
           product: item.product,
@@ -212,11 +325,14 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
           customerId,
           customerName,
           paymentType,
+          payments: linePays,
+          saleGroupId,
           pricebookId: activePricebook?.id || null,
           date: saleDate || inventoryDate,
+          branch,
           createdAt: now,
           ...(checkData ? { checkDate: checkData.checkDate, checkAmount: checkData.checkAmount } : {}),
-          ...(gcashRef ? { gcashRef } : {}),
+          ...(lineGcashRef ? { gcashRef: lineGcashRef } : {}),
         });
       }
 
@@ -231,7 +347,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       console.error("Sale error:", error);
       return "Failed to record sale.";
     }
-  }, [salesSections, activePricebook, inventoryDate, findOrCreateCustomer, onToast]);
+  }, [branch, salesSections, activePricebook, inventoryDate, findOrCreateCustomer, onToast]);
 
   // ---- updateSale ----
   const updateSale = useCallback(async (

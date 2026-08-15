@@ -15,8 +15,8 @@ const TYPE_STYLES: Record<string, { label: string; bg: string; color: string }> 
 
 interface CustomersPageProps {
   customers: Customer[];
-  onAddCustomer: (name: string, phone: string) => Promise<void>;
-  onUpdateCustomer: (customerId: string, data: { name: string; phone: string }) => Promise<void>;
+  onAddCustomer: (name: string, phone: string) => Promise<boolean>;
+  onUpdateCustomer: (customerId: string, data: { name: string; phone: string }) => Promise<boolean>;
   onDeleteCustomer: (customerId: string) => Promise<void>;
   onFetchCustomerTransactions: (customerId: string) => Promise<CustomerTransaction[]>;
 }
@@ -62,7 +62,8 @@ export default function CustomersPage({
 
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
-    await onUpdateCustomer(editingId, { name: editName, phone: editPhone });
+    const ok = await onUpdateCustomer(editingId, { name: editName, phone: editPhone });
+    if (!ok) return; // rejected (e.g. name collision) — leave the row open so the toast is legible against it
     setEditingId(null);
     setEditName("");
     setEditPhone("");

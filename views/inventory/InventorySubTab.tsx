@@ -2,10 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import InventoryPage from "../InventoryPage";
 import InventoryControls from "./InventoryControls";
 import RangeView from "./RangeView";
+import TransferModal from "../../components/TransferModal";
 import { db } from "../../lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
-import type { InventoryState, InventoryCell } from "../../lib/types";
-import type { InventorySection } from "../../lib/constants";
+import { today } from "../../lib/utils";
+import type { InventoryState, InventoryCell, Branch } from "../../lib/types";
+import type { InventorySection, PurchaseSection } from "../../lib/constants";
+import type { RecordTransferInput } from "../../lib/hooks/usePurchasesData";
 import { getDatesInRange, exportInventory, exportDailyReports } from "./inventoryExport";
 import styles from "./InventorySubTab.module.css";
 
@@ -26,6 +29,10 @@ interface RangeTxData {
 }
 
 interface InventorySubTabProps {
+  branch: string;
+  branches: Branch[];
+  purchaseSections: PurchaseSection[];
+  onRecordTransfer: (input: RecordTransferInput) => Promise<string | null>;
   inventoryDate: string;
   setInventoryDate: (v: string) => void;
   resolvedInventory: InventoryState;
@@ -38,6 +45,7 @@ interface InventorySubTabProps {
 }
 
 export default function InventorySubTab({
+  branch, branches, purchaseSections, onRecordTransfer,
   inventoryDate, setInventoryDate,
   resolvedInventory, totalCylinderData, inventorySections,
   onInventoryChange, onSaveSection, onFixBeginning,
@@ -50,6 +58,54 @@ export default function InventorySubTab({
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [showAudit, setShowAudit] = useState(true);
   const [rangeDailyData, setRangeDailyData] = useState<Record<string, InventoryState> | null>(null);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferModalDate, setTransferModalDate] = useState(today());
+  const [transferModalError, setTransferModalError] = useState("");
+
+  const fromBranch = branches.find((b) => b.id === branch);
+  const destinationBranches = branches.filter((b) => b.id !== branch);
+
+  // Current on-hand (END) per purchase-section+product at this outlet, for the
+  // transfer modal's max-qty validation. Full Cylinder/Refill purchase sections
+  // both feed the "full" inventory section's END (see purchaseSource in
+  // buildInventorySections); single-price categories map to their own same-key
+  // inventory section.
+  const availableStock = useMemo(() => {
+    const stock: Record<string, Record<string, number>> = {};
+    for (const purchaseSection of purchaseSections) {
+      const invSectionKey = (purchaseSection.key === "cylinderWithRefill" || purchaseSection.key === "refill")
+        ? "full"
+        : purchaseSection.key;
+      const invSection = inventorySections.find((s) => s.key === invSectionKey);
+      if (!invSection) continue;
+      const products = purchaseSection.subgroups
+        ? purchaseSection.subgroups.flatMap((g) => g.products)
+        : (purchaseSection.products || []);
+      const map: Record<string, number> = {};
+      for (const product of products) {
+        const row = resolvedInventory[invSectionKey]?.[product] || {};
+        map[product] = invSection.calcEnd(row);
+      }
+      stock[purchaseSection.key] = map;
+    }
+    return stock;
+  }, [purchaseSections, inventorySections, resolvedInventory]);
+
+  const handleOpenTransferModal = () => {
+    setTransferModalOpen(true);
+    setTransferModalDate(today());
+    setTransferModalError("");
+  };
+
+  const handleRecordTransfer = async (input: { toBranch: string; items: Array<{ section: string; product: string; qty: string | number }> }) => {
+    setTransferModalError("");
+    const err = await onRecordTransfer({ ...input, fromBranch: branch, date: transferModalDate });
+    if (err) {
+      setTransferModalError(err);
+      return;
+    }
+    setTransferModalOpen(false);
+  };
 
   // ---- Range fetch ----
   useEffect(() => {
@@ -70,17 +126,19 @@ export default function InventorySubTab({
         Promise.all(dates.map(async (date) => {
           const sectData: Record<string, Record<string, InventoryCell>> = {};
           await Promise.all(sectionKeys.map(async (sectionKey) => {
-            const snap = await getDoc(doc(db, "dailyInventory", `${date}_${sectionKey}`));
+            const snap = await getDoc(doc(db, "dailyInventory", `${date}_${branch}_${sectionKey}`));
             sectData[sectionKey] = snap.exists() ? (snap.data().items || {}) : {};
           }));
           return { date, sectData };
         })),
         Promise.all(dates.map(async (date): Promise<RangeTxData> => {
+          // Purchases isn't a separate screen per outlet, but each purchase still
+          // carries a branch tag so this outlet's range view only counts its own.
           const [salesSnap, purchasesSnap, swapsSnap, refundsSnap] = await Promise.all([
-            getDocs(query(collection(db, "saleTransactions"), where("date", "==", date))),
-            getDocs(query(collection(db, "purchases"), where("date", "==", date))),
-            getDocs(query(collection(db, "swaps"), where("date", "==", date))),
-            getDocs(query(collection(db, "refunds"), where("date", "==", date))),
+            getDocs(query(collection(db, "saleTransactions"), where("date", "==", date), where("branch", "==", branch))),
+            getDocs(query(collection(db, "purchases"), where("date", "==", date), where("branch", "==", branch))),
+            getDocs(query(collection(db, "swaps"), where("date", "==", date), where("branch", "==", branch))),
+            getDocs(query(collection(db, "refunds"), where("date", "==", date), where("branch", "==", branch))),
           ]);
 
           const saleCounts: Record<string, Record<string, number>> = {};
@@ -198,7 +256,7 @@ export default function InventorySubTab({
       setRangeLoading(false);
     });
     return () => { cancelled = true; };
-  }, [rangeMode, inventoryDate, rangeEndDate, inventorySections]);
+  }, [rangeMode, inventoryDate, rangeEndDate, inventorySections, branch]);
 
   // ---- Range total cylinder ----
   const rangeTotalCylinderData = useMemo(() => {
@@ -237,6 +295,8 @@ export default function InventorySubTab({
         onFixBeginning={onFixBeginning}
         onExportInventory={() => exportInventory({ resolvedInventory, totalCylinderData, inventorySections, inventoryDate, rangeMode, rangeEndDate })}
         onExportDailyReports={() => exportDailyReports({ rangeDailyData, inventorySections, inventoryDate, rangeEndDate })}
+        showTransfer={destinationBranches.length > 0}
+        onOpenTransfer={handleOpenTransferModal}
       />
 
       {/* Single day view */}
@@ -285,6 +345,20 @@ export default function InventorySubTab({
           rangeInventory={rangeInventory}
           inventorySections={inventorySections}
           rangeTotalCylinderData={rangeTotalCylinderData}
+        />
+      )}
+
+      {transferModalOpen && fromBranch && (
+        <TransferModal
+          fromBranch={fromBranch}
+          destinationBranches={destinationBranches}
+          date={transferModalDate}
+          setDate={setTransferModalDate}
+          error={transferModalError}
+          purchaseSections={purchaseSections}
+          availableStock={availableStock}
+          onClose={() => setTransferModalOpen(false)}
+          onSubmit={handleRecordTransfer}
         />
       )}
     </>

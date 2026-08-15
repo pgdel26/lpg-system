@@ -1,17 +1,26 @@
-.summaryCards {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
 .summaryCard {
-  flex: 1;
-  min-width: 160px;
+  margin-bottom: 20px;
   padding: 16px 20px;
   border-radius: 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
+}
+
+.pageLayout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.mainColumn {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .pageLayout {
+    flex-direction: column;
+  }
 }
 
 .summaryLabel {
@@ -27,12 +36,6 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--accent-red);
-}
-
-.summaryValueGreen {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent-green);
 }
 
 .filters {
@@ -71,30 +74,17 @@
   cursor: pointer;
 }
 
-.dateGroup {
-  margin-bottom: 16px;
-}
-
-.dateGroupLabel {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  padding-left: 2px;
-}
-
 .tableCard {
   background: var(--bg-card);
   border-radius: 12px;
   border: 1px solid var(--border);
   overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
+  grid-template-columns: 100px 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   font-size: 10px;
@@ -102,6 +92,24 @@
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.sortableHeader {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+}
+
+.sortableHeader:hover {
+  color: var(--text-secondary);
 }
 
 .alignRight {
@@ -192,11 +200,16 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
+  grid-template-columns: 100px 1fr 1.2fr 1fr 0.8fr 0.8fr 90px 60px;
   padding: 10px 14px;
   align-items: center;
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
   font-size: 12px;
+}
+
+.dateCell {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .invoiceCell {
@@ -273,6 +286,11 @@
   display: flex;
 }
 
+.iconButtonDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .emptyState {
   text-align: center;
   padding: 60px 20px;
@@ -284,6 +302,20 @@
 .emptyStateText {
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.loadMoreButton {
+  display: block;
+  margin: 4px auto 20px;
+  padding: 9px 24px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  background: rgba(37, 99, 235, 0.1);
+  font-family: inherit;
 }
 
 /* Collect Modal */

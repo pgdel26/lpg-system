@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp,
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { fmt } from "../utils";
@@ -26,6 +26,7 @@ export interface RecordRefundInput {
 }
 
 export interface UseRefundsDataDeps {
+  branch: string;
   inventoryDate: string;
   onToast: ToastFn;
 }
@@ -64,15 +65,26 @@ export interface UseRefundsData {
 }
 
 export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
-  const { inventoryDate, onToast } = deps;
+  const { branch, inventoryDate, onToast } = deps;
 
   const [allRefunds, setAllRefunds] = useState<Refund[]>([]);
 
-  // ---- FIREBASE: All refunds listener (for Refunds tab) ----
+  // ---- Branch-switch safety ----
+  // Without this, switching outlets leaves the previous branch's data on
+  // screen under the new branch's label until the new listener's first
+  // snapshot arrives. React's documented "adjust state during render"
+  // pattern (tracked via useState, not a ref) clears it immediately.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setAllRefunds([]);
+  }
+
+  // ---- FIREBASE: All refunds listener, scoped to branch (for Refunds tab) ----
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
-      collection(db, "refunds"),
+      query(collection(db, "refunds"), where("branch", "==", branch)),
       (snapshot) => {
         const list: Refund[] = [];
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as Refund));
@@ -81,7 +93,7 @@ export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
       },
     );
     return () => unsub();
-  }, []);
+  }, [branch]);
 
   // ---- recordRefund ----
   const recordRefund = useCallback(async (input: RecordRefundInput): Promise<string | null> => {
@@ -108,6 +120,7 @@ export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
         totalRefund: input.totalRefund,
         reason: input.reason || "",
         date: inventoryDate,
+        branch,
         createdAt: Timestamp.now(),
       });
 
@@ -122,7 +135,7 @@ export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
       console.error("Refund error:", error);
       return "Failed to record refund.";
     }
-  }, [inventoryDate, onToast]);
+  }, [branch, inventoryDate, onToast]);
 
   // ---- updateRefund ----
   const updateRefund = useCallback(async (

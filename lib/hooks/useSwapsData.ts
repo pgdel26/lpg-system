@@ -31,6 +31,7 @@ export interface RecordSwapInput {
 }
 
 export interface UseSwapsDataDeps {
+  branch: string;
   inventoryDate: string;
   /**
    * Owned by the customers hook. Injected here so recordSwap can look up or
@@ -74,17 +75,29 @@ export interface UseSwapsData {
 }
 
 export function useSwapsData(deps: UseSwapsDataDeps): UseSwapsData {
-  const { inventoryDate, findOrCreateCustomer, onToast } = deps;
+  const { branch, inventoryDate, findOrCreateCustomer, onToast } = deps;
 
   const [swaps, setSwaps] = useState<Swap[]>([]);
 
-  // ---- FIREBASE: Swaps listener (by date) ----
+  // ---- Branch-switch safety ----
+  // Without this, switching outlets leaves the previous branch's data on
+  // screen under the new branch's label until the new listener's first
+  // snapshot arrives. React's documented "adjust state during render"
+  // pattern (tracked via useState, not a ref) clears it immediately.
+  const [prevBranch, setPrevBranch] = useState(branch);
+  if (prevBranch !== branch) {
+    setPrevBranch(branch);
+    setSwaps([]);
+  }
+
+  // ---- FIREBASE: Swaps listener (by date + branch) ----
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
       query(
         collection(db, "swaps"),
         where("date", "==", inventoryDate),
+        where("branch", "==", branch),
         orderBy("createdAt", "desc"),
       ),
       (snapshot) => {
@@ -94,7 +107,7 @@ export function useSwapsData(deps: UseSwapsDataDeps): UseSwapsData {
       },
     );
     return () => unsub();
-  }, [inventoryDate]);
+  }, [inventoryDate, branch]);
 
   // ---- recordSwap ----
   const recordSwap = useCallback(async (input: RecordSwapInput): Promise<string | null> => {
@@ -144,6 +157,7 @@ export function useSwapsData(deps: UseSwapsDataDeps): UseSwapsData {
         customerId,
         customerName,
         date: inventoryDate,
+        branch,
         createdAt: Timestamp.now(),
       });
 
@@ -157,7 +171,7 @@ export function useSwapsData(deps: UseSwapsDataDeps): UseSwapsData {
       console.error("Swap error:", error);
       return "Failed to record swap.";
     }
-  }, [inventoryDate, findOrCreateCustomer, onToast]);
+  }, [branch, inventoryDate, findOrCreateCustomer, onToast]);
 
   // ---- updateSwap ----
   const updateSwap = useCallback(async (

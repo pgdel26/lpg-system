@@ -3,10 +3,17 @@ import { XIcon, PlusIcon } from "./Icons";
 import { fmt, getPricebookSrp, today } from "../lib/utils";
 import CustomerSearch from "./CustomerSearch";
 import styles from "./SaleModal.module.css";
-import type { Customer, Pricebook } from "../lib/types";
-import type { RecordSaleInput } from "../lib/hooks/useSalesData";
+import type { Customer, Pricebook, PaymentType } from "../lib/types";
+import type { RecordSaleInput, RecordSalePaymentInput } from "../lib/hooks/useSalesData";
 
 type SaleItem = RecordSaleInput["items"][number];
+
+const METHOD_META: Record<PaymentType, { label: string; color: string }> = {
+  cash: { label: "Cash", color: "#22c55e" },
+  gcash: { label: "GCash", color: "#3b82f6" },
+  ar: { label: "AR", color: "#f59e42" },
+};
+const METHOD_ORDER: PaymentType[] = ["cash", "gcash", "ar"];
 
 interface SalesSubgroup {
   label: string;
@@ -32,8 +39,6 @@ interface SaleModalProps {
   setNewName: (v: string) => void;
   newPhone: string;
   setNewPhone: (v: string) => void;
-  payment: string;
-  setPayment: (v: string) => void;
   error: string;
   customers: Customer[];
   activePricebook: Pricebook | null;
@@ -46,7 +51,7 @@ interface SaleModalProps {
     saleDate: string,
     deliveryCharge: number,
     checkData: { checkDate: string; checkAmount: number } | null,
-    gcashRef: string,
+    payments: RecordSalePaymentInput[],
   ) => void;
 }
 
@@ -56,7 +61,6 @@ export default function SaleModal({
   newCustomer, setNewCustomer,
   newName, setNewName,
   newPhone, setNewPhone,
-  payment, setPayment,
   error,
   customers, activePricebook, inventoryDate,
   salesSections,
@@ -79,7 +83,16 @@ export default function SaleModal({
   const [deliveryCharge, setDeliveryCharge] = useState("");
   const [checkDate, setCheckDate] = useState("");
   const [checkAmount, setCheckAmount] = useState("");
-  const [gcashRef, setGcashRef] = useState("");
+
+  // ---- Payment state ----
+  // Check a method to reveal its amount field; checked methods must sum to
+  // the total. Cash is checked by default. When exactly one method is
+  // checked, its amount always tracks the live grand total (never stale,
+  // even if items/discount/delivery change afterward) — it only becomes a
+  // fixed, manually-entered value once a second method is checked too.
+  const [splitEnabled, setSplitEnabled] = useState<Record<PaymentType, boolean>>({ cash: true, gcash: false, ar: false });
+  const [splitAmount, setSplitAmount] = useState<Record<PaymentType, string>>({ cash: "", gcash: "", ar: "" });
+  const [splitGcashRef, setSplitGcashRef] = useState("");
 
   const updateItem = (index: number, field: string, value: string | number) => {
     setItems((prev) => {
@@ -122,11 +135,78 @@ export default function SaleModal({
   const deliveryNum = parseFloat(deliveryCharge) || 0;
   const grandTotal = Math.max(0, subtotal - discountNum + deliveryNum);
 
+  // ---- Split payment helpers ----
+  const enabledMethods = METHOD_ORDER.filter((m) => splitEnabled[m]);
+  const isSolo = enabledMethods.length === 1;
+
+  // When exactly one method is checked, its amount is always the live grand
+  // total — not a stored value, so it can never go stale if items/discount/
+  // delivery change after. Once a second method is checked, amounts become
+  // explicit/manual (see toggleSplitMethod for the freeze/heal transitions).
+  const amountFor = (method: PaymentType): number =>
+    (isSolo && enabledMethods[0] === method) ? grandTotal : (parseFloat(splitAmount[method]) || 0);
+
+  const splitTotal = enabledMethods.reduce((sum, m) => sum + amountFor(m), 0);
+  // Round to centavos to avoid float noise showing "Remaining: ₱0.00000001".
+  const remaining = Math.round((grandTotal - splitTotal) * 100) / 100;
+  const isBalanced = Math.round(remaining * 100) === 0;
+  const hasAr = splitEnabled.ar;
+
+  const toggleSplitMethod = (method: PaymentType) => {
+    const currentlyEnabled = METHOD_ORDER.filter((m) => splitEnabled[m]);
+    const turningOn = !splitEnabled[method];
+
+    if (turningOn) {
+      const willBeEnabled = [...currentlyEnabled, method];
+      setSplitEnabled((prev) => ({ ...prev, [method]: true }));
+      setSplitAmount((prev) => {
+        const next = { ...prev };
+        if (willBeEnabled.length === 1) {
+          next[method] = String(grandTotal);
+        } else {
+          if (currentlyEnabled.length === 1) {
+            // Freeze the previously-solo method's live total into a real value.
+            next[currentlyEnabled[0]] = String(grandTotal);
+          }
+          const allocated = currentlyEnabled.reduce((sum, m) => sum + (parseFloat(next[m]) || 0), 0);
+          next[method] = String(Math.max(0, Math.round((grandTotal - allocated) * 100) / 100));
+        }
+        return next;
+      });
+    } else {
+      setSplitEnabled((prev) => ({ ...prev, [method]: false }));
+      setSplitAmount((prev) => ({ ...prev, [method]: "" }));
+      if (method === "gcash") setSplitGcashRef("");
+    }
+  };
+
+  const putRemainderOnAccount = () => {
+    if (remaining <= 0) return;
+    const currentlyEnabled = METHOD_ORDER.filter((m) => splitEnabled[m]);
+    setSplitEnabled((prev) => ({ ...prev, ar: true }));
+    setSplitAmount((prev) => {
+      const next = { ...prev };
+      if (currentlyEnabled.length === 1 && !splitEnabled.ar) {
+        // Freeze the previously-solo method's live total before adding AR.
+        next[currentlyEnabled[0]] = String(grandTotal);
+      }
+      next.ar = String((parseFloat(next.ar) || 0) + remaining);
+      return next;
+    });
+  };
+
   const handleSubmit = () => {
-    const checkData = payment === "ar" && checkDate
+    const payments: RecordSalePaymentInput[] = enabledMethods.map((m) => ({
+      method: m,
+      amount: amountFor(m),
+      gcashRef: m === "gcash" ? (splitGcashRef.trim() || undefined) : undefined,
+    }));
+
+    const checkData = hasAr && checkDate
       ? { checkDate, checkAmount: parseFloat(checkAmount) || 0 }
       : null;
-    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, gcashRef.trim());
+
+    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, payments);
   };
 
   return (
@@ -284,57 +364,83 @@ export default function SaleModal({
         {/* 5. Payment Type */}
         <div className={styles.fieldGroup}>
           <label className={styles.label}>Payment Type</label>
-          <div className={styles.paymentToggle}>
-            {[
-              { value: "cash", label: "Cash", color: "#22c55e", bg: "rgba(34,197,94,0.10)" },
-              { value: "gcash", label: "GCash", color: "#3b82f6", bg: "rgba(59,130,246,0.10)" },
-              { value: "ar", label: "AR", color: "#f59e42", bg: "rgba(245,158,66,0.10)" },
-            ].map((opt, i) => {
-              const isActive = payment === opt.value;
+
+          <div className={styles.splitEditor}>
+            {/* Check a method to reveal its amount field. */}
+            <div className={styles.splitCheckRow}>
+              {METHOD_ORDER.map((method) => {
+                const meta = METHOD_META[method];
+                const checked = splitEnabled[method];
+                return (
+                  <label
+                    key={method}
+                    className={styles.splitCheckLabel}
+                    style={{ color: checked ? meta.color : "var(--text-dim)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSplitMethod(method)}
+                      className={styles.splitCheckbox}
+                    />
+                    {meta.label}
+                  </label>
+                );
+              })}
+            </div>
+
+            {enabledMethods.map((method) => {
+              const meta = METHOD_META[method];
+              const soloAndLive = isSolo && enabledMethods[0] === method;
               return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setPayment(opt.value)}
-                  // payment button colors/weights/shadows are runtime-dynamic (3 active variants)
-                  className={`${styles.paymentButton} ${i < 2 ? styles.paymentButtonDivider : ""}`}
-                  style={{
-                    fontWeight: isActive ? 700 : 500,
-                    background: isActive ? opt.bg : "rgba(241,245,249,0.5)",
-                    color: isActive ? opt.color : "var(--text-dim)",
-                    boxShadow: isActive ? `inset 0 -2px 0 ${opt.color}` : "none",
-                  }}
-                >
-                  {opt.label}
-                </button>
+                <div key={method} className={styles.splitRow}>
+                  <div className={styles.splitRowMain}>
+                    <span className={styles.splitRowMethodLabel} style={{ color: meta.color }}>
+                      {meta.label}
+                    </span>
+                    <div className={styles.splitAmountGroup}>
+                      <span className={styles.pesoSign}>₱</span>
+                      <input
+                        type="number"
+                        value={soloAndLive ? grandTotal : splitAmount[method]}
+                        onChange={(e) => setSplitAmount((prev) => ({ ...prev, [method]: e.target.value }))}
+                        disabled={soloAndLive}
+                        placeholder="0"
+                        className={styles.splitAmountInput}
+                      />
+                    </div>
+                  </div>
+                  {method === "gcash" && (
+                    <input
+                      type="text"
+                      value={splitGcashRef}
+                      onChange={(e) => setSplitGcashRef(e.target.value.replace(/\D/g, "").slice(0, 13))}
+                      placeholder="GCash reference (13 digits, optional)"
+                      maxLength={13}
+                      className={styles.splitGcashRefInput}
+                    />
+                  )}
+                </div>
               );
             })}
-          </div>
+
+            {!isBalanced && (
+              <div className={`${styles.remainingRow} ${remaining > 0 ? styles.remainingUnder : styles.remainingOver}`}>
+                <span>
+                  {remaining > 0 ? `Remaining: ${fmt(remaining)}` : `Over by ${fmt(Math.abs(remaining))}`}
+                </span>
+                {remaining > 0 && (
+                  <button onClick={putRemainderOnAccount} className={styles.putOnAccountButton}>
+                    Put {fmt(remaining)} on account
+                  </button>
+                )}
+              </div>
+            )}
+            </div>
         </div>
 
-        {/* GCash Reference Number (GCash only) */}
-        {payment === "gcash" && (
-          <div className={styles.gcashPanel}>
-            <label className={styles.gcashLabel}>GCash Reference Number</label>
-            <input
-              type="text"
-              value={gcashRef}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 13);
-                setGcashRef(v);
-              }}
-              placeholder="e.g. 1234567890123"
-              maxLength={13}
-              className={styles.monoInput}
-            />
-            <span className={styles.gcashHint}>
-              {gcashRef.length > 0 ? `${gcashRef.length}/13 digits` : "Optional — can be added later"}
-            </span>
-          </div>
-        )}
-
-        {/* Post-dated check (AR only) */}
-        {payment === "ar" && (
+        {/* Post-dated check (whenever an AR leg is present) */}
+        {hasAr && (
           <div className={styles.arPanel}>
             <label className={styles.arLabel}>Post-Dated Check</label>
             <div className={styles.arRow}>
@@ -415,7 +521,14 @@ export default function SaleModal({
 
         <div className={styles.actions}>
           <button onClick={onClose} className={styles.cancelButton}>Cancel</button>
-          <button onClick={handleSubmit} className={styles.submitButton}>Record Sale</button>
+          <button
+            onClick={handleSubmit}
+            disabled={!isBalanced}
+            className={styles.submitButton}
+            style={!isBalanced ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+          >
+            Record Sale
+          </button>
         </div>
       </div>
     </div>

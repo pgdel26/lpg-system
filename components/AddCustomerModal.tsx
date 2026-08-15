@@ -6,17 +6,20 @@ export default function AddCustomerModal({
   onSubmit,
   onClose,
 }: {
-  onSubmit: (name: string, phone: string) => void;
+  onSubmit: (name: string, phone: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("");
     if (!name.trim()) { setError("Customer name is required."); return; }
-    onSubmit(name.trim(), phone.trim());
+    const ok = await onSubmit(name.trim(), phone.trim());
+    // Rejected (e.g. name/phone conflict) — the hook already toasts why;
+    // keep the modal open so the operator can see and correct it.
+    if (!ok) return;
     onClose();
   };
 

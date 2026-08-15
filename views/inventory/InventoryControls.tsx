@@ -18,6 +18,8 @@ interface InventoryControlsProps {
   onFixBeginning: () => void;
   onExportInventory: () => void;
   onExportDailyReports: () => void;
+  showTransfer: boolean;
+  onOpenTransfer: () => void;
 }
 
 export default function InventoryControls({
@@ -30,6 +32,8 @@ export default function InventoryControls({
   onFixBeginning,
   onExportInventory,
   onExportDailyReports,
+  showTransfer,
+  onOpenTransfer,
 }: InventoryControlsProps) {
   const exportBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -88,6 +92,15 @@ export default function InventoryControls({
             className={styles.actionButton}
           >
             Fix Beginning
+          </button>
+        )}
+        {showTransfer && (
+          <button
+            onClick={onOpenTransfer}
+            title="Move stock between outlets"
+            className={styles.actionButton}
+          >
+            Transfer Stock
           </button>
         )}
         <div className={styles.exportWrapper}>
