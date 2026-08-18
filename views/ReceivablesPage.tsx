@@ -1,10 +1,13 @@
 import { useState, useMemo } from "react";
-import { fmt } from "../lib/utils";
+import { fmt, formatDateShort } from "../lib/utils";
 import { paymentSplit } from "../lib/payments";
-import { EditIcon, TrashIcon, XIcon } from "../components/Icons";
+import { arStatus, arCollectionEvents, collectionMethodLabel, batchSummary } from "../lib/receivables";
+import { EditIcon, TrashIcon, PlusIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
+import RecordCollectionModal from "../components/RecordCollectionModal";
 import TopDebtorsChart from "./TopDebtorsChart";
-import type { SaleTransaction } from "../lib/types";
+import type { SaleTransaction, Branch } from "../lib/types";
+import type { RecordArCollectionInput } from "../lib/hooks/useReceivablesData";
 import styles from "./ReceivablesPage.module.css";
 
 interface EditData {
@@ -19,37 +22,46 @@ interface EditData {
 // rendering every row on every visit gets slower as it does.
 const ROWS_PER_PAGE = 50;
 
-// Bare "YYYY-MM-DD" strings must be parsed with an explicit local-midnight
-// time component — new Date("YYYY-MM-DD") parses as UTC and can render as
-// the wrong calendar day depending on the browser's timezone.
-const formatDateShort = (dateStr: string): string =>
-  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+interface PendingVoid {
+  batchId: string;
+  amount: number;
+  invoiceCount: number;
+  date: string;
+  method?: string;
+}
 
 interface ReceivablesPageProps {
   arTransactions: SaleTransaction[];
-  onMarkCollected: (saleId: string, method?: string) => Promise<void>;
+  branches: Branch[];
+  onRecordCollection: (input: RecordArCollectionInput) => Promise<string | null>;
+  onVoidCollection: (batchId: string) => Promise<void>;
   onUpdateSale: (saleId: string, data: { invoice?: string; customerName?: string; discount?: number; totalAmount?: number; paymentType?: string }) => Promise<void>;
   onDeleteSale: (saleId: string) => Promise<void>;
 }
 
-export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpdateSale, onDeleteSale }: ReceivablesPageProps) {
+export default function ReceivablesPage({ arTransactions, branches, onRecordCollection, onVoidCollection, onUpdateSale, onDeleteSale }: ReceivablesPageProps) {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending"); // "all", "pending", "collected"
+  const [statusFilter, setStatusFilter] = useState("outstanding"); // "all", "outstanding", "pending", "partial", "collected"
   const [customerFilter, setCustomerFilter] = useState("");
   const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
-  const [pendingCollect, setPendingCollect] = useState<SaleTransaction | null>(null);
-  const [collectionMethod, setCollectionMethod] = useState("cash");
+  const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pendingVoid, setPendingVoid] = useState<PendingVoid | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SaleTransaction | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData>({ invoice: "", customerName: "", discount: 0, totalAmount: 0, paymentType: "ar" });
+
+  const branchName = (id?: string): string => branches.find((b) => b.id === id)?.name || id || "—";
 
   const filtered = useMemo(() => {
     let list = [...arTransactions];
     if (filterFrom) list = list.filter((t) => t.date >= filterFrom);
     if (filterTo) list = list.filter((t) => t.date <= filterTo);
-    if (statusFilter === "pending") list = list.filter((t) => !t.arCollected);
-    if (statusFilter === "collected") list = list.filter((t) => t.arCollected);
+    if (statusFilter === "outstanding") list = list.filter((t) => arStatus(t).status !== "collected");
+    if (statusFilter === "pending") list = list.filter((t) => arStatus(t).status === "pending");
+    if (statusFilter === "partial") list = list.filter((t) => arStatus(t).status === "partial");
+    if (statusFilter === "collected") list = list.filter((t) => arStatus(t).status === "collected");
     if (customerFilter.trim()) {
       const q = customerFilter.trim().toLowerCase();
       list = list.filter((t) => (t.customerName || "").toLowerCase().includes(q));
@@ -79,10 +91,10 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
   const visibleRows = filtered.slice(0, visibleRowCount);
   const hasMoreRows = filtered.length > visibleRowCount;
 
-  // The AR portion only, not the doc's full line total — a partially-AR sale
-  // (see lib/payments.ts) must only count what's actually owed as receivable.
+  // Remaining balance, not the doc's full AR portion — a partially collected
+  // invoice must only count what's still actually owed.
   const totalPending = useMemo(() =>
-    arTransactions.filter((t) => !t.arCollected).reduce((sum, t) => sum + paymentSplit(t).ar, 0),
+    arTransactions.reduce((sum, t) => sum + arStatus(t).remaining, 0),
     [arTransactions]
   );
 
@@ -117,7 +129,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
         <div className={styles.summaryValueRed}>{fmt(totalPending)}</div>
       </div>
 
-      {/* Filters */}
+      {/* Filters + Record Collection */}
       <div className={styles.filters}>
         <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}
           className={styles.filterInput} />
@@ -127,11 +139,16 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           className={styles.filterSelect}>
           <option value="all">All</option>
+          <option value="outstanding">Outstanding</option>
           <option value="pending">Pending</option>
+          <option value="partial">Partial</option>
           <option value="collected">Collected</option>
         </select>
         <input type="text" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
           placeholder="Filter by customer..." className={styles.filterInput} />
+        <button onClick={() => setRecordModalOpen(true)} className={styles.recordCollectionButton}>
+          <PlusIcon /> Record Collection
+        </button>
       </div>
 
       <div className={styles.pageLayout}>
@@ -145,7 +162,7 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                 onClick={() => setDateSortDir((d) => (d === "asc" ? "desc" : "asc"))}
                 className={styles.sortableHeader}
               >
-                Date {dateSortDir === "asc" ? "\u25b2" : "\u25bc"}
+                Date {dateSortDir === "asc" ? "▲" : "▼"}
               </button>
               <span>Invoice</span>
               <span>Customer</span>
@@ -161,7 +178,11 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
               // changing discount/total/paymentType would desync it from
               // the per-row payment allocation. Delete and re-record instead.
               const isSplitPayment = (t.payments?.length ?? 0) > 0;
-              const arAmount = paymentSplit(t).ar;
+              const status = arStatus(t);
+              const hasCollections = status.collected > 0;
+              const events = arCollectionEvents(t);
+              const hasHistory = events.length > 0;
+              const isExpanded = expandedId === t.id;
               return editingId === t.id ? (
                 <div key={t.id} className={styles.editRow}>
                   <div className={styles.editFields}>
@@ -195,62 +216,100 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
                   </div>
                 </div>
               ) : (
-                <div key={t.id} className={styles.tableRow}>
-                  <span className={styles.dateCell}>
-                    {formatDateShort(t.date)}
-                  </span>
-                  <span className={styles.invoiceCell}>
-                    {t.invoice || "\u2014"}
-                  </span>
-                  <span className={styles.customerCell}>
-                    {t.customerName || "\u2014"}
-                  </span>
-                  <span className={styles.productCell}>
-                    {t.product || "\u2014"}
-                    {t.quantity > 1 && <span className={styles.qtyHint}> x{t.quantity}</span>}
-                  </span>
-                  <span className={styles.amountCell}>
-                    {fmt(arAmount)}
-                  </span>
-                  <span className={styles.checkCell}>
-                    {t.checkDate ? (
-                      <span title={`Check: ${fmt(t.checkAmount)} on ${t.checkDate}`}>
-                        {t.checkDate}
-                      </span>
-                    ) : "\u2014"}
-                  </span>
-                  <div className={styles.statusCell}>
-                    {t.arCollected ? (
-                      <span className={styles.collectedBadge}>
-                        {t.collectionMethod === "check" ? "Check" : "Cash"}
-                      </span>
-                    ) : (
+                <div key={t.id}>
+                  <div className={styles.tableRow}>
+                    <span className={styles.dateCell}>
+                      {formatDateShort(t.date)}
+                    </span>
+                    <span className={styles.invoiceCell}>
+                      {t.invoice || "—"}
+                    </span>
+                    <span className={styles.customerCell}>
+                      {t.customerName || "—"}
+                    </span>
+                    <span className={styles.productCell}>
+                      {t.product || "—"}
+                      {t.quantity > 1 && <span className={styles.qtyHint}> x{t.quantity}</span>}
+                    </span>
+                    <span className={styles.amountCell}>
+                      {fmt(status.arTotal)}
+                      {status.status === "partial" && (
+                        <span className={styles.balanceHint}>Bal {fmt(status.remaining)}</span>
+                      )}
+                    </span>
+                    <span className={styles.checkCell}>
+                      {t.checkDate ? (
+                        <span title={`Check: ${fmt(t.checkAmount)} on ${t.checkDate}`}>
+                          {t.checkDate}
+                        </span>
+                      ) : "—"}
+                    </span>
+                    <div className={styles.statusCell}>
+                      {hasHistory ? (
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : t.id)}
+                          className={
+                            status.status === "collected" ? styles.collectedBadge
+                              : status.status === "partial" ? styles.partialBadge
+                              : styles.pendingBadge
+                          }
+                        >
+                          {status.status === "collected" ? (collectionMethodLabel(t) ?? "Collected")
+                            : status.status === "partial" ? "Partial" : "Pending"}
+                        </button>
+                      ) : (
+                        <span className={styles.pendingBadge}>Pending</span>
+                      )}
+                    </div>
+                    <div className={styles.actionsCell}>
+                      {isSplitPayment || hasCollections ? (
+                        <button
+                          disabled
+                          className={`${styles.iconButton} ${styles.iconButtonDisabled}`}
+                          title={hasCollections ? "Has collections — void them first" : "Split payment — delete and re-record to change"}
+                        >
+                          <EditIcon />
+                        </button>
+                      ) : (
+                        <button onClick={() => startEdit(t)} className={styles.iconButton} title="Edit">
+                          <EditIcon />
+                        </button>
+                      )}
                       <button
-                        onClick={() => setPendingCollect(t)}
-                        className={styles.markCollectedButton}
+                        onClick={() => setPendingDelete(t)}
+                        disabled={hasCollections}
+                        className={`${styles.iconButton} ${hasCollections ? styles.iconButtonDisabled : ""}`}
+                        title={hasCollections ? "Has collections — void them first" : "Delete"}
                       >
-                        Mark Collected
+                        <TrashIcon />
                       </button>
-                    )}
+                    </div>
                   </div>
-                  <div className={styles.actionsCell}>
-                    {isSplitPayment ? (
-                      <button
-                        disabled
-                        className={`${styles.iconButton} ${styles.iconButtonDisabled}`}
-                        title="Split payment — delete and re-record to change"
-                      >
-                        <EditIcon />
-                      </button>
-                    ) : (
-                      <button onClick={() => startEdit(t)} className={styles.iconButton} title="Edit">
-                        <EditIcon />
-                      </button>
-                    )}
-                    <button onClick={() => setPendingDelete(t)} className={styles.iconButton} title="Delete">
-                      <TrashIcon />
-                    </button>
-                  </div>
+
+                  {isExpanded && events.length > 0 && (
+                    <div className={styles.historyPanel}>
+                      {events.map((e, i) => (
+                        <div key={`${e.batchId}-${i}`} className={e.voided ? `${styles.historyRow} ${styles.historyRowVoided}` : styles.historyRow}>
+                          <span className={styles.historyText}>
+                            {e.date ? formatDateShort(e.date) : "—"} &middot; {e.method === "check" ? "Check" : e.method === "gcash" ? "GCash" : "Cash"} &middot; {fmt(e.amount)} &middot; {branchName(e.branch)}
+                          </span>
+                          {e.voided ? (
+                            <span className={styles.voidedLabel}>Voided</span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const summary = batchSummary(arTransactions, e.batchId || "");
+                                setPendingVoid({ batchId: e.batchId || "", amount: summary.amount, invoiceCount: summary.invoiceCount, date: e.date || "", method: summary.method });
+                              }}
+                              className={styles.voidButton}
+                            >
+                              Void
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -276,69 +335,31 @@ export default function ReceivablesPage({ arTransactions, onMarkCollected, onUpd
         <TopDebtorsChart arTransactions={arTransactions} />
       </div>
 
-      {pendingCollect && (
-        <div
-          className={styles.modalOverlay}
-          onClick={(e) => { if (e.target === e.currentTarget) { setPendingCollect(null); setCollectionMethod("cash"); } }}
-        >
-          <div className={styles.modalDialog}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>
-                Mark as Collected
-              </h3>
-              <button
-                onClick={() => { setPendingCollect(null); setCollectionMethod("cash"); }}
-                className={styles.modalCloseButton}
-              >
-                <XIcon />
-              </button>
-            </div>
+      {recordModalOpen && (
+        <RecordCollectionModal
+          arTransactions={arTransactions}
+          branches={branches}
+          onSubmit={onRecordCollection}
+          onClose={() => setRecordModalOpen(false)}
+        />
+      )}
 
-            <p className={styles.modalBody}>
-              Mark {fmt(paymentSplit(pendingCollect).ar)} from &quot;{pendingCollect.customerName || "Unknown"}&quot; (Invoice: {pendingCollect.invoice || "N/A"}) as collected?
-            </p>
-
-            <div className={styles.paymentMethodSection}>
-              <div className={styles.paymentMethodLabel}>
-                Payment Method
-              </div>
-              <div className={styles.paymentMethodOptions}>
-                {[
-                  { value: "cash", label: "Cash", color: "#22c55e" },
-                  { value: "check", label: "Check", color: "#3b82f6" },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setCollectionMethod(opt.value)}
-                    className={styles.paymentMethodButton}
-                    style={{
-                      border: collectionMethod === opt.value ? `2px solid ${opt.color}` : "2px solid var(--border-light)",
-                      background: collectionMethod === opt.value ? `${opt.color}11` : "transparent",
-                      color: collectionMethod === opt.value ? opt.color : "var(--text-muted)",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.modalActions}>
-              <button
-                onClick={() => { setPendingCollect(null); setCollectionMethod("cash"); }}
-                className={styles.modalCancelButton}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { onMarkCollected(pendingCollect.id, collectionMethod); setPendingCollect(null); setCollectionMethod("cash"); }}
-                className={styles.collectButton}
-              >
-                Collect
-              </button>
-            </div>
-          </div>
-        </div>
+      {pendingVoid && (
+        <ConfirmModal
+          title="Void Collection"
+          message={
+            `This reopens ${pendingVoid.invoiceCount} invoice(s) totaling ${fmt(pendingVoid.amount)}` +
+            (pendingVoid.method === "cash" && pendingVoid.date
+              ? ` and reduces ${formatDateShort(pendingVoid.date)}'s Expected Cash Remit by that amount.`
+              : pendingVoid.method === "cash"
+              ? ". It has no recorded collection date, so it never counted toward any day's cash remit."
+              : `. It was collected by ${pendingVoid.method === "check" ? "check" : "GCash"}, so it never counted toward any day's cash remit.`) +
+            " This cannot be undone."
+          }
+          confirmLabel="Void"
+          onConfirm={() => { onVoidCollection(pendingVoid.batchId); setPendingVoid(null); }}
+          onCancel={() => setPendingVoid(null)}
+        />
       )}
 
       {pendingDelete && (

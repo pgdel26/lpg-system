@@ -90,6 +90,8 @@ export function AppDataProvider({
     onToast,
   });
   const purchases = usePurchasesData({
+    branch,
+    inventoryDate: inventory.inventoryDate,
     purchaseSections: products.purchaseSections,
     onToast,
   });
@@ -122,17 +124,16 @@ export function AppDataProvider({
     const resolved: InventoryState = {};
 
     // Aggregate purchase quantities for current date: { [purchaseSection]: { [product]: totalQty } }
-    // Purchases aren't a separate screen per outlet, but each doc still carries
-    // a branch tag — filter by it here so one outlet's PURCHASES column doesn't
-    // pick up stock bought for the other.
+    // datePurchaseTransactions is already scoped to inventory.inventoryDate +
+    // branch (see usePurchasesData) — unlike purchaseTransactions, which is
+    // paginated and not guaranteed to cover every date, this listener always
+    // has the full set for whatever date is currently viewed.
     const purchaseCounts: Record<string, Record<string, number>> = {};
-    purchases.purchaseTransactions
-      .filter((t) => t.date === inventory.inventoryDate && t.branch === branch)
-      .forEach((t) => {
-        if (!purchaseCounts[t.purchaseSection]) purchaseCounts[t.purchaseSection] = {};
-        purchaseCounts[t.purchaseSection][t.product] =
-          (purchaseCounts[t.purchaseSection][t.product] || 0) + (t.quantity || 0);
-      });
+    purchases.datePurchaseTransactions.forEach((t) => {
+      if (!purchaseCounts[t.purchaseSection]) purchaseCounts[t.purchaseSection] = {};
+      purchaseCounts[t.purchaseSection][t.product] =
+        (purchaseCounts[t.purchaseSection][t.product] || 0) + (t.quantity || 0);
+    });
 
     // Aggregate refund quantities by section+product: { [refundSection]: { [product]: qty } }
     // Also track non-defective counts separately
@@ -210,11 +211,9 @@ export function AppDataProvider({
   }, [
     inventory.inventory,
     sales.sales,
-    purchases.purchaseTransactions,
+    purchases.datePurchaseTransactions,
     swaps.swaps,
     dateRefunds,
-    inventory.inventoryDate,
-    branch,
     products.inventorySections,
     products.cylinderProducts,
   ]);
@@ -239,6 +238,11 @@ export function AppDataProvider({
   // (and writing all section docs) on unrelated product field updates.
   const inventorySectionKeysString = products.inventorySections.map((s) => s.key).join(",");
   useEffect(() => {
+    // Skip while datePurchaseTransactions' first snapshot for the current
+    // scope hasn't arrived yet (e.g. right after a branch/date switch) — a
+    // slow/cold-start snapshot could otherwise lose the race against this
+    // 2s debounce and get saveSection to persist purchases=0 for the new scope.
+    if (!purchases.datePurchasesLoaded) return;
     const sectionKeys = inventorySectionKeysString.split(",").filter(Boolean);
     const timer = setTimeout(() => {
       sectionKeys.forEach((key) => saveSection(key));
@@ -246,7 +250,8 @@ export function AppDataProvider({
     return () => clearTimeout(timer);
   }, [
     sales.sales,
-    purchases.purchaseTransactions,
+    purchases.datePurchaseTransactions,
+    purchases.datePurchasesLoaded,
     swaps.swaps,
     dateRefunds,
     saveSection,

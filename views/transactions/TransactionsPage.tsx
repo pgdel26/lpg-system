@@ -29,6 +29,7 @@ interface TransactionsPageProps {
   onUpdateDailyStaff: (data: DailyReportWithCash) => Promise<void>;
   allRefunds: Refund[];
   arTransactions: SaleTransaction[];
+  branch: string;
   onOpenSaleModal: () => void;
   onOpenSwapModal: () => void;
   onOpenRefundModal: () => void;
@@ -55,7 +56,7 @@ export default function TransactionsPage({
   saleTransactions, swaps, refunds,
   expenses,
   staff, dailyReport, onUpdateDailyStaff,
-  allRefunds, arTransactions,
+  allRefunds, arTransactions, branch,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
@@ -94,7 +95,7 @@ export default function TransactionsPage({
     exportFullReport({
       date: inventoryDate,
       saleTransactions, swaps, refunds, expenses,
-      staff, dailyReport, arTransactions,
+      staff, dailyReport, arTransactions, branch,
     });
   };
 
@@ -112,6 +113,7 @@ export default function TransactionsPage({
         paymentType: t.paymentType || "cash",
         srp: t.srp || 0,
         quantity: t.quantity || 1,
+        deliveryCharge: t.deliveryCharge || 0,
       });
     } else if (type === "swap") {
       const s = item as Swap;
@@ -188,6 +190,7 @@ export default function TransactionsPage({
             staff={staff}
             dailyReport={dailyReport}
             arTransactions={arTransactions}
+            branch={branch}
             onUpdateDailyStaff={onUpdateDailyStaff}
             onAddExpense={onAddExpense}
             onUpdateExpense={onUpdateExpense}

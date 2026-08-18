@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { fmt } from "../lib/utils";
-import { paymentSplit } from "../lib/payments";
+import { arStatus } from "../lib/receivables";
 import { customerKey } from "../lib/hooks/useCustomersData";
 import type { SaleTransaction } from "../lib/types";
 import styles from "./TopDebtorsChart.module.css";
@@ -13,7 +13,8 @@ export default function TopDebtorsChart({ arTransactions }: TopDebtorsChartProps
   const customerBalances = useMemo(() => {
     const byCustomer = new Map<string, { key: string; name: string; amount: number; count: number }>();
     for (const t of arTransactions) {
-      if (t.arCollected) continue;
+      const status = arStatus(t);
+      if (status.status === "collected") continue;
       // Grouped by name, not customerId — a stale/orphaned customerId on an
       // old sale doc must not split one person's balance into two rows (or
       // collide as a duplicate React key when it happens to match another
@@ -22,9 +23,9 @@ export default function TopDebtorsChart({ arTransactions }: TopDebtorsChartProps
       // splittable at creation time.
       const key = customerKey(t.customerName || "Unknown");
       const entry = byCustomer.get(key) || { key, name: t.customerName || "Unknown", amount: 0, count: 0 };
-      // The AR portion only — a partially-AR sale must not inflate a
-      // customer's balance by the whole line total.
-      entry.amount += paymentSplit(t).ar;
+      // Remaining balance, not the doc's full AR portion — a partially
+      // collected invoice must only count what's still actually owed.
+      entry.amount += status.remaining;
       entry.count += 1;
       byCustomer.set(key, entry);
     }

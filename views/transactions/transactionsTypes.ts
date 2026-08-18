@@ -20,6 +20,7 @@ export type EditData =
       paymentType: string;
       srp: number;
       quantity: number;
+      deliveryCharge: number;
     }
   | {
       type: "swap";

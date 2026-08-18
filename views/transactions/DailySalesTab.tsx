@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fmt, today } from "../../lib/utils";
 import { PlusIcon, EditIcon, TrashIcon, DownloadIcon, ChevronLeftIcon } from "../../components/Icons";
 import { paymentSplit } from "../../lib/payments";
+import { arStatus } from "../../lib/receivables";
 import type { SaleTransaction, Swap, Refund } from "../../lib/types";
 import type { EditData, PendingDelete } from "./transactionsTypes";
 import styles from "./DailySalesTab.module.css";
@@ -138,7 +139,11 @@ export default function DailySalesTab({
                         <span className={styles.editFieldLabel}>Discount</span>
                         <input type="number" value={editData.discount} onChange={(e) => {
                           const disc = parseFloat(e.target.value) || 0;
-                          setEditData((p) => (p && p.type === "sale" ? { ...p, discount: disc, totalAmount: Math.max(0, (p.srp * p.quantity) - disc) } : p));
+                          // Must include deliveryCharge — it's already baked into the
+                          // doc's totalAmount, and dropping it here would understate
+                          // this doc's totalAmount without touching its deliveryCharge
+                          // field, silently desyncing the two.
+                          setEditData((p) => (p && p.type === "sale" ? { ...p, discount: disc, totalAmount: Math.max(0, (p.srp * p.quantity) - disc + p.deliveryCharge) } : p));
                         }} className={`${styles.editInput} ${styles.editInputDiscount} ${styles.editInputMono}`} />
                       </div>
                       <div>
@@ -167,6 +172,11 @@ export default function DailySalesTab({
               // changing discount/total/paymentType would desync it from the
               // per-row payment allocation. Delete and re-record instead.
               const isSplitPayment = !!t.payments;
+              // An AR sale with a recorded collection can't be edited/deleted
+              // either — that would desync arCollections from the invoice
+              // total, or silently remove cash that already fed a past day's
+              // Expected Cash Remit. Same guard as the Receivables page.
+              const hasCollections = arStatus(t).collected > 0;
 
               return (
                 <div key={t.id} className={styles.saleRow} style={{ gridTemplateColumns: SALE_GRID }}>
@@ -196,12 +206,11 @@ export default function DailySalesTab({
                     {t.gcashRef || "—"}
                   </span>
                   <div className={styles.rowActions}>
-                    {isSplitPayment ? (
+                    {isSplitPayment || hasCollections ? (
                       <button
                         disabled
-                        className={styles.iconButton}
-                        style={{ opacity: 0.3, cursor: "not-allowed" }}
-                        title="Split payment — delete and re-record to change"
+                        className={`${styles.iconButton} ${styles.iconButtonDisabled}`}
+                        title={hasCollections ? "Has collections — void them on the Receivables page first" : "Split payment — delete and re-record to change"}
                       >
                         <EditIcon />
                       </button>
@@ -210,7 +219,12 @@ export default function DailySalesTab({
                         <EditIcon />
                       </button>
                     )}
-                    <button onClick={() => setPendingDelete({ type: "sale", id: t.id })} className={styles.iconButton} title="Delete">
+                    <button
+                      onClick={() => setPendingDelete({ type: "sale", id: t.id })}
+                      disabled={hasCollections}
+                      className={`${styles.iconButton} ${hasCollections ? styles.iconButtonDisabled : ""}`}
+                      title={hasCollections ? "Has collections — void them on the Receivables page first" : "Delete"}
+                    >
                       <TrashIcon />
                     </button>
                   </div>

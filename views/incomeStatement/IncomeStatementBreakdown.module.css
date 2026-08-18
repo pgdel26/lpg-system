@@ -16,35 +16,37 @@
   letter-spacing: 0.5px;
 }
 
-.cardHeaderRow {
+.cardHeaderButton {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-}
-
-.cardHeaderRow .cardTitle {
-  border-bottom: none;
-}
-
-.toggleButton {
-  margin-right: 16px;
-  padding: 5px 10px;
-  border-radius: 6px;
+  width: 100%;
+  padding: 12px 20px;
   border: none;
+  background: none;
   cursor: pointer;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--accent-blue);
-  font-size: 11px;
-  font-weight: 600;
+  text-align: left;
   font-family: inherit;
 }
 
-.cardNote {
-  padding: 0 20px 12px;
-  font-size: 11px;
-  line-height: 1.5;
+.cardHeaderButton:disabled {
+  cursor: default;
+}
+
+.rowValueGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expensesChevron {
+  display: flex;
   color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.expensesChevronClosed {
+  transform: rotate(-90deg);
 }
 
 .row {
@@ -53,13 +55,6 @@
   align-items: center;
   padding: 12px 20px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-}
-
-.rowEmpty {
-  padding: 16px 20px;
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
 }
 
 .rowLabel {
@@ -92,27 +87,18 @@
   color: var(--text-dim);
 }
 
-.subTotalRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 20px;
-  background: rgba(241, 245, 249, 0.5);
-  border-bottom: 1px solid var(--border);
+.channelRow {
+  padding-left: 36px;
+  background: rgba(37, 99, 235, 0.03);
 }
 
-.subTotalLabel {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.channelLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue);
 }
 
-.subTotalValue {
-  font-size: 13px;
-  font-weight: 700;
-  font-family: var(--font-mono);
+.valueNeutral {
   color: var(--text-secondary);
 }
 
@@ -139,60 +125,41 @@
   font-family: var(--font-mono);
 }
 
-.transferMemoRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 20px;
-  font-size: 11px;
-  color: var(--text-dim);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-}
-
-.grossProfitBar {
+.finalTotalRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-radius: 12px;
-  background: rgba(37, 99, 235, 0.06);
-  border: 1px solid var(--border);
-  margin-bottom: 4px;
+  background: rgba(241, 245, 249, 0.5);
+  border-top: 2px solid var(--border);
 }
 
-.marginBadge {
-  margin-left: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-
-.marginFootnote {
-  font-size: 10px;
-  color: var(--text-dim);
-  margin-bottom: 16px;
-  padding: 0 4px;
-}
-
-.operatingResultBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 20px;
-  border-radius: 12px;
-  background: var(--bg-card);
-  border: 2px solid var(--border-light);
-  margin-bottom: 16px;
-}
-
-.operatingResultLabel {
-  font-size: 14px;
+.finalTotalLabel {
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.operatingResultValue {
-  font-size: 22px;
+.finalTotalSub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.finalTotalValue {
+  font-size: 18px;
   font-weight: 700;
   font-family: var(--font-mono);
 }
+
+.cashMemo {
+  padding: 8px 20px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+

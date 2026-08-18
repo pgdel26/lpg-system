@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { fmt } from "../lib/utils";
-import { paymentSplit } from "../lib/payments";
+import { arStatus } from "../lib/receivables";
 import { customerKey } from "../lib/hooks/useCustomersData";
 import { PlusIcon, PackageIcon } from "../components/Icons";
 import type {
@@ -94,16 +94,17 @@ export default function DashboardPage({
   }, [staff, dailyReport]);
 
   // ─── Pending A/R (all outstanding as of today) + biggest account ───
-  // Uses paymentSplit().ar (not totalAmount) and customerKey() (not a raw
-  // name compare) so this agrees with Receivables/TopDebtorsChart on both
-  // the split-payment rule and the "same customer" identity rule — see
-  // lib/payments.ts and lib/hooks/useCustomersData.ts.
+  // Uses arStatus().remaining (not totalAmount, and not the full AR portion —
+  // a partial collection reduces what's still owed) and customerKey() (not a
+  // raw name compare) so this agrees with Receivables/TopDebtorsChart on both
+  // the collection rule and the "same customer" identity rule — see
+  // lib/receivables.ts and lib/hooks/useCustomersData.ts.
   const arPending = useMemo(() => {
-    const open = (arTransactions || []).filter((t) => !t.arCollected);
+    const open = (arTransactions || []).filter((t) => arStatus(t).status !== "collected");
     let total = 0;
     const byAccount = new Map<string, { name: string; amount: number }>();
     for (const t of open) {
-      const arAmount = paymentSplit(t).ar;
+      const arAmount = arStatus(t).remaining;
       total += arAmount;
       const key = customerKey(t.customerName || "Unknown");
       const entry = byAccount.get(key) || { name: t.customerName || "Unknown", amount: 0 };

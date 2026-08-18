@@ -9,6 +9,29 @@ export type ProductCategory =
 export type PaymentType = "cash" | "gcash" | "ar";
 export type PricebookStatus = "active" | "draft" | "inactive";
 
+// One payment applied to one AR sale doc via the Receivables page's Record
+// Collection flow. A doc accumulates these over time (e.g. partly cash on one
+// date, partly check on another) — see lib/receivables.ts for how they're
+// read back into a status, and lib/hooks/useReceivablesData.ts for how a
+// single collection (possibly spanning several docs via FIFO) writes them.
+export interface ArCollectionEvent {
+  amount: number;
+  method: "cash" | "check" | "gcash";
+  date: string;
+  branch: BranchId;
+  // Shared by every doc touched by one Record Collection action, so voiding
+  // a mis-entered collection can find and reverse all of them together.
+  batchId: string;
+  checkDate?: string;
+  checkNumber?: string;
+  createdAt: Timestamp;
+  // Set (never removed) when this event is reversed — kept in the array
+  // rather than deleted so the collection history stays auditable. Excluded
+  // from every balance/report calculation in lib/receivables.ts.
+  voided?: boolean;
+  voidedAt?: Timestamp;
+}
+
 // branches collection — doc ID doubles as the URL/branch slug (e.g. "pili").
 // BranchId is deliberately `string`, not a "pili" | "cadlan" union — a third
 // outlet must be addable via a new doc, not a code change (see safe-category-change,
@@ -97,9 +120,21 @@ export interface SaleTransaction {
   checkDate?: string;
   checkAmount?: number;
   gcashRef?: string;
+  // Legacy-only: written by the old all-or-nothing "Mark Collected" flow,
+  // before per-event collection tracking existed. No longer written by the
+  // app — every collection recorded since is tracked exclusively via
+  // arCollections below, which always takes priority when present (see
+  // lib/receivables.ts's arCollectionEvents). Left in place only so old,
+  // untouched docs keep reading correctly.
   arCollected?: boolean;
   collectedDate?: string;
   collectionMethod?: string;
+  // Every collection event ever recorded against this invoice, written by
+  // the Receivables page's Record Collection flow — source of truth for
+  // partial payments. Absent on docs untouched by it (including legacy docs,
+  // which lib/receivables.ts's arCollectionEvents synthesizes one event for
+  // from the fields above).
+  arCollections?: ArCollectionEvent[];
 }
 
 // purchases collection

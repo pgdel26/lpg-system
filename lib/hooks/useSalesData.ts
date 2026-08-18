@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   collection, onSnapshot, query, where, orderBy,
-  addDoc, updateDoc, deleteDoc, doc, Timestamp,
+  addDoc, updateDoc, deleteDoc, getDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getPricebookSrp, fmt } from "../utils";
 import { buildSalesSections } from "../constants";
+import { arStatus } from "../receivables";
 import type { SaleTransaction, Pricebook, PaymentType, SalePayment } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
@@ -361,7 +362,17 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
     },
   ): Promise<void> => {
     try {
-      await updateDoc(doc(db, "saleTransactions", saleId), {
+      const ref = doc(db, "saleTransactions", saleId);
+      const snap = await getDoc(ref);
+      // Editing an AR sale with recorded collections would desync
+      // arCollections from the new totalAmount/discount — same boundary the
+      // Receivables/Daily Sales UI already enforces, but enforced here too
+      // so it can't be bypassed by a caller that skips those screens' guard.
+      if (snap.exists() && arStatus({ id: snap.id, ...snap.data() }).collected > 0) {
+        onToast({ type: "error", message: "Has collections — void them on the Receivables page first." });
+        return;
+      }
+      await updateDoc(ref, {
         invoice: data.invoice ?? "",
         customerName: data.customerName ?? "",
         discount: parseFloat(String(data.discount)) || 0,
@@ -378,7 +389,17 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
   // ---- deleteSale ----
   const deleteSale = useCallback(async (saleId: string): Promise<void> => {
     try {
-      await deleteDoc(doc(db, "saleTransactions", saleId));
+      const ref = doc(db, "saleTransactions", saleId);
+      const snap = await getDoc(ref);
+      // Deleting an AR sale with recorded collections would destroy money in
+      // two directions: the customer's paid-down balance reappears, and the
+      // cash events vanish from a past day's Expected Cash Remit. Same
+      // boundary as updateSale above.
+      if (snap.exists() && arStatus({ id: snap.id, ...snap.data() }).collected > 0) {
+        onToast({ type: "error", message: "Has collections — void them on the Receivables page first." });
+        return;
+      }
+      await deleteDoc(ref);
       onToast({ type: "success", message: "Sale deleted." });
     } catch (error) {
       console.error("Delete sale error:", error);

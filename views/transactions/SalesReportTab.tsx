@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { fmt, today } from "../../lib/utils";
 import { paymentSplit } from "../../lib/payments";
-import { DownloadIcon, EditIcon, TrashIcon, XIcon } from "../../components/Icons";
+import { collectionEventsOnDate, arStatusAsOf } from "../../lib/receivables";
+import { groupDiscountsByCustomer } from "../../lib/reports/incomeStatement";
+import { DownloadIcon, EditIcon, TrashIcon, XIcon, ChevronDownIcon } from "../../components/Icons";
 import ExpenseModal from "../../components/ExpenseModal";
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
 import type { EditData, PendingDelete, DailyReportWithCash, UpdateExpenseFn } from "./transactionsTypes";
@@ -17,6 +19,7 @@ interface SalesReportTabProps {
   staff: Staff[];
   dailyReport: DailyReportWithCash;
   arTransactions: SaleTransaction[];
+  branch: string;
   onUpdateDailyStaff: (data: DailyReportWithCash) => Promise<void>;
   onAddExpense: (description: string, amount: string | number) => Promise<void>;
   onUpdateExpense: UpdateExpenseFn;
@@ -33,17 +36,19 @@ interface SalesReportTabProps {
 export default function SalesReportTab({
   inventoryDate, setInventoryDate,
   saleTransactions, swaps, refunds, expenses, staff,
-  dailyReport, arTransactions,
+  dailyReport, arTransactions, branch,
   onUpdateDailyStaff, onAddExpense, onUpdateExpense,
   onExportFullReport,
   editingId, editData, setEditData, setEditingId, cancelEdit, setPendingDelete,
 }: SalesReportTabProps) {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [discountBreakdownOpen, setDiscountBreakdownOpen] = useState(true);
 
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const totalDelivery = saleTransactions.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
   const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
+  const discountByCustomer = groupDiscountsByCustomer(saleTransactions);
   const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
   const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
@@ -53,9 +58,18 @@ export default function SalesReportTab({
   // split-payment sale's cash/gcash/ar portions instead of one channel only.
   const totalAR = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
   const totalGCash = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
-  const collectionsForDay = (arTransactions || []).filter((t) => t.arCollected && t.collectedDate === inventoryDate && t.collectionMethod !== "check");
-  // The AR portion collected, not the doc's full line total.
-  const totalCollections = collectionsForDay.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
+  // Only cash collected at THIS branch, on this date, counts — a doc can
+  // receive partial collections across several dates/branches, and check/
+  // GCash collections never touch the physical drawer. See lib/receivables.ts.
+  // Derived from one shared call so the peso figure and the invoice count
+  // below can never drift apart by re-encoding the same predicate twice.
+  const collectionsToday = collectionEventsOnDate(arTransactions || [], inventoryDate, branch);
+  const totalCollections = collectionsToday.reduce((sum, { event }) => sum + (event.amount || 0), 0);
+  const docsCollectedToday = Array.from(new Map(collectionsToday.map(({ doc }) => [doc.id, doc])).values());
+  // Status as of THIS date, not live — a doc later fully settled on some
+  // future date must not retroactively change what a past day's report says
+  // happened that day.
+  const partialCollectionsCount = docsCollectedToday.filter((t) => arStatusAsOf(t, inventoryDate).status === "partial").length;
   const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
 
   return (
@@ -110,17 +124,41 @@ export default function SalesReportTab({
             </div>
 
             {/* Discount row */}
-            <div className={styles.breakdownRow}>
+            <button
+              type="button"
+              onClick={() => setDiscountBreakdownOpen((v) => !v)}
+              disabled={discountByCustomer.length === 0}
+              className={styles.breakdownRowButton}
+            >
               <div>
                 <div className={styles.rowLabel}>Discounts</div>
                 <div className={styles.rowSub}>
                   {saleTransactions.filter((t) => t.discount > 0).length} discounted sale{saleTransactions.filter((t) => t.discount > 0).length !== 1 ? "s" : ""}
                 </div>
               </div>
-              <span className={`${styles.rowValue} ${totalDiscount > 0 ? styles.valueRed : styles.valueDim}`}>
-                {totalDiscount > 0 ? `- ${fmt(totalDiscount)}` : fmt(0)}
-              </span>
-            </div>
+              <div className={styles.rowValueGroup}>
+                <span className={`${styles.rowValue} ${totalDiscount > 0 ? styles.valueRed : styles.valueDim}`}>
+                  {totalDiscount > 0 ? `- ${fmt(totalDiscount)}` : fmt(0)}
+                </span>
+                {discountByCustomer.length > 0 && (
+                  <span className={`${styles.discountChevron} ${discountBreakdownOpen ? "" : styles.closed}`}>
+                    <ChevronDownIcon />
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Per-customer discount breakdown */}
+            {discountBreakdownOpen && discountByCustomer.length > 0 && (
+              <div className={styles.discountBreakdown}>
+                {discountByCustomer.map((d) => (
+                  <div key={d.label} className={styles.discountBreakdownRow}>
+                    <span className={styles.discountCustomerName}>{d.label}</span>
+                    <span className={styles.discountCustomerAmount}>- {fmt(d.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Expenses row */}
             <div className={styles.breakdownRow}>
@@ -188,7 +226,9 @@ export default function SalesReportTab({
             <div className={styles.subTotalRow}>
               <div>
                 <div className={styles.rowLabel}>Collections</div>
-                <div className={styles.rowSub}>{collectionsForDay.length} AR collected</div>
+                <div className={styles.rowSub}>
+                  {docsCollectedToday.length} invoice{docsCollectedToday.length !== 1 ? "s" : ""}{partialCollectionsCount > 0 ? ` (${partialCollectionsCount} partial)` : ""}
+                </div>
               </div>
               <span className={`${styles.rowValue} ${totalCollections > 0 ? styles.valueGreen : styles.valueDim}`}>
                 {totalCollections > 0 ? `+ ${fmt(totalCollections)}` : fmt(0)}

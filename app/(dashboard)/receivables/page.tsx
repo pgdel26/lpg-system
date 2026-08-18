@@ -7,7 +7,9 @@ export default function ReceivablesRoutePage() {
   return (
     <ReceivablesPage
       arTransactions={data.arTransactions}
-      onMarkCollected={data.markArCollected}
+      branches={data.branches}
+      onRecordCollection={data.recordArCollection}
+      onVoidCollection={data.voidArCollectionBatch}
       onUpdateSale={data.updateSale}
       onDeleteSale={data.deleteSale}
     />

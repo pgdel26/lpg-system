@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { fmt } from "../lib/utils";
+import { useState, useMemo, useEffect } from "react";
+import { fmt, today, presetThisMonth, presetLastMonth, formatDateShort } from "../lib/utils";
 import { PlusIcon, EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import type { Purchase, Branch } from "../lib/types";
@@ -43,6 +43,13 @@ const subTabs = [
 interface PurchasesPageProps {
   purchaseTransactions: Purchase[];
   branches: Branch[];
+  hasMorePurchases: boolean;
+  loadingMorePurchases: boolean;
+  onLoadMorePurchases: () => void;
+  /** One-time range query — see usePurchasesData's doc for why the From/To filters need this instead of filtering purchaseTransactions. */
+  fetchPurchasesInRange: (from: string, to: string) => Promise<{ purchases: Purchase[]; truncated: boolean }>;
+  /** Bumped by the hook after any mutation — refetches the active range query so it doesn't go stale after an edit/delete. */
+  purchasesVersion: number;
   onOpenPurchaseModal: () => void;
   onUpdatePurchase: (purchaseId: string, data: { quantity: number; unitCost: number; totalCost: number }) => Promise<void>;
   onDeletePurchase: (purchaseId: string) => Promise<void>;
@@ -52,6 +59,11 @@ interface PurchasesPageProps {
 export default function PurchasesPage({
   purchaseTransactions,
   branches,
+  hasMorePurchases,
+  loadingMorePurchases,
+  onLoadMorePurchases,
+  fetchPurchasesInRange,
+  purchasesVersion,
   onOpenPurchaseModal,
   onUpdatePurchase,
   onDeletePurchase,
@@ -64,18 +76,67 @@ export default function PurchasesPage({
   const [editData, setEditData] = useState<EditData>({ quantity: 0, unitCost: 0, totalCost: 0 });
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
-  // Filter by date range
-  const filtered = useMemo(() => {
-    let list = [...purchaseTransactions];
-    if (filterFrom) list = list.filter((t) => t.date >= filterFrom);
-    if (filterTo) list = list.filter((t) => t.date <= filterTo);
-    return list;
-  }, [purchaseTransactions, filterFrom, filterTo]);
+  const isRangeActive = !!(filterFrom || filterTo);
+
+  // A date range is a real Firestore query (fetchPurchasesInRange), not a
+  // filter over purchaseTransactions — that array only holds the recent
+  // paginated window, so filtering it client-side would silently miss any
+  // older history the range asks for.
+  const [rangeResults, setRangeResults] = useState<Purchase[] | null>(null);
+  const [rangeTruncated, setRangeTruncated] = useState(false);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState(false);
+
+  // Reset synchronously when the range changes (React's documented "adjust
+  // state during render" pattern, same as useSalesData's branch-switch reset)
+  // so stale results never flash under a new From/To before the fetch below resolves.
+  const filterKey = `${filterFrom}|${filterTo}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setRangeResults(null);
+    setRangeTruncated(false);
+    setRangeError(false);
+    setRangeLoading(isRangeActive);
+  }
+
+  useEffect(() => {
+    if (!isRangeActive) return;
+    let cancelled = false;
+    fetchPurchasesInRange(filterFrom, filterTo)
+      .then(({ purchases, truncated }) => {
+        if (cancelled) return;
+        setRangeResults(purchases);
+        setRangeTruncated(truncated);
+        setRangeError(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Purchases range query error:", error);
+        setRangeError(true);
+      })
+      .finally(() => { if (!cancelled) setRangeLoading(false); });
+    return () => { cancelled = true; };
+    // purchasesVersion isn't read in the body — it's a refetch trigger so an
+    // edit/delete made while a range filter is active doesn't leave stale results on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterFrom, filterTo, fetchPurchasesInRange, purchasesVersion]);
+
+  // Never fall back to the unfiltered recent window while a range is active —
+  // that would silently show the wrong data on a query error.
+  const filtered = useMemo(
+    () => (isRangeActive ? (rangeResults ?? []) : purchaseTransactions),
+    [isRangeActive, rangeResults, purchaseTransactions],
+  );
 
   // Real purchases only — transfers move existing stock, they don't add to
   // how much was actually bought/spent.
   const totalCost = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.totalCost || 0), 0);
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
+  // A range query is always complete, so "Total" is accurate there. With no
+  // filter, purchaseTransactions is just the paginated recent window — flag
+  // that explicitly rather than let the total read as "all-time".
+  const totalLabel = !isRangeActive && hasMorePurchases ? "Total (recent)" : "Total";
 
   // Merge each transfer's source/destination doc pair into a single row.
   const rows = useMemo(() => {
@@ -116,9 +177,13 @@ export default function PurchasesPage({
     }
 
     transferGroups.forEach((group, groupId) => {
-      const positive = group.find((g) => (g.quantity || 0) > 0) || group[0];
+      const positive = group.find((g) => (g.quantity || 0) > 0);
       const negative = group.find((g) => (g.quantity || 0) < 0);
-      const fromId = negative?.branch || positive.transferBranch || "";
+      // Both sides of the pair commit in one batch (see recordTransfer), but
+      // a range/window boundary can still load only one of them — wait for
+      // the other rather than mislabel the route off a single side.
+      if (!positive || !negative) return;
+      const fromId = negative.branch || positive.transferBranch || "";
       const toId = positive.branch || "";
       result.push({
         key: groupId,
@@ -149,32 +214,26 @@ export default function PurchasesPage({
       });
     });
 
-    result.sort((a, b) => {
-      if (a.date !== b.date) return b.date.localeCompare(a.date);
-      return b.createdAtSeconds - a.createdAtSeconds;
-    });
     return result;
   }, [filtered, branches]);
 
   // Purchases and Transfers are shown in separate subtabs — split once here.
   const purchaseRows = useMemo(() => rows.filter((r) => !r.isTransfer), [rows]);
   const transferRows = useMemo(() => rows.filter((r) => r.isTransfer), [rows]);
-  const activeRows = subTab === "purchases" ? purchaseRows : transferRows;
 
-  // Group by date for section headers
-  const groupByDate = (list: DisplayRow[]) => {
-    const groups: { date: string; items: DisplayRow[] }[] = [];
-    let currentDate: string | null = null;
-    for (const row of list) {
-      if (row.date !== currentDate) {
-        currentDate = row.date;
-        groups.push({ date: row.date, items: [] });
-      }
-      groups[groups.length - 1].items.push(row);
-    }
-    return groups;
-  };
-  const grouped = useMemo(() => groupByDate(activeRows), [activeRows]);
+  // Date column is sortable (click the header to toggle); everything else
+  // stays in whatever order it was built in above.
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const toggleDateSort = () => setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+
+  const activeRows = useMemo(() => {
+    const base = subTab === "purchases" ? purchaseRows : transferRows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...base].sort((a, b) => {
+      if (a.date !== b.date) return dir * a.date.localeCompare(b.date);
+      return dir * (a.createdAtSeconds - b.createdAtSeconds);
+    });
+  }, [subTab, purchaseRows, transferRows, sortDir]);
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
@@ -254,6 +313,18 @@ export default function PurchasesPage({
               className={styles.dateInput}
             />
           </div>
+          <button
+            className={styles.presetButton}
+            onClick={() => { const r = presetThisMonth(today()); setFilterFrom(r.start); setFilterTo(r.end); }}
+          >
+            This Month
+          </button>
+          <button
+            className={styles.presetButton}
+            onClick={() => { const r = presetLastMonth(today()); setFilterFrom(r.start); setFilterTo(r.end); }}
+          >
+            Last Month
+          </button>
           {(filterFrom || filterTo) && (
             <button
               onClick={() => { setFilterFrom(""); setFilterTo(""); }}
@@ -274,163 +345,183 @@ export default function PurchasesPage({
 
         {/* Purchases / Transfers list */}
         <div className={styles.tableCard}>
-        {/* Header */}
-        {subTab === "purchases" ? (
-          <div className={styles.tableHeader}>
-            <span>Product</span>
-            <span className={styles.alignCenter}>Qty</span>
-            <span className={styles.alignRight}>Unit Cost</span>
-            <span className={styles.alignRight}>Total</span>
-            <span className={styles.alignCenter}>Actions</span>
-          </div>
-        ) : (
-          <div className={styles.tableHeaderTransfers}>
-            <span>Product</span>
-            <span>Route</span>
-            <span className={styles.alignCenter}>Qty</span>
-            <span className={styles.alignCenter}>Actions</span>
-          </div>
-        )}
-
-        {activeRows.length > 0 ? (
-          <>
-            {grouped.map((group) => {
-              const dateObj = new Date(group.date + "T00:00:00");
-              const dateLabel = dateObj.toLocaleDateString("en-PH", {
-                weekday: "short", month: "short", day: "numeric", year: "numeric",
-              });
-              const groupTotal = group.items.reduce((sum, r) => sum + (r.totalCost || 0), 0);
-              const groupQty = group.items.reduce((sum, r) => sum + (r.quantity || 0), 0);
-
-              return (
-                <React.Fragment key={group.date}>
-                  {/* Date header */}
-                  <div className={styles.dateHeader}>
-                    <span>{dateLabel}</span>
-                    <span className={styles.dateHeaderTotal}>
-                      {subTab === "purchases" ? fmt(groupTotal) : `${groupQty} item${groupQty !== 1 ? "s" : ""}`}
-                    </span>
-                  </div>
-
-                  {/* Rows */}
-                  {group.items.map((row) => (
-                    editingId === row.key ? (
-                      <div key={row.key} className={styles.editRow}>
-                        <div className={styles.editFields}>
-                          <div className={styles.editFieldProduct}>
-                            <span className={styles.editFieldLabel}>Product</span>
-                            <div className={styles.editProductName}>
-                              {row.product}
-                            </div>
-                          </div>
-                          <div className={styles.editFieldShort}>
-                            <span className={styles.editFieldLabel}>Qty</span>
-                            <input type="number" value={editData.quantity} onChange={(e) => {
-                              const qty = parseInt(e.target.value) || 0;
-                              setEditData((p) => ({ ...p, quantity: qty, totalCost: qty * (p.unitCost || 0) }));
-                            }} className={styles.editInput} />
-                          </div>
-                          <div className={styles.editFieldMed}>
-                            <span className={styles.editFieldLabel}>Unit Cost</span>
-                            <input type="number" value={editData.unitCost} onChange={(e) => {
-                              const uc = parseFloat(e.target.value) || 0;
-                              setEditData((p) => ({ ...p, unitCost: uc, totalCost: (p.quantity || 0) * uc }));
-                            }} className={styles.editInput} />
-                          </div>
-                          <div className={styles.editFieldMed}>
-                            <span className={styles.editFieldLabel}>Total</span>
-                            <div className={styles.editTotalValue}>
-                              {fmt(editData.totalCost)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className={styles.editActions}>
-                          <button onClick={cancelEdit} className={styles.cancelButton}>Cancel</button>
-                          <button onClick={saveEdit} className={styles.saveButton}>Save</button>
-                        </div>
-                      </div>
-                    ) : subTab === "purchases" ? (
-                      <div key={row.key} className={styles.tableRow}>
-                        <span className={styles.productName}>
-                          {row.product}
-                        </span>
-                        <span className={styles.qtyCell}>
-                          {row.quantity}
-                        </span>
-                        <span className={styles.unitCostCell}>
-                          {fmt(row.unitCost || 0)}
-                        </span>
-                        <span className={styles.totalCostCell}>
-                          {fmt(row.totalCost || 0)}
-                        </span>
-                        <div className={styles.actionsCell}>
-                          <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">
-                            <EditIcon />
-                          </button>
-                          <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div key={row.key} className={styles.tableRowTransfers}>
-                        <span className={styles.productName}>
-                          {row.product}
-                        </span>
-                        <span className={styles.routeCell}>
-                          {row.transferLabel}
-                        </span>
-                        <span className={styles.qtyCell}>
-                          {row.quantity}
-                        </span>
-                        <div className={styles.actionsCell}>
-                          <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </React.Fragment>
-              );
-            })}
-
-            {/* Grand total */}
+        <div className={styles.tableScroll}>
+        <table className={styles.table}>
+          <colgroup>
             {subTab === "purchases" ? (
-              <div className={styles.grandTotalRow}>
-                <span className={styles.grandTotalLabel}>
-                  Total
-                </span>
-                <span className={styles.grandTotalQty}>
-                  {totalItems}
-                </span>
-                <span />
-                <span className={styles.grandTotalCost}>
-                  {fmt(totalCost)}
-                </span>
-                <span />
-              </div>
+              <>
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "34%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "8%" }} />
+              </>
             ) : (
-              <div className={styles.grandTotalRowTransfers}>
-                <span className={styles.grandTotalLabel}>
-                  Total
-                </span>
-                <span />
-                <span className={styles.grandTotalQty}>
-                  {totalTransferItems}
-                </span>
-                <span />
-              </div>
+              <>
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+              </>
             )}
-          </>
-        ) : (
-          <div className={styles.emptyState}>
-            {subTab === "purchases"
-              ? (purchaseTransactions.some((t) => !t.isTransfer) ? "No purchases match the selected date range." : "No purchases recorded yet.")
-              : (purchaseTransactions.some((t) => t.isTransfer) ? "No transfers match the selected date range." : "No transfers recorded yet.")}
+          </colgroup>
+          <thead>
+            <tr>
+              <th
+                className={styles.sortableHeader}
+                onClick={toggleDateSort}
+                title="Sort by date"
+              >
+                Date {sortDir === "desc" ? "▼" : "▲"}
+              </th>
+              <th>Product</th>
+              {subTab === "purchases" ? (
+                <>
+                  <th className={styles.alignCenter}>Qty</th>
+                  <th className={styles.alignRight}>Unit Cost</th>
+                  <th className={styles.alignRight}>Total</th>
+                  <th className={styles.alignCenter}>Actions</th>
+                </>
+              ) : (
+                <>
+                  <th>Route</th>
+                  <th className={styles.alignCenter}>Qty</th>
+                  <th className={styles.alignCenter}>Actions</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {activeRows.length > 0 ? (
+              activeRows.map((row) => (
+                editingId === row.key ? (
+                  <tr key={row.key}>
+                    <td colSpan={subTab === "purchases" ? 6 : 5} className={styles.editCell}>
+                      <div className={styles.editFields}>
+                        <div className={styles.editFieldProduct}>
+                          <span className={styles.editFieldLabel}>Product</span>
+                          <div className={styles.editProductName}>
+                            {row.product}
+                          </div>
+                        </div>
+                        <div className={styles.editFieldShort}>
+                          <span className={styles.editFieldLabel}>Qty</span>
+                          <input type="number" value={editData.quantity} onChange={(e) => {
+                            const qty = parseInt(e.target.value) || 0;
+                            setEditData((p) => ({ ...p, quantity: qty, totalCost: qty * (p.unitCost || 0) }));
+                          }} className={styles.editInput} />
+                        </div>
+                        <div className={styles.editFieldMed}>
+                          <span className={styles.editFieldLabel}>Unit Cost</span>
+                          <input type="number" value={editData.unitCost} onChange={(e) => {
+                            const uc = parseFloat(e.target.value) || 0;
+                            setEditData((p) => ({ ...p, unitCost: uc, totalCost: (p.quantity || 0) * uc }));
+                          }} className={styles.editInput} />
+                        </div>
+                        <div className={styles.editFieldMed}>
+                          <span className={styles.editFieldLabel}>Total</span>
+                          <div className={styles.editTotalValue}>
+                            {fmt(editData.totalCost)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={styles.editActions}>
+                        <button onClick={cancelEdit} className={styles.cancelButton}>Cancel</button>
+                        <button onClick={saveEdit} className={styles.saveButton}>Save</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : subTab === "purchases" ? (
+                  <tr key={row.key}>
+                    <td className={styles.dateCell}>{formatDateShort(row.date)}</td>
+                    <td className={styles.productName}>{row.product}</td>
+                    <td className={styles.qtyCell}>{row.quantity}</td>
+                    <td className={styles.unitCostCell}>{fmt(row.unitCost || 0)}</td>
+                    <td className={styles.totalCostCell}>{fmt(row.totalCost || 0)}</td>
+                    <td>
+                      <div className={styles.actionsCell}>
+                        <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">
+                          <EditIcon />
+                        </button>
+                        <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={row.key}>
+                    <td className={styles.dateCell}>{formatDateShort(row.date)}</td>
+                    <td className={styles.productName}>{row.product}</td>
+                    <td className={styles.routeCell}>{row.transferLabel}</td>
+                    <td className={styles.qtyCell}>{row.quantity}</td>
+                    <td>
+                      <div className={styles.actionsCell}>
+                        <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              ))
+            ) : (
+              <tr>
+                <td colSpan={subTab === "purchases" ? 6 : 5} className={styles.emptyState}>
+                  {rangeError
+                    ? "Couldn't load purchases for this range. Please try again."
+                    : rangeLoading
+                    ? "Searching…"
+                    : isRangeActive
+                    ? `No ${subTab === "purchases" ? "purchases" : "transfers"} in the selected date range.`
+                    : `No ${subTab === "purchases" ? "purchases" : "transfers"} recorded yet.`}
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {activeRows.length > 0 && (
+            <tfoot>
+              {subTab === "purchases" ? (
+                <tr>
+                  <td colSpan={2} className={styles.grandTotalLabel}>{totalLabel}</td>
+                  <td className={styles.grandTotalQty}>{totalItems}</td>
+                  <td />
+                  <td className={styles.grandTotalCost}>{fmt(totalCost)}</td>
+                  <td />
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={2} className={styles.grandTotalLabel}>{totalLabel}</td>
+                  <td />
+                  <td className={styles.grandTotalQty}>{totalTransferItems}</td>
+                  <td />
+                </tr>
+              )}
+            </tfoot>
+          )}
+        </table>
+        </div>
+        </div>
+
+        {/* A date range is already a complete query — pagination only applies to the unfiltered recent view. */}
+        {!isRangeActive && hasMorePurchases && (
+          <div className={styles.loadMoreRow}>
+            <button
+              onClick={onLoadMorePurchases}
+              disabled={loadingMorePurchases}
+              className={styles.loadMoreButton}
+            >
+              {loadingMorePurchases ? "Loading…" : "Load older purchases"}
+            </button>
           </div>
         )}
-        </div>
+        {isRangeActive && rangeTruncated && (
+          <div className={styles.rangeTruncatedNote}>
+            Showing the first 500 matches — narrow the date range to see everything.
+          </div>
+        )}
       </div>
 
       {pendingDelete && (

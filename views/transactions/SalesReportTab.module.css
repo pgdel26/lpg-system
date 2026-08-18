@@ -30,18 +30,18 @@
 
 .exportButton {
   margin-left: auto;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border-light);
-  background: transparent;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
   cursor: pointer;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
 }
 
 .layout {
@@ -85,6 +85,66 @@
   align-items: center;
   padding: 12px 20px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.breakdownRowButton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.breakdownRowButton:disabled {
+  cursor: default;
+}
+
+.rowValueGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discountChevron {
+  display: flex;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.discountChevron.closed {
+  transform: rotate(-90deg);
+}
+
+.discountBreakdown {
+  padding: 4px 20px 10px 32px;
+  background: rgba(239, 68, 68, 0.03);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.discountBreakdownRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.discountCustomerName {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.discountCustomerAmount {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-red);
 }
 
 .subTotalRow {

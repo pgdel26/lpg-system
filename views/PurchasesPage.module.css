@@ -78,6 +78,18 @@
   font-family: inherit;
 }
 
+.presetButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
 .addButton {
   margin-left: auto;
   padding: 8px 18px;
@@ -101,28 +113,72 @@
   overflow: hidden;
 }
 
-.tableHeader {
-  display: grid;
-  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 4px;
 }
 
-.tableHeaderTransfers {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 0.8fr 60px;
+.loadMoreButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.loadMoreButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
   padding: 10px 20px;
+  text-align: left;
+}
+
+.table thead th {
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortableHeader:hover {
+  color: var(--accent-blue);
+}
+
+.dateCell {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .alignCenter {
@@ -133,28 +189,7 @@
   text-align: right;
 }
 
-.dateHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 20px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: rgba(241, 245, 249, 0.5);
-  border-bottom: 1px solid var(--border);
-}
-
-.dateHeaderTotal {
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
-.editRow {
-  padding: 10px 20px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+.editCell {
   background: rgba(59, 130, 246, 0.04);
 }
 
@@ -242,22 +277,6 @@
   font-family: inherit;
 }
 
-.tableRow {
-  display: grid;
-  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
-  padding: 10px 20px;
-  align-items: center;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-}
-
-.tableRowTransfers {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 0.8fr 60px;
-  padding: 10px 20px;
-  align-items: center;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-}
-
 .productName {
   font-size: 13px;
   font-weight: 600;
@@ -308,10 +327,7 @@
   display: flex;
 }
 
-.grandTotalRow {
-  display: grid;
-  grid-template-columns: 2fr 0.8fr 1fr 1fr 60px;
-  padding: 10px 20px;
+.table tfoot td {
   border-top: 1px solid var(--border);
   background: rgba(241, 245, 249, 0.5);
 }
@@ -339,17 +355,17 @@
   color: var(--accent-blue);
 }
 
-.grandTotalRowTransfers {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 0.8fr 60px;
-  padding: 10px 20px;
-  border-top: 1px solid var(--border);
-  background: rgba(241, 245, 249, 0.5);
-}
-
 .emptyState {
   padding: 40px 20px;
   text-align: center;
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.rangeTruncatedNote {
+  padding: 14px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-orange-dark);
 }

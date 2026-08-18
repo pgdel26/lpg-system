@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import { fmt, today } from "../../lib/utils";
+import { today, formatDateShort, presetThisMonth, presetLastMonth } from "../../lib/utils";
 import {
   computeIncomeStatement, exportIncomeStatementWorkbook, partitionByBranch,
 } from "../../lib/reports/incomeStatement";
+import { collectionEventsInRange } from "../../lib/receivables";
 import IncomeStatementBreakdown from "./IncomeStatementBreakdown";
+import DiscountsByCustomerCard from "./DiscountsByCustomerCard";
 import { LoadingIcon, DownloadIcon } from "../../components/Icons";
 import type { SaleTransaction, Swap, Refund, Purchase, Expense, Branch } from "../../lib/types";
 import styles from "./IncomeStatementPage.module.css";
@@ -20,34 +22,14 @@ interface IncomeStatementPageProps {
   purchases: Purchase[];
   expenses: Expense[];
   branches: Branch[];
-}
-
-const pad2 = (n: number): string => String(n).padStart(2, "0");
-const ymd = (y: number, m: number, d: number): string => `${y}-${pad2(m)}-${pad2(d)}`;
-
-function presetThisMonth(todayStr: string): { start: string; end: string } {
-  const [y, m] = todayStr.split("-").map(Number);
-  return { start: ymd(y, m, 1), end: todayStr };
-}
-
-function presetLastMonth(todayStr: string): { start: string; end: string } {
-  const [y, m] = todayStr.split("-").map(Number);
-  const prevY = m === 1 ? y - 1 : y;
-  const prevM = m === 1 ? 12 : m - 1;
-  const lastDay = new Date(Date.UTC(prevY, prevM, 0)).getUTCDate();
-  return { start: ymd(prevY, prevM, 1), end: ymd(prevY, prevM, lastDay) };
+  /** Unbounded, live AR doc list — NOT date-ranged. See IncomeStatementInput. */
+  arTransactions: SaleTransaction[];
 }
 
 function presetThisYear(todayStr: string): { start: string; end: string } {
   const y = Number(todayStr.split("-")[0]);
-  return { start: ymd(y, 1, 1), end: todayStr };
+  return { start: `${y}-01-01`, end: todayStr };
 }
-
-// Bare "YYYY-MM-DD" strings must be parsed with an explicit local-midnight
-// time component — new Date("YYYY-MM-DD") parses as UTC and can render as
-// the wrong calendar day depending on the browser's timezone.
-const formatDateLabel = (dateStr: string): string =>
-  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
 export default function IncomeStatementPage({
   startDate,
@@ -61,12 +43,13 @@ export default function IncomeStatementPage({
   purchases,
   expenses,
   branches,
+  arTransactions,
 }: IncomeStatementPageProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
 
   const combinedResult = useMemo(
-    () => computeIncomeStatement({ saleTransactions, swaps, refunds, purchases, expenses }),
-    [saleTransactions, swaps, refunds, purchases, expenses],
+    () => computeIncomeStatement({ saleTransactions, swaps, refunds, purchases, expenses, arTransactions, startDate, endDate }),
+    [saleTransactions, swaps, refunds, purchases, expenses, arTransactions, startDate, endDate],
   );
 
   // Partition each collection by branch from a single unfiltered fetch — never
@@ -83,23 +66,47 @@ export default function IncomeStatementPage({
 
     const perBranch = branches.map((branch) => ({
       branch,
+      // arTransactions is passed UNPARTITIONED to every branch — a
+      // collection is attributed by where the cash was received (the
+      // event's own branch, filtered inside computeIncomeStatement), not by
+      // the invoice's origin branch, so partitioning the AR docs themselves
+      // would misattribute cash collected at one outlet to the other.
       result: computeIncomeStatement({
         saleTransactions: salesPart.byBranch[branch.id],
         swaps: swapsPart.byBranch[branch.id],
         refunds: refundsPart.byBranch[branch.id],
         purchases: purchasesPart.byBranch[branch.id],
         expenses: expensesPart.byBranch[branch.id],
+        arTransactions,
+        startDate,
+        endDate,
+        branch: branch.id,
       }),
     }));
 
+    // Collection events (not the AR docs themselves — see the comment above)
+    // whose own branch is missing/unrecognized. Without this, a collection
+    // that can't be attributed to an outlet counts in All Outlets' cash
+    // figures but neither outlet tab's, silently breaking the
+    // "PILI + CADLAN + Unassigned == Combined" promise this warning exists for.
+    const unassignedCollections = startDate && endDate
+      ? collectionEventsInRange(arTransactions, startDate, endDate).filter(({ event }) => !event.branch || !branchIds.includes(event.branch)).length
+      : 0;
+
     const unassigned = salesPart.unassigned.length + swapsPart.unassigned.length
-      + refundsPart.unassigned.length + purchasesPart.unassigned.length + expensesPart.unassigned.length;
+      + refundsPart.unassigned.length + purchasesPart.unassigned.length + expensesPart.unassigned.length
+      + unassignedCollections;
 
     return { perBranchResults: perBranch, unassignedCount: unassigned };
-  }, [saleTransactions, swaps, refunds, purchases, expenses, branches]);
+  }, [saleTransactions, swaps, refunds, purchases, expenses, branches, arTransactions, startDate, endDate]);
 
+  // Includes AR collections — a period whose only money event is a
+  // collection (invoice sold earlier, paid this period) still has real cash
+  // movement to show, even with zero sales/swaps/purchases/refunds/expenses
+  // of its own.
   const hasData = saleTransactions.length > 0 || swaps.length > 0 || purchases.length > 0
-    || refunds.length > 0 || expenses.length > 0;
+    || refunds.length > 0 || expenses.length > 0
+    || combinedResult.arCollectedCash + combinedResult.arCollectedGcash + combinedResult.arCollectedCheck > 0;
 
   const activeResult = activeTab === "all"
     ? combinedResult
@@ -150,7 +157,7 @@ export default function IncomeStatementPage({
       </div>
 
       <div className={styles.periodLabel}>
-        {formatDateLabel(startDate)} &ndash; {formatDateLabel(endDate)}
+        {formatDateShort(startDate)} &ndash; {formatDateShort(endDate)}
       </div>
 
       {/* Outlet tabs */}
@@ -189,28 +196,16 @@ export default function IncomeStatementPage({
       ) : !hasData ? (
         <div className={styles.emptyState}>No transactions recorded for this period.</div>
       ) : (
-        <>
-          {activeTab === "all" && (
-            <div className={styles.comparisonStrip}>
-              {perBranchResults.map(({ branch, result }) => (
-                <div key={branch.id} className={styles.comparisonCard}>
-                  <div className={styles.comparisonName}>{branch.name}</div>
-                  <div className={styles.comparisonRow}><span>Net Revenue</span><span>{fmt(result.netRevenue)}</span></div>
-                  <div className={styles.comparisonRow}><span>Gross Profit</span><span>{fmt(result.grossProfit)}</span></div>
-                  <div className={styles.comparisonRow}>
-                    <span>Margin</span>
-                    <span>
-                      {result.grossMarginPct === null ? "—" : `${result.grossMarginPct.toFixed(1)}%${result.hasTransferActivity ? "*" : ""}`}
-                    </span>
-                  </div>
-                  <div className={styles.comparisonRow}><span>Operating Result</span><span>{fmt(result.operatingResult)}</span></div>
-                </div>
-              ))}
+        <div className={styles.pageLayout}>
+          <div className={styles.mainColumn}>
+            <IncomeStatementBreakdown result={activeResult} isPerBranchView={activeTab !== "all"} />
+          </div>
+          {activeResult.discountsByCustomer.length > 0 && (
+            <div className={styles.rightCol}>
+              <DiscountsByCustomerCard result={activeResult} />
             </div>
           )}
-
-          <IncomeStatementBreakdown result={activeResult} />
-        </>
+        </div>
       )}
     </div>
   );

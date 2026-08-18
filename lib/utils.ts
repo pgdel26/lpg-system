@@ -53,3 +53,29 @@ export const formatDate = (d: FirestoreTimestampLike | string | null | undefined
     : new Date(d as string);
   return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 };
+
+// For a bare "YYYY-MM-DD" string (not a Firestore Timestamp or full ISO
+// datetime) — new Date("YYYY-MM-DD") parses as UTC and can render as the
+// wrong calendar day depending on the browser's timezone, so this parses
+// with an explicit local-midnight time component instead.
+export const formatDateShort = (dateStr: string): string =>
+  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+
+// Shared "This Month"/"Last Month" date-range presets — used by any screen
+// with a From/To filter (Income Statement, Purchases) so the two can't drift
+// into different definitions of "this month."
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+const ymd = (y: number, m: number, d: number): string => `${y}-${pad2(m)}-${pad2(d)}`;
+
+export function presetThisMonth(todayStr: string): { start: string; end: string } {
+  const [y, m] = todayStr.split("-").map(Number);
+  return { start: ymd(y, m, 1), end: todayStr };
+}
+
+export function presetLastMonth(todayStr: string): { start: string; end: string } {
+  const [y, m] = todayStr.split("-").map(Number);
+  const prevY = m === 1 ? y - 1 : y;
+  const prevM = m === 1 ? 12 : m - 1;
+  const lastDay = new Date(Date.UTC(prevY, prevM, 0)).getUTCDate();
+  return { start: ymd(prevY, prevM, 1), end: ymd(prevY, prevM, lastDay) };
+}

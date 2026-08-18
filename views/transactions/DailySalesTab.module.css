@@ -240,6 +240,11 @@
   align-items: center;
 }
 
+.iconButtonDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .emptyRow {
   padding: 20px 14px;
   text-align: center;

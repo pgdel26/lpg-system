@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAppData } from "../../../../lib/providers/AppDataProvider";
 
@@ -15,15 +15,6 @@ export default function SalesPage() {
   const router = useRouter();
   const { branch } = useParams<{ branch: string }>();
   const data = useAppData();
-
-  // useReceivablesData fetches AR company-wide (the standalone Receivables
-  // page is intentionally not branch-scoped) — but the Sales Report's
-  // Collections figure must only count this outlet's own collections, or a
-  // collection made at one branch bleeds into every other branch's report.
-  const branchArTransactions = useMemo(
-    () => data.arTransactions.filter((t) => t.branch === branch),
-    [data.arTransactions, branch],
-  );
 
   // ---- Sale modal UI state ----
   const [saleModalOpen, setSaleModalOpen] = useState(false);
@@ -165,7 +156,8 @@ export default function SalesPage() {
         dailyReport={data.dailyReport}
         onUpdateDailyStaff={data.updateDailyStaff}
         allRefunds={data.allRefunds}
-        arTransactions={branchArTransactions}
+        arTransactions={data.arTransactions}
+        branch={branch}
         onOpenSaleModal={handleOpenSaleModal}
         onOpenSwapModal={handleOpenSwapModal}
         onOpenRefundModal={handleOpenRefundModal}

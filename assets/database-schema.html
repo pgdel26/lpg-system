@@ -492,7 +492,8 @@
           <tr><td class="fbadge"><span class="badge required"></span></td><td class="fname">date / createdAt</td><td class="ftype">string / Timestamp</td><td class="fnote"></td></tr>
           <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">checkDate, checkAmount</td><td class="ftype">string, number</td><td class="fnote">check-payment detail</td></tr>
           <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">gcashRef</td><td class="ftype">string</td><td class="fnote">13-digit GCash reference, when provided</td></tr>
-          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">arCollected, collectedDate, collectionMethod</td><td class="ftype">boolean, string, string</td><td class="fnote">written later by Receivables when an AR sale gets paid</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">arCollected, collectedDate, collectionMethod</td><td class="ftype">boolean, string, string</td><td class="fnote">legacy-only, no longer written — see arCollections</td></tr>
+          <tr><td class="fbadge"><span class="badge optional"></span></td><td class="fname">arCollections</td><td class="ftype">array of {amount, method, date, branch, batchId, checkDate?, checkNumber?, createdAt, voided?, voidedAt?}</td><td class="fnote">every collection event against this invoice, written by Receivables' Record Collection flow — source of truth for partial payments</td></tr>
         </table>
         <div class="card-foot">Also queried directly by <code>paymentType == "ar"</code> for the Receivables screen — same collection, no separate table.</div>
       </div>

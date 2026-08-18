@@ -1,5 +1,8 @@
 import * as XLSX from "xlsx-js-style";
 import { titleCaseCategory } from "../utils";
+import { customerKey } from "../hooks/useCustomersData";
+import { paymentSplit } from "../payments";
+import { collectionEventsInRange } from "../receivables";
 import type { SaleTransaction, Swap, Refund, Purchase, Expense } from "../types";
 
 export interface IncomeStatementLine {
@@ -14,6 +17,23 @@ export interface IncomeStatementInput {
   refunds?: Refund[];
   purchases?: Purchase[];
   expenses?: Expense[];
+  /**
+   * The UNBOUNDED, live AR doc list (e.g. useReceivablesData's
+   * `arTransactions`) — NOT a date-ranged fetch. An invoice sold last month
+   * can be collected this month, so collections-in-range must be derived
+   * from every AR doc regardless of the doc's own sale date, then filtered
+   * by each event's own date.
+   */
+  arTransactions?: SaleTransaction[];
+  /** Needed alongside arTransactions to bound collections to this period. */
+  startDate?: string;
+  endDate?: string;
+  /**
+   * Attributes collections to where the cash was physically received (event
+   * branch), not the invoice's origin branch — same rule as
+   * lib/receivables.ts's collectionEventsOnDate. Omit for company-wide.
+   */
+  branch?: string;
 }
 
 export interface IncomeStatementResult {
@@ -22,10 +42,21 @@ export interface IncomeStatementResult {
   swapCount: number;
   deliveryRevenue: number;
   deliveryCount: number;
+  /**
+   * Product revenue only (sum of revenueLines) — deliberately excludes
+   * swapRevenue, unlike this app's other "Gross Sales" figures (e.g. the
+   * Sales Report tab's), so that grossSales + deliveryRevenue −
+   * totalDiscounts equals totalBilled exactly (swap fees have no payment
+   * channel — they're not billed to a customer through a sale doc — so
+   * folding them in here would break that identity). Swap fees still
+   * contribute to netRevenue, just added there explicitly instead.
+   */
   grossSales: number;
   totalDiscounts: number;
   totalRefunds: number;
   netRevenue: number;
+  /** One line per customer with a nonzero discount this period, sorted by amount desc. */
+  discountsByCustomer: IncomeStatementLine[];
   costLines: IncomeStatementLine[];
   totalCostOfPurchases: number;
   grossProfit: number;
@@ -45,6 +76,57 @@ export interface IncomeStatementResult {
   transferInQty: number;
   transferOutQty: number;
   hasTransferActivity: boolean;
+
+  // ---- Payment-channel / cash-position figures ----
+  // These are period cash MOVEMENTS, not a running balance — this app has no
+  // opening-balance concept, so there is no "cash on hand at period end" to
+  // compute, only "cash generated this period." See netCashMovement.
+
+  /** How this period's SALES were billed — sums to totalBilled, not netRevenue (which also adds swap fees and subtracts refunds). */
+  salesCash: number;
+  salesGcash: number;
+  salesAr: number;
+  /**
+   * salesCash + salesGcash + salesAr === grossSales + deliveryRevenue −
+   * totalDiscounts exactly (grossSales here is product revenue only — see
+   * its own comment) for every doc recordSale writes (payments are
+   * validated to the centavo at write time — see useSalesData.ts). A legacy
+   * doc missing `totalAmount` falls back to paymentSplit()'s per-unit
+   * `finalPrice`, so the identity isn't unconditional for pre-multi-payment
+   * historical data.
+   */
+  totalBilled: number;
+
+  /** AR collected THIS period (any invoice date), split by how it was collected. Check collections are money not yet cash — memo only, excluded from netCashMovement. */
+  arCollectedCash: number;
+  arCollectedGcash: number;
+  arCollectedCheck: number;
+
+  /**
+   * Net cash generated this period: salesCash + swapRevenue (assumed cash)
+   * + arCollectedCash − totalRefunds − totalExpenses − totalCostOfPurchases
+   * (totalCostOfPurchases excludes isTransfer docs — see realPurchases).
+   * Purchases are paid COD (confirmed business practice, not an assumption —
+   * if that ever changes, add a paymentMethod field to Purchase and subtract
+   * only cash-tagged docs). This is DIFFERENT from — and, once purchases
+   * were included, permanently diverges from — the Sales Report's per-day
+   * Expected Cash Remit, which deliberately excludes purchases (that figure
+   * reconciles against the physically-counted drawer, a different workflow).
+   * Do not "fix" that divergence by touching salesReport.ts's
+   * expectedCashRemit; see cashBuildUp for the other reason these two can
+   * differ.
+   */
+  netCashMovement: number;
+  /**
+   * The on-screen/Excel cash walk's build-up: operatingResult − salesGcash
+   * − salesAr + arCollectedCash. Equals netCashMovement exactly ONLY when
+   * totalBilled's identity holds for every doc in range (see totalBilled) —
+   * computed once here (not duplicated in the component and the workbook
+   * builder) so both surfaces read the same number instead of risking drift.
+   */
+  cashBuildUp: number;
+  /** netCashMovement − cashBuildUp. Nonzero only when a legacy doc breaks the totalBilled identity — see cashBuildUp. Surfaced on screen/Excel as a reconciliation note rather than left as a silent non-footing gap. */
+  cashReconciliationGap: number;
 }
 
 // "cylinderWithRefill"/"refill" get their established Sales Report labels;
@@ -54,6 +136,46 @@ const sectionLabel = (section: string): string => {
   if (section === "refill") return "Refill";
   return titleCaseCategory(section);
 };
+
+// Grouped by customerKey() (not raw name) so casing/whitespace variants of
+// the same person don't split into separate rows — same identity rule as
+// TopDebtorsChart/useCustomersData. Display label keeps the first-seen name
+// variant, not the normalized key. Exported so any other surface breaking
+// discounts down by customer (e.g. the Sales Report tab) shares this exact
+// grouping instead of a second, driftable copy.
+export function groupDiscountsByCustomer(saleTransactions: SaleTransaction[]): IncomeStatementLine[] {
+  const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
+  for (const t of saleTransactions) {
+    if (!t.discount) continue;
+    const key = customerKey(t.customerName || "Unknown");
+    const entry = byCustomer.get(key) || { name: t.customerName || "Unknown", amount: 0, count: 0 };
+    entry.amount += t.discount;
+    entry.count += 1;
+    byCustomer.set(key, entry);
+  }
+  return Array.from(byCustomer.values())
+    .map((v) => ({ label: v.name, amount: v.amount, count: v.count }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+// Revenue lines follow a fixed business-preferred order rather than
+// alphabetical — everything else (any other product category, e.g. other
+// cylinder brands) sorts after these three, alphabetically among themselves.
+// Used by the Excel export's per-category revenue rows (the on-screen
+// breakdown shows Gross Sales as a single total, not a per-category
+// breakdown). Derived from sectionLabel() (not hardcoded display strings) so
+// a section-key rename can't silently degrade this to alphabetical order
+// without also changing this line.
+const REVENUE_LABEL_PRIORITY = ["refill", "cylinderWithRefill", "accessories"].map(sectionLabel);
+function compareRevenueLabels(a: string, b: string): number {
+  const ai = REVENUE_LABEL_PRIORITY.indexOf(a);
+  const bi = REVENUE_LABEL_PRIORITY.indexOf(b);
+  if (ai !== -1 || bi !== -1) return (ai === -1 ? REVENUE_LABEL_PRIORITY.length : ai) - (bi === -1 ? REVENUE_LABEL_PRIORITY.length : bi);
+  return a.localeCompare(b);
+}
+function sortRevenueLines(lines: IncomeStatementLine[]): IncomeStatementLine[] {
+  return [...lines].sort((a, b) => compareRevenueLabels(a.label, b.label));
+}
 
 function groupByLine<T>(
   items: T[],
@@ -79,12 +201,16 @@ export function computeIncomeStatement({
   refunds = [],
   purchases = [],
   expenses = [],
+  arTransactions = [],
+  startDate,
+  endDate,
+  branch,
 }: IncomeStatementInput): IncomeStatementResult {
-  const revenueLines = groupByLine(
+  const revenueLines = sortRevenueLines(groupByLine(
     saleTransactions,
     (t) => t.saleSection,
     (t) => (t.srp || 0) * (t.quantity || 1),
-  );
+  ));
 
   const swapRevenue = swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const swapCount = swaps.length;
@@ -93,10 +219,13 @@ export function computeIncomeStatement({
   const deliveryRevenue = deliverySales.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
   const deliveryCount = deliverySales.length;
 
-  const grossSales = revenueLines.reduce((sum, l) => sum + l.amount, 0) + swapRevenue;
+  // Product revenue only — see the field comment on why swapRevenue is
+  // deliberately excluded here and added back in below for netRevenue.
+  const grossSales = revenueLines.reduce((sum, l) => sum + l.amount, 0);
   const totalDiscounts = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
+  const discountsByCustomer = groupDiscountsByCustomer(saleTransactions);
   const totalRefunds = refunds.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
-  const netRevenue = grossSales + deliveryRevenue - totalDiscounts - totalRefunds;
+  const netRevenue = grossSales + swapRevenue + deliveryRevenue - totalDiscounts - totalRefunds;
 
   // Inter-branch transfers are recorded in this same collection (see
   // recordTransfer in usePurchasesData.ts) at zero cost, purely to move the
@@ -128,6 +257,57 @@ export function computeIncomeStatement({
   const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const operatingResult = grossProfit - totalExpenses;
 
+  // How this period's sales were billed — foots to totalBilled, a DIFFERENT
+  // figure from netRevenue (which also folds in swaps and subtracts refunds).
+  // Single pass over saleTransactions (was three separate reduces, each
+  // re-running paymentSplit on every doc).
+  const paymentTotals = saleTransactions.reduce((acc, t) => {
+    const split = paymentSplit(t);
+    acc.cash += split.cash;
+    acc.gcash += split.gcash;
+    acc.ar += split.ar;
+    return acc;
+  }, { cash: 0, gcash: 0, ar: 0 });
+  const salesCash = paymentTotals.cash;
+  const salesGcash = paymentTotals.gcash;
+  const salesAr = paymentTotals.ar;
+  const totalBilled = salesCash + salesGcash + salesAr;
+
+  // AR collected THIS period, from any invoice regardless of when it was
+  // sold — collectionEventsInRange takes the unbounded arTransactions list
+  // (not the date-ranged saleTransactions) for exactly that reason.
+  const collectionsThisPeriod = startDate && endDate
+    ? collectionEventsInRange(arTransactions, startDate, endDate, branch)
+    : [];
+  const collectedTotal = collectionsThisPeriod.reduce((sum, { event }) => sum + (event.amount || 0), 0);
+  const sumByMethod = (method: string): number =>
+    collectionsThisPeriod.filter(({ event }) => event.method === method).reduce((sum, { event }) => sum + (event.amount || 0), 0);
+  const arCollectedGcash = sumByMethod("gcash");
+  const arCollectedCheck = sumByMethod("check");
+  // Derived as the remainder rather than sumByMethod("cash") — a collection
+  // event with a missing/unrecognized method (the type allows any string)
+  // must still count as cash, matching how collectionMethodLabel/arStatus
+  // elsewhere in the codebase treat anything non-gcash/non-check as cash.
+  // Summing only exact "cash" matches would silently drop such an event from
+  // both this figure AND netCashMovement, with no reconciliation-gap warning
+  // (both derive from arCollectedCash, so they'd stay consistent with each
+  // other while both quietly under-counting).
+  const arCollectedCash = collectedTotal - arCollectedGcash - arCollectedCheck;
+
+  // Includes totalCostOfPurchases — purchases are paid COD (confirmed
+  // business practice), so treating the full cost as a cash outflow here is
+  // accurate, not an assumption (see the field comment on netCashMovement).
+  const netCashMovement = salesCash + swapRevenue + arCollectedCash - totalRefunds - totalExpenses - totalCostOfPurchases;
+
+  // The on-screen/Excel cash walk (Operating Result − GCash − A/R + A/R
+  // Collected in Cash) only equals netCashMovement exactly when totalBilled's
+  // identity holds for every doc in range (see totalBilled's comment) — a
+  // legacy doc missing totalAmount can create a gap. Computed once here, not
+  // duplicated in the component and the workbook builder, so the two can't
+  // drift out of sync with each other.
+  const cashBuildUp = operatingResult - salesGcash - salesAr + arCollectedCash;
+  const cashReconciliationGap = netCashMovement - cashBuildUp;
+
   return {
     revenueLines,
     swapRevenue,
@@ -138,6 +318,7 @@ export function computeIncomeStatement({
     totalDiscounts,
     totalRefunds,
     netRevenue,
+    discountsByCustomer,
     costLines,
     totalCostOfPurchases,
     grossProfit,
@@ -148,6 +329,16 @@ export function computeIncomeStatement({
     transferInQty,
     transferOutQty,
     hasTransferActivity,
+    salesCash,
+    salesGcash,
+    salesAr,
+    totalBilled,
+    arCollectedCash,
+    arCollectedGcash,
+    arCollectedCheck,
+    netCashMovement,
+    cashBuildUp,
+    cashReconciliationGap,
   };
 }
 
@@ -239,17 +430,17 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["", ...columnLabels]);
   tableHeaderRows.push(r);
-  const revenueLabels = unionLabels(allResults.map((res) => res.revenueLines));
+  const revenueLabels = unionLabels(allResults.map((res) => res.revenueLines)).sort(compareRevenueLabels);
   revenueLabels.forEach((label) => {
     data.push([label, ...allResults.map((res) => amountFor(res.revenueLines, label))]);
   });
-  data.push(["Swap Fees", ...amountsFor((res) => res.swapRevenue)]);
   r = data.length;
   data.push(["Gross Sales", ...amountsFor((res) => res.grossSales)]);
   totalRows.push(r);
   data.push(["Delivery Charge", ...amountsFor((res) => res.deliveryRevenue)]);
   data.push(["Less: Discounts", ...amountsFor((res) => (res.totalDiscounts > 0 ? -res.totalDiscounts : 0))]);
   data.push(["Less: Refunds", ...amountsFor((res) => (res.totalRefunds > 0 ? -res.totalRefunds : 0))]);
+  data.push(["Swap Fees", ...amountsFor((res) => res.swapRevenue)]);
   r = data.length;
   data.push(["Net Revenue", ...amountsFor((res) => res.netRevenue)]);
   totalRows.push(r);
@@ -273,11 +464,13 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["Total Cost of Purchases", ...amountsFor((res) => res.totalCostOfPurchases)]);
   totalRows.push(r);
+  data.push(["  Stock bought this period, not adjusted for opening/closing inventory — a heavy-restocking month looks worse than it was, a sell-down month looks better"]);
   // Memo only — units, not pesos, and only meaningful per-outlet (nets to
   // zero company-wide, so Combined always reads 0/0 here by design).
   if (allResults.some((res) => res.hasTransferActivity)) {
     data.push(["  Stock transferred in (units, not valued)", ...amountsFor((res) => res.transferInQty)]);
     data.push(["  Stock transferred out (units, not valued)", ...amountsFor((res) => res.transferOutQty)]);
+    data.push(["  Transferred stock is zero-cost here — the receiving outlet's Gross Profit is overstated, the sending outlet's understated, by the transferred amount"]);
   }
   data.push([]);
 
@@ -311,6 +504,67 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["Operating Result (before shared costs)", ...amountsFor((res) => res.operatingResult)]);
   totalRows.push(r);
+  data.push([]);
+
+  // ---- Cash position — a separate appendix, not part of the accrual
+  // statement above. These rows do NOT foot to Net Revenue or Gross
+  // Profit — see the field comments in IncomeStatementResult. Starts from
+  // Operating Result rather than rebuilding from Total Billed — Operating
+  // Result already nets out Cost of Purchases (paid COD), Refunds, and
+  // Expenses, so nothing here re-subtracts them. All that's left to adjust
+  // for is revenue that wasn't billed as cash (GCash, A/R), then A/R
+  // actually collected in cash this period. GCash and A/R are explicitly
+  // subtracted (mirroring the on-screen layout) rather than just never
+  // added, since GCash is reconciled by a separate account and this section
+  // exists specifically to answer "how much is in cash, only."
+  r = data.length;
+  data.push(["CASH POSITION THIS PERIOD"]);
+  sectionRows.push(r);
+  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
+  r = data.length;
+  data.push(["Cash movements only, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses. Assumes swap fees and expenses are settled in cash."]);
+  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
+  r = data.length;
+  data.push(["", ...columnLabels]);
+  tableHeaderRows.push(r);
+  data.push(["Operating Result", ...amountsFor((res) => res.operatingResult)]);
+  data.push(["Less: GCash", ...amountsFor((res) => (res.salesGcash > 0 ? -res.salesGcash : 0))]);
+  data.push(["Less: A/R (credit sales)", ...amountsFor((res) => (res.salesAr > 0 ? -res.salesAr : 0))]);
+  // A/R collected this period — always its own line (how much came back in
+  // on credit sales this month), broken out by channel so GCash/check
+  // collections are subtracted back out BEFORE the final cash total, instead
+  // of appearing in a memo section after it.
+  const hasArChannelSplit = allResults.some((res) => res.arCollectedGcash > 0 || res.arCollectedCheck > 0);
+  data.push(["+ A/R Collected This Period", ...amountsFor((res) => res.arCollectedCash + res.arCollectedGcash + res.arCollectedCheck)]);
+  if (hasArChannelSplit) {
+    if (allResults.some((res) => res.arCollectedGcash > 0)) {
+      data.push(["  Less: collected via GCash", ...amountsFor((res) => (res.arCollectedGcash > 0 ? -res.arCollectedGcash : 0))]);
+    }
+    if (allResults.some((res) => res.arCollectedCheck > 0)) {
+      data.push(["  Less: collected by check (to deposit, not in drawer)", ...amountsFor((res) => (res.arCollectedCheck > 0 ? -res.arCollectedCheck : 0))]);
+    }
+    // Only shown when there's an actual channel split to resolve — otherwise
+    // this would be the exact same figure as "+ A/R Collected This Period"
+    // one row up, reading as a duplicate rather than a subtotal.
+    r = data.length;
+    data.push(["A/R Collected in Cash", ...amountsFor((res) => res.arCollectedCash)]);
+    totalRows.push(r);
+  }
+  r = data.length;
+  data.push(["NET CASH MOVEMENT THIS PERIOD", ...amountsFor((res) => res.netCashMovement)]);
+  totalRows.push(r);
+  data.push(["  Physical cash only, from this period's activity — GCash and checks not included"]);
+  data.push(["  Net of stock purchases (paid COD) — differs from the Sales Report's Expected Cash Remit, which excludes purchases"]);
+  if (branchResults.length > 0) {
+    data.push(["  Per-outlet columns: purchases are paid from shared profit across outlets, not each outlet's own till — only the Combined column is a reliable cash figure"]);
+  }
+  // cashReconciliationGap is computed once in computeIncomeStatement (not
+  // duplicated here) — nonzero only when a legacy doc breaks the totalBilled
+  // identity (see its field comment). Surface it rather than let the
+  // workbook silently not foot.
+  if (allResults.some((res) => Math.abs(res.cashReconciliationGap) > 0.01)) {
+    data.push(["  Rows above may not sum exactly to the total — a small number of older sales records predate this app's full payment breakdown per sale", ...amountsFor((res) => res.cashReconciliationGap)]);
+  }
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!merges"] = merges;

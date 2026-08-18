@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx-js-style";
 import { titleCaseCategory } from "../utils";
 import { paymentSplit } from "../payments";
+import { collectionsOnDate } from "../receivables";
 
 // Local interfaces for report data shapes (admin SDK plain objects)
 
@@ -63,9 +64,11 @@ interface ReportDailyReport {
 
 interface ReportArTransaction {
   id?: string;
+  branch?: string;
   arCollected?: boolean;
   collectedDate?: string;
   collectionMethod?: string;
+  arCollections?: Array<{ amount?: number; method?: string; date?: string; branch?: string; batchId?: string }>;
   totalAmount?: number;
   finalPrice?: number;
   paymentType?: string;
@@ -81,6 +84,11 @@ export interface SalesReportInput {
   staff?: ReportStaff[];
   dailyReport?: ReportDailyReport;
   arTransactions?: ReportArTransaction[];
+  // Omit for an all-outlet report (e.g. the cron email) — collectionsOnDate
+  // then counts every branch's collections for the day, matching today's
+  // behavior. Pass it to scope to one outlet's own collections (the in-app
+  // per-branch Sales Report and its Export button).
+  branch?: string;
 }
 
 const saleTypeLabel = (section: string): string => {
@@ -100,6 +108,7 @@ export function buildSalesReportWorkbook({
   staff = [],
   dailyReport = { cashier: null, staff: [] },
   arTransactions = [],
+  branch,
 }: SalesReportInput): XLSX.WorkBook {
   const sorted = [...saleTransactions].sort((a, b) => {
     const invA = (a.invoice || "").toLowerCase();
@@ -124,12 +133,10 @@ export function buildSalesReportWorkbook({
   // cash/gcash/ar portions instead of booking the whole line to one channel.
   const totalAR = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
   const totalGCash = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
-  const collectionsForDay = arTransactions.filter(
-    (t) => t.arCollected && t.collectedDate === date && t.collectionMethod !== "check"
-  );
-  // The AR portion collected, not the collected doc's full line total — a
-  // partially-AR sale must only credit the drawer for what was actually owed.
-  const totalCollections = collectionsForDay.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
+  // Only the cash actually collected ON this date counts — a doc can receive
+  // partial collections across several dates, and check/GCash collections
+  // never touch the physical drawer. See lib/receivables.ts.
+  const totalCollections = collectionsOnDate(arTransactions, date, branch);
   const expectedCashRemit = netSales - totalAR - totalGCash + totalCollections;
   const actual = parseFloat(String(dailyReport?.actualCashRemit ?? "")) || 0;
   const diff = actual - expectedCashRemit;
