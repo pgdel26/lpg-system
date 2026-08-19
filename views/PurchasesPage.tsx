@@ -149,15 +149,29 @@ export default function PurchasesPage({
 
   // Real purchases only — transfers move existing stock, they don't add to
   // how much was actually bought/spent.
+  // A purchaseDelivery stands on its own: it records what was paid, and deleting
+  // its product lines only adjusts inventory. So the scope is by DATE, not by the
+  // ids the visible lines happen to reference — otherwise a delivery whose lines
+  // were all deleted would keep counting in the Income Statement while vanishing
+  // from this table and its footer.
+  //
+  // With a range filter, that range is the scope. Without one, `filtered` is just
+  // the paginated recent window, so the scope is the date span it covers — a
+  // delivery older than everything on screen belongs to a page not yet loaded.
+  const visibleDeliveries = useMemo(() => {
+    if (isRangeActive) {
+      return purchaseDeliveries.filter((d) =>
+        (!filterFrom || d.date >= filterFrom) && (!filterTo || d.date <= filterTo));
+    }
+    if (filtered.length === 0) return [];
+    const dates = filtered.map((t) => t.date);
+    const earliest = dates.reduce((a, b) => (a < b ? a : b));
+    return purchaseDeliveries.filter((d) => d.date >= earliest);
+  }, [purchaseDeliveries, isRangeActive, filterFrom, filterTo, filtered]);
+
   // purchaseCost() rather than a local sum, so this footer can never disagree
-  // with the Income Statement. Deliveries are matched by the ids the visible
-  // lines actually reference — not by date — so a delivery whose lines are off
-  // screen (paginated away) can't inflate the figure shown.
-  const visibleDeliveryIds = new Set(filtered.map((t) => t.deliveryId).filter(Boolean));
-  const totalCost = purchaseCost(
-    filtered,
-    purchaseDeliveries.filter((d) => visibleDeliveryIds.has(d.id)),
-  ).total;
+  // with the Income Statement.
+  const totalCost = purchaseCost(filtered, visibleDeliveries).total;
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
   // A range query is always complete, so "Total" is accurate there. With no
   // filter, purchaseTransactions is just the paginated recent window — flag
@@ -269,31 +283,50 @@ export default function PurchasesPage({
     // sort leaving a delivery's lines adjacent — every line of one delivery
     // shares a createdAt to the second, so two deliveries in the same second
     // would otherwise interleave.
-    const costById = new Map(purchaseDeliveries.map((d) => [d.id, d.totalCost]));
+    const byId = new Map(visibleDeliveries.map((d) => [d.id, d]));
     const items: DisplayItem[] = [];
     const emitted = new Set<string>();
+
+    const pushDelivery = (deliveryId: string, fallbackDate: string) => {
+      emitted.add(deliveryId);
+      const lines = sorted.filter((r) => r.deliveryId === deliveryId);
+      items.push({
+        kind: "deliveryHeader",
+        key: `d-${deliveryId}`,
+        date: byId.get(deliveryId)?.date || fallbackDate,
+        // undefined (not 0) when the doc isn't loaded — "—" is honest, a zero
+        // would read as a free delivery.
+        totalCost: byId.get(deliveryId)?.totalCost,
+        lineCount: lines.length,
+        itemCount: lines.reduce((s, r) => s + (r.quantity || 0), 0),
+      });
+      lines.forEach((r) => items.push({ kind: "row", row: r }));
+    };
+
     for (const row of sorted) {
       if (!row.deliveryId) {
         items.push({ kind: "row", row: { ...row, deliveryCost: row.totalCost } });
         continue;
       }
       if (emitted.has(row.deliveryId)) continue;
-      emitted.add(row.deliveryId);
-      const lines = sorted.filter((r) => r.deliveryId === row.deliveryId);
-      items.push({
-        kind: "deliveryHeader",
-        key: `d-${row.deliveryId}`,
-        date: row.date,
-        // undefined (not 0) when the delivery doc is missing from the loaded
-        // window — "—" is honest, a zero would read as a free delivery.
-        totalCost: costById.get(row.deliveryId),
-        lineCount: lines.length,
-        itemCount: lines.reduce((s, r) => s + (r.quantity || 0), 0),
-      });
-      lines.forEach((r) => items.push({ kind: "row", row: r }));
+      pushDelivery(row.deliveryId, row.date);
     }
-    return items;
-  }, [subTab, purchaseRows, transferRows, sortDir, purchaseDeliveries]);
+
+    // Deliveries with no surviving lines still cost money, so they still get a
+    // header — showing 0 items rather than disappearing. Appended, then the whole
+    // list is re-sorted by date below so they land in the right place.
+    // Purchases subtab only: a delivery is not a transfer.
+    if (subTab === "purchases") {
+      for (const d of visibleDeliveries) {
+        if (!emitted.has(d.id)) pushDelivery(d.id, d.date);
+      }
+    }
+
+    const itemDate = (i: DisplayItem) => (i.kind === "deliveryHeader" ? i.date : i.row.date);
+    // Stable: a delivery header and its children share a date, and sort() keeps
+    // their relative order, so children stay under their own header.
+    return [...items].sort((a, b) => dir * itemDate(a).localeCompare(itemDate(b)));
+  }, [subTab, purchaseRows, transferRows, sortDir, visibleDeliveries]);
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
