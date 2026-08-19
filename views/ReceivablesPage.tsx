@@ -44,7 +44,17 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
   const [filterTo, setFilterTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("outstanding"); // "all", "outstanding", "pending", "partial", "collected"
   const [customerFilter, setCustomerFilter] = useState("");
-  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
+  // Two sortable columns now, so direction alone is no longer enough state —
+  // which column is active has to be tracked too.
+  const [sortKey, setSortKey] = useState<"date" | "amount">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Clicking the active column flips direction; clicking a different one
+  // switches to it and starts at desc (newest / largest first), which is the
+  // useful default for both columns.
+  const toggleSort = (key: "date" | "amount") => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  };
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pendingVoid, setPendingVoid] = useState<PendingVoid | null>(null);
@@ -66,22 +76,47 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
       const q = customerFilter.trim().toLowerCase();
       list = list.filter((t) => (t.customerName || "").toLowerCase().includes(q));
     }
-    list.sort((a, b) => {
-      const dir = dateSortDir === "asc" ? 1 : -1;
-      if (a.date !== b.date) return dir * a.date.localeCompare(b.date);
-      const tA = a.createdAt?.seconds || 0;
-      const tB = b.createdAt?.seconds || 0;
-      return dir * (tA - tB);
-    });
+    // Date is the secondary key for amount sorting (and the tiebreaker within a
+    // date), so both orderings stay deterministic instead of depending on the
+    // incoming array order.
+    const byDate = (a: SaleTransaction, b: SaleTransaction) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0);
+    };
+    if (sortKey === "amount") {
+      // Sorts on REMAINING balance, not the original invoice amount. The default
+      // filter is "outstanding" and totalPending below is remaining-based, so
+      // ordering by arTotal would rank a ₱48k invoice with ₱500 left above a
+      // fully unpaid ₱20k one — and since only ROWS_PER_PAGE rows render at a
+      // time, it can push the genuinely largest debts out of view entirely.
+      // arTotal breaks ties so equal balances still order sensibly.
+      // arStatus() walks each doc's collection events, so precompute once per
+      // doc rather than calling it the O(n log n) times a comparator would.
+      const amountOf = new Map(list.map((t) => {
+        const s = arStatus(t);
+        return [t.id, { remaining: s.remaining, arTotal: s.arTotal }];
+      }));
+      const dir = sortDir === "asc" ? 1 : -1;
+      list.sort((a, b) => {
+        const sa = amountOf.get(a.id), sb = amountOf.get(b.id);
+        const diff = (sa?.remaining || 0) - (sb?.remaining || 0);
+        if (diff !== 0) return dir * diff;
+        const tie = (sa?.arTotal || 0) - (sb?.arTotal || 0);
+        return tie !== 0 ? dir * tie : byDate(a, b);
+      });
+    } else {
+      const dir = sortDir === "asc" ? 1 : -1;
+      list.sort((a, b) => dir * byDate(a, b));
+    }
     return list;
-  }, [arTransactions, filterFrom, filterTo, statusFilter, customerFilter, dateSortDir]);
+  }, [arTransactions, filterFrom, filterTo, statusFilter, customerFilter, sortKey, sortDir]);
 
   // Lazy-load the rendered list: only the current window of rows is in the
   // DOM. Resets whenever the filters/sort change so a new view doesn't
   // inherit a stale scroll depth — done during render (React's documented
   // pattern for "adjusting state when a prop changes"), not in an effect,
   // so the stale-count frame never paints.
-  const filterKey = `${filterFrom}|${filterTo}|${statusFilter}|${customerFilter}|${dateSortDir}`;
+  const filterKey = `${filterFrom}|${filterTo}|${statusFilter}|${customerFilter}|${sortKey}|${sortDir}`;
   const [visibleRowCount, setVisibleRowCount] = useState(ROWS_PER_PAGE);
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
@@ -159,15 +194,22 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
             {/* Header */}
             <div className={styles.tableHeader}>
               <button
-                onClick={() => setDateSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                onClick={() => toggleSort("date")}
                 className={styles.sortableHeader}
               >
-                Date {dateSortDir === "asc" ? "▲" : "▼"}
+                {/* Arrow only on the active column — with two sortable headers,
+                    showing one on each would leave the active sort ambiguous. */}
+                Date {sortKey === "date" ? (sortDir === "asc" ? "▲" : "▼") : ""}
               </button>
               <span>Invoice</span>
               <span>Customer</span>
               <span>Product</span>
-              <span className={styles.alignRight}>Amount</span>
+              <button
+                onClick={() => toggleSort("amount")}
+                className={`${styles.sortableHeader} ${styles.sortableHeaderRight}`}
+              >
+                Amount {sortKey === "amount" ? (sortDir === "asc" ? "▲" : "▼") : ""}
+              </button>
               <span className={styles.alignCenter}>Check</span>
               <span className={styles.alignCenter}>Status</span>
               <span className={styles.alignCenter}>Actions</span>

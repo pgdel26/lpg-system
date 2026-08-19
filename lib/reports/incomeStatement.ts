@@ -137,25 +137,46 @@ const sectionLabel = (section: string): string => {
   return titleCaseCategory(section);
 };
 
-// Grouped by customerKey() (not raw name) so casing/whitespace variants of
-// the same person don't split into separate rows — same identity rule as
-// TopDebtorsChart/useCustomersData. Display label keeps the first-seen name
-// variant, not the normalized key. Exported so any other surface breaking
-// discounts down by customer (e.g. the Sales Report tab) shares this exact
-// grouping instead of a second, driftable copy.
-export function groupDiscountsByCustomer(saleTransactions: SaleTransaction[]): IncomeStatementLine[] {
+// Shared per-customer roll-up behind every itemized breakdown row in the Sales
+// Report's Daily Breakdown. `amountOf` picks which peso figure is being
+// itemized; sales contributing 0 are skipped, so a pure-cash sale never appears
+// in the A/R or GCash list and an undiscounted one never appears under
+// Discounts. Grouped by customerKey() (not raw name) so casing/whitespace
+// variants of one person don't split into separate rows — same identity rule as
+// useCustomersData/TopDebtorsChart. The display label keeps the first-seen name
+// variant, not the normalized key.
+export function groupSalesByCustomer(
+  saleTransactions: SaleTransaction[],
+  amountOf: (t: SaleTransaction) => number,
+): IncomeStatementLine[] {
   const byCustomer = new Map<string, { name: string; amount: number; count: number }>();
   for (const t of saleTransactions) {
-    if (!t.discount) continue;
+    const amount = amountOf(t);
+    if (!amount) continue;
     const key = customerKey(t.customerName || "Unknown");
     const entry = byCustomer.get(key) || { name: t.customerName || "Unknown", amount: 0, count: 0 };
-    entry.amount += t.discount;
+    entry.amount += amount;
     entry.count += 1;
     byCustomer.set(key, entry);
   }
   return Array.from(byCustomer.values())
     .map((v) => ({ label: v.name, amount: v.amount, count: v.count }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+export function groupDiscountsByCustomer(saleTransactions: SaleTransaction[]): IncomeStatementLine[] {
+  return groupSalesByCustomer(saleTransactions, (t) => t.discount || 0);
+}
+
+// A/R and GCash both go through paymentSplit() rather than reading paymentType,
+// so a split-payment sale contributes its actual per-channel portions to each
+// list instead of landing wholly in one. Same rule as the row totals above them.
+export function groupARByCustomer(saleTransactions: SaleTransaction[]): IncomeStatementLine[] {
+  return groupSalesByCustomer(saleTransactions, (t) => paymentSplit(t).ar);
+}
+
+export function groupGCashByCustomer(saleTransactions: SaleTransaction[]): IncomeStatementLine[] {
+  return groupSalesByCustomer(saleTransactions, (t) => paymentSplit(t).gcash);
 }
 
 // Revenue lines follow a fixed business-preferred order rather than

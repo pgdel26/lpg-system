@@ -13,6 +13,7 @@ interface RangeViewProps {
   inventoryDate: string;
   rangeEndDate: string;
   rangeInventory: InventoryState;
+  rangeEndByProduct: Record<string, Record<string, number>>;
   inventorySections: InventorySection[];
   rangeTotalCylinderData: RangeTotalCylinderRow[];
 }
@@ -21,6 +22,7 @@ export default function RangeView({
   inventoryDate,
   rangeEndDate,
   rangeInventory,
+  rangeEndByProduct,
   inventorySections,
   rangeTotalCylinderData,
 }: RangeViewProps) {
@@ -29,6 +31,8 @@ export default function RangeView({
       <div className={styles.banner}>
         Consolidated from <strong>{inventoryDate}</strong> to <strong>{rangeEndDate}</strong>.
         BEG is from the first day; activity columns are totals for the period; END is the final day&apos;s closing balance.
+        If a day in this range was audited, that correction carries into the following day&apos;s BEG — so BEG plus activity
+        will not always equal END.
       </div>
 
       {inventorySections.map((section) => (
@@ -46,6 +50,7 @@ export default function RangeView({
             allInventory={rangeInventory}
             onChange={() => {}}
             onSaveSection={() => {}}
+            endOverride={rangeEndByProduct[section.key]}
           />
         </div>
       ))}

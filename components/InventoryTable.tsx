@@ -10,9 +10,15 @@ interface InventoryTableProps {
   onChange: (sectionKey: string, product: string, field: string, value: number | string) => void;
   onSaveSection: (sectionKey: string) => void;
   showAudit?: boolean;
+  /** Per-product END that overrides calcEnd(). Range mode needs this: its
+   *  consolidated row sums activity across days, and calcEnd would re-derive
+   *  END from day one's BEG — which only holds if END(day N) === BEG(day N+1).
+   *  An audit breaks that chain by design, so range mode passes the final
+   *  day's actual END here rather than letting the arithmetic drift. */
+  endOverride?: Record<string, number>;
 }
 
-export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection, showAudit = true }: InventoryTableProps) {
+export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection, showAudit = true, endOverride }: InventoryTableProps) {
   const { columns, products, calcEnd, subgroups } = section;
 
   const visibleColumns = showAudit
@@ -43,7 +49,8 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
     return row as InventoryCell;
   };
 
-  const getEndValue = (product: string) => calcEnd(getMergedRow(product));
+  const getEndValue = (product: string) =>
+    endOverride?.[product] ?? calcEnd(getMergedRow(product));
   const getVarValue = (product: string): number | null => {
     const row = getMergedRow(product);
     if (row.aud == null || (row.aud as unknown) === "") return null;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmt, today } from "../../lib/utils";
 import { paymentSplit } from "../../lib/payments";
 import { collectionEventsOnDate, arStatusAsOf } from "../../lib/receivables";
-import { groupDiscountsByCustomer } from "../../lib/reports/incomeStatement";
+import { groupDiscountsByCustomer, groupARByCustomer, groupGCashByCustomer } from "../../lib/reports/incomeStatement";
 import { DownloadIcon, EditIcon, TrashIcon, XIcon, ChevronDownIcon } from "../../components/Icons";
 import ExpenseModal from "../../components/ExpenseModal";
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
@@ -43,6 +43,10 @@ export default function SalesReportTab({
 }: SalesReportTabProps) {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [discountBreakdownOpen, setDiscountBreakdownOpen] = useState(true);
+  // All three itemized panels default open, matching Discounts — the breakdown
+  // is the point of the row, so it should be visible without a click.
+  const [arBreakdownOpen, setArBreakdownOpen] = useState(true);
+  const [gcashBreakdownOpen, setGcashBreakdownOpen] = useState(true);
 
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
@@ -58,6 +62,8 @@ export default function SalesReportTab({
   // split-payment sale's cash/gcash/ar portions instead of one channel only.
   const totalAR = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
   const totalGCash = saleTransactions.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
+  const arByCustomer = groupARByCustomer(saleTransactions);
+  const gcashByCustomer = groupGCashByCustomer(saleTransactions);
   // Only cash collected at THIS branch, on this date, counts — a doc can
   // receive partial collections across several dates/branches, and check/
   // GCash collections never touch the physical drawer. See lib/receivables.ts.
@@ -127,6 +133,7 @@ export default function SalesReportTab({
             <button
               type="button"
               onClick={() => setDiscountBreakdownOpen((v) => !v)}
+              aria-expanded={discountBreakdownOpen}
               disabled={discountByCustomer.length === 0}
               className={styles.breakdownRowButton}
             >
@@ -141,7 +148,7 @@ export default function SalesReportTab({
                   {totalDiscount > 0 ? `- ${fmt(totalDiscount)}` : fmt(0)}
                 </span>
                 {discountByCustomer.length > 0 && (
-                  <span className={`${styles.discountChevron} ${discountBreakdownOpen ? "" : styles.closed}`}>
+                  <span className={`${styles.rowChevron} ${discountBreakdownOpen ? "" : styles.closed}`}>
                     <ChevronDownIcon />
                   </span>
                 )}
@@ -150,11 +157,11 @@ export default function SalesReportTab({
 
             {/* Per-customer discount breakdown */}
             {discountBreakdownOpen && discountByCustomer.length > 0 && (
-              <div className={styles.discountBreakdown}>
+              <div className={`${styles.itemBreakdown} ${styles.tintRed}`}>
                 {discountByCustomer.map((d) => (
-                  <div key={d.label} className={styles.discountBreakdownRow}>
-                    <span className={styles.discountCustomerName}>{d.label}</span>
-                    <span className={styles.discountCustomerAmount}>- {fmt(d.amount)}</span>
+                  <div key={d.label} className={styles.itemBreakdownRow}>
+                    <span className={styles.itemCustomerName}>{d.label}</span>
+                    <span className={`${styles.itemCustomerAmount} ${styles.valueRed}`}>- {fmt(d.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -195,32 +202,82 @@ export default function SalesReportTab({
             </div>
 
             {/* Accounts Receivable row */}
-            <div className={styles.subTotalRow}>
+            <button
+              type="button"
+              onClick={() => setArBreakdownOpen((v) => !v)}
+              aria-expanded={arBreakdownOpen}
+              disabled={arByCustomer.length === 0}
+              className={styles.subTotalRowButton}
+            >
               <div>
                 <div className={styles.rowLabel}>Accounts Receivable</div>
                 <div className={styles.rowSub}>
                   {/* Count docs with a non-zero AR allocation, not paymentType==="ar" —
                       a split sale's AR portion must still show up in this count. */}
-                  {saleTransactions.filter((t) => paymentSplit(t).ar > 0).length} AR sale{saleTransactions.filter((t) => paymentSplit(t).ar > 0).length !== 1 ? "s" : ""}
+                  {saleTransactions.filter((t) => paymentSplit(t).ar > 0).length} AR sale{saleTransactions.filter((t) => paymentSplit(t).ar > 0).length !== 1 ? "s" : ""} — new credit today, before collections
                 </div>
               </div>
-              <span className={`${styles.rowValue} ${totalAR > 0 ? styles.valueOrange : styles.valueDim}`}>
-                {totalAR > 0 ? `- ${fmt(totalAR)}` : fmt(0)}
-              </span>
-            </div>
+              <div className={styles.rowValueGroup}>
+                <span className={`${styles.rowValue} ${totalAR > 0 ? styles.valueOrange : styles.valueDim}`}>
+                  {totalAR > 0 ? `- ${fmt(totalAR)}` : fmt(0)}
+                </span>
+                {arByCustomer.length > 0 && (
+                  <span className={`${styles.rowChevron} ${arBreakdownOpen ? "" : styles.closed}`}>
+                    <ChevronDownIcon />
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Per-customer A/R breakdown */}
+            {arBreakdownOpen && arByCustomer.length > 0 && (
+              <div className={`${styles.itemBreakdown} ${styles.tintOrange} ${styles.flushNext}`}>
+                {arByCustomer.map((d) => (
+                  <div key={d.label} className={styles.itemBreakdownRow}>
+                    <span className={styles.itemCustomerName}>{d.label}</span>
+                    <span className={`${styles.itemCustomerAmount} ${styles.valueOrange}`}>- {fmt(d.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* GCash row */}
-            <div className={styles.subTotalRow}>
+            <button
+              type="button"
+              onClick={() => setGcashBreakdownOpen((v) => !v)}
+              aria-expanded={gcashBreakdownOpen}
+              disabled={gcashByCustomer.length === 0}
+              className={styles.subTotalRowButton}
+            >
               <div>
                 <div className={styles.rowLabel}>GCash</div>
                 <div className={styles.rowSub}>
                   {saleTransactions.filter((t) => paymentSplit(t).gcash > 0).length} GCash sale{saleTransactions.filter((t) => paymentSplit(t).gcash > 0).length !== 1 ? "s" : ""}
                 </div>
               </div>
-              <span className={`${styles.rowValue} ${totalGCash > 0 ? styles.valueBlue : styles.valueDim}`}>
-                {totalGCash > 0 ? `- ${fmt(totalGCash)}` : fmt(0)}
-              </span>
-            </div>
+              <div className={styles.rowValueGroup}>
+                <span className={`${styles.rowValue} ${totalGCash > 0 ? styles.valueBlue : styles.valueDim}`}>
+                  {totalGCash > 0 ? `- ${fmt(totalGCash)}` : fmt(0)}
+                </span>
+                {gcashByCustomer.length > 0 && (
+                  <span className={`${styles.rowChevron} ${gcashBreakdownOpen ? "" : styles.closed}`}>
+                    <ChevronDownIcon />
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Per-customer GCash breakdown */}
+            {gcashBreakdownOpen && gcashByCustomer.length > 0 && (
+              <div className={`${styles.itemBreakdown} ${styles.tintBlue} ${styles.flushNext}`}>
+                {gcashByCustomer.map((d) => (
+                  <div key={d.label} className={styles.itemBreakdownRow}>
+                    <span className={styles.itemCustomerName}>{d.label}</span>
+                    <span className={`${styles.itemCustomerAmount} ${styles.valueBlue}`}>- {fmt(d.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Collections row */}
             <div className={styles.subTotalRow}>

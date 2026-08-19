@@ -27,6 +27,26 @@ export interface UseInventoryData {
   handleFixBeginning: () => Promise<void>;
 }
 
+/** Carry-forward rule for seeding the next day's BEG.
+ *  An AUDIT is a correction to the physical count, so it wins over the computed
+ *  END. 0 is a valid audited count, so presence is checked against null/""
+ *  rather than falsiness (same convention as InventoryTable's DIFF cell), and
+ *  the `as unknown` cast is there because aud is typed number | FieldValue but
+ *  a doc read back can still hold "" from older writes.
+ *
+ *  CALLERS MUST PASS ROWS READ FROM FIRESTORE, NOT LOCAL STATE: saveSection
+ *  puts deleteField() sentinels into row.aud when clearing an audit, and
+ *  String(FieldValue) would silently resolve to 0 — writing a phantom zero BEG.
+ *
+ *  scripts/daily-init-beg.mjs applies this same rule in the 6am PHT cron, which
+ *  is the primary mechanism — keep the two in sync. This hook's fallback is the
+ *  backstop for what the cron cannot see: an audit entered after it has run. */
+function carryForwardBeg(row: InventoryCell): number {
+  const aud = row.aud as unknown;
+  const audited = aud != null && aud !== "";
+  return parseFloat(String(audited ? aud : row.end)) || 0;
+}
+
 export function useInventoryData(
   branch: string,
   inventorySections: ReturnType<typeof buildInventorySections>,
@@ -105,7 +125,7 @@ export function useInventoryData(
     return () => unsubscribers.forEach((unsub) => unsub());
   }, [inventoryDate, branch, sectionKeysString]);
 
-  // ---- Client-side BEG fallback: use previous day's saved END if BEG is missing ----
+  // ---- Client-side BEG fallback: seed from the previous day's AUDIT (or END) if BEG is missing ----
   useEffect(() => {
     begFallbackRanRef.current = null;
     const sectionKeys = sectionKeysString ? sectionKeysString.split(",") : [];
@@ -126,7 +146,7 @@ export function useInventoryData(
       if (hasBeg || begFallbackRanRef.current === inventoryDate) return;
       begFallbackRanRef.current = inventoryDate;
       try {
-        // Fetch previous day's inventory docs — they already have `end` saved
+        // Fetch previous day's inventory docs — they already have `end` (and any `aud`) saved
         const prevItems: InventoryState = {};
         for (const sk of sectionKeys) {
           const snap = await getDoc(doc(db, "dailyInventory", `${prevDate}_${branch}_${sk}`));
@@ -135,7 +155,7 @@ export function useInventoryData(
         if (cancelled) return;
         const hasAnyPrev = sectionKeys.some((sk) => Object.keys(prevItems[sk]).length > 0);
         if (!hasAnyPrev) return;
-        // Set BEG = previous day's END
+        // Set BEG = previous day's AUDIT where one was recorded, else its END
         setInventory((prev) => {
           const stillMissing = !sectionKeys.some((sk) =>
             Object.values(prev[sk] || {}).some((row) => isBegPresent(row.beg))
@@ -145,7 +165,7 @@ export function useInventoryData(
           for (const sk of sectionKeys) {
             const newItems = { ...(prev[sk] || {}) };
             for (const [product, row] of Object.entries(prevItems[sk])) {
-              const beg = row.end != null ? (parseFloat(String(row.end)) || 0) : 0;
+              const beg = carryForwardBeg(row);
               newItems[product] = { ...(newItems[product] || {}), beg };
             }
             updated[sk] = newItems;
@@ -218,10 +238,10 @@ export function useInventoryData(
     }, 500);
   }, [inventoryDate, branch, onToast]);
 
-  // ---- Manually re-pull BEG from the previous day's saved END ----
+  // ---- Manually re-pull BEG from the previous day's saved AUDIT / END ----
   // The auto-fallback (see effect above) only fires when BEG is entirely missing.
   // This handler is the manual trigger: it overwrites the viewed date's BEG for
-  // every product with the prior day's END, then persists each section.
+  // every product with the prior day's audited count (or END), then persists each section.
   const handleFixBeginning = useCallback(async () => {
     const sectionKeys = inventorySectionsRef.current.map((s) => s.key);
     const prevDate = (() => {
@@ -245,7 +265,7 @@ export function useInventoryData(
         for (const sk of sectionKeys) {
           const newItems = { ...(prev[sk] || {}) };
           for (const [product, row] of Object.entries(prevItems[sk])) {
-            const beg = row.end != null ? (parseFloat(String(row.end)) || 0) : 0;
+            const beg = carryForwardBeg(row);
             newItems[product] = { ...(newItems[product] || {}), beg };
           }
           updated[sk] = newItems;

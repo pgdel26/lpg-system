@@ -88,7 +88,7 @@ export default function InventoryControls({
         {!rangeMode && (
           <button
             onClick={onFixBeginning}
-            title="Re-pull this date's beginning inventory from the previous day's ending inventory"
+            title="Re-pull this date's beginning inventory from the previous day's audited count (or ending inventory where no audit was recorded)"
             className={styles.actionButton}
           >
             Fix Beginning

@@ -111,40 +111,60 @@
   gap: 8px;
 }
 
-.discountChevron {
+.rowChevron {
   display: flex;
   color: var(--text-dim);
   transition: transform 0.2s;
 }
 
-.discountChevron.closed {
+.rowChevron.closed {
   transform: rotate(-90deg);
 }
 
-.discountBreakdown {
+/* Shared itemized-breakdown panel: Discounts, A/R, and GCash all render the
+   same per-customer list. The tint* modifiers below carry the row's accent so
+   the panel reads as belonging to the row that opened it. */
+.itemBreakdown {
   padding: 4px 20px 10px 32px;
-  background: rgba(239, 68, 68, 0.03);
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
 }
 
-.discountBreakdownRow {
+/* The A/R and GCash panels are followed by .subTotalRow* rows, which draw their
+   own border-top — without this the two hairlines stack into a double rule.
+   The Discounts panel keeps its border because .breakdownRow has no top border. */
+.itemBreakdown.flushNext {
+  border-bottom: none;
+}
+
+.itemBreakdown.tintRed {
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.itemBreakdown.tintOrange {
+  background: rgba(245, 158, 66, 0.04);
+}
+
+.itemBreakdown.tintBlue {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.itemBreakdownRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
 }
 
-.discountCustomerName {
+.itemCustomerName {
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 600;
 }
 
-.discountCustomerAmount {
+.itemCustomerAmount {
   font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
-  color: var(--accent-red);
 }
 
 .subTotalRow {
@@ -153,6 +173,27 @@
   align-items: center;
   padding: 12px 20px;
   border-top: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+/* Same visual as .subTotalRow, but as a <button> — used for the A/R and GCash
+   rows now that they expand. Button resets (border/background/font) are needed
+   because a <button> does not inherit them the way a <div> does. */
+.subTotalRowButton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-top: 1px solid rgba(15, 23, 42, 0.04);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.subTotalRowButton:disabled {
+  cursor: default;
 }
 
 .rowLabel {

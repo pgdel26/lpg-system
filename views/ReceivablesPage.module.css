@@ -129,7 +129,7 @@
   color: var(--text-secondary);
 }
 
-.alignRight {
+.sortableHeaderRight {
   text-align: right;
 }
 

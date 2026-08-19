@@ -54,6 +54,8 @@ export default function InventorySubTab({
   const [rangeMode, setRangeMode] = useState(false);
   const [rangeEndDate, setRangeEndDate] = useState("");
   const [rangeInventory, setRangeInventory] = useState<InventoryState | null>(null);
+  // Final-day END per section/product — see the comment where this is built.
+  const [rangeEndByProduct, setRangeEndByProduct] = useState<Record<string, Record<string, number>>>({});
   const [rangeLoading, setRangeLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [showAudit, setShowAudit] = useState(true);
@@ -248,6 +250,21 @@ export default function InventorySubTab({
         }
       }
 
+      // The consolidated row's END cannot be re-derived from day one's BEG plus
+      // summed activity: an audit on any intermediate day resets the next day's
+      // BEG, breaking the END(N) === BEG(N+1) chain that arithmetic assumes.
+      // Take the final day's actual END instead, which is true either way.
+      const lastDate = dates[dates.length - 1];
+      const endByProduct: Record<string, Record<string, number>> = {};
+      for (const section of inventorySections) {
+        endByProduct[section.key] = {};
+        for (const product of section.products) {
+          const lastRow = (perDay[lastDate][section.key][product] || {}) as InventoryCell;
+          endByProduct[section.key][product] = section.calcEnd(lastRow);
+        }
+      }
+      setRangeEndByProduct(endByProduct);
+
       setRangeInventory(consolidated);
       setRangeLoading(false);
     };
@@ -270,10 +287,13 @@ export default function InventorySubTab({
       return {
         product,
         beg: ((fullRow.beg as number) || 0) + ((emptyRow.beg as number) || 0),
-        end: fullSection.calcEnd(fullRow) + emptySection.calcEnd(emptyRow),
+        // Final-day ENDs, not calcEnd() of the consolidated rows — same
+        // audit-breaks-the-chain reason as the per-section tables.
+        end: (rangeEndByProduct.full?.[product] ?? fullSection.calcEnd(fullRow))
+           + (rangeEndByProduct.empty?.[product] ?? emptySection.calcEnd(emptyRow)),
       };
     });
-  }, [rangeInventory, inventorySections]);
+  }, [rangeInventory, inventorySections, rangeEndByProduct]);
 
   const rangeValid = rangeMode && !!rangeEndDate && rangeEndDate > inventoryDate;
   const showRangeView = !!(rangeValid && rangeInventory && !rangeLoading);
@@ -343,6 +363,7 @@ export default function InventorySubTab({
           inventoryDate={inventoryDate}
           rangeEndDate={rangeEndDate}
           rangeInventory={rangeInventory}
+          rangeEndByProduct={rangeEndByProduct}
           inventorySections={inventorySections}
           rangeTotalCylinderData={rangeTotalCylinderData}
         />
