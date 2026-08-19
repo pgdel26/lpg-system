@@ -318,7 +318,10 @@ export function arRollForward<T extends ArRollForwardDoc>(
     // removes rows for invoices dated after endDate, which produce four zeros.
     .filter((r) => r.beginning > EPSILON || r.added > EPSILON
       || r.collected > EPSILON || r.ending > EPSILON || Math.abs(r.drift) > EPSILON)
-    .sort((a, b) => b.ending - a.ending || b.added - a.added);
+    // Alphabetical by customer. Case-insensitive via sensitivity:"base", or the
+    // mixed casing in the data ("metro fiesta" next to "NIKKA BABES") would sort
+    // every lowercase name into a separate block after the uppercase ones.
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 export function collectionsOnDate<T extends ArStatusLike>(
