@@ -251,11 +251,11 @@ export interface ArRollForwardDoc extends ArStatusLike {
  *   - a collection dated before its own invoice. recordArCollection rejects this
  *     for writes made since its tooEarlyFor check landed, but legacy docs
  *     predate the check and are unguarded;
- *   - a collection carrying no date at all, which is counted nowhere here and
- *     so leaves `ending` permanently above the true live balance. The 72
- *     pre-event-tracking docs in that state were backfilled to their invoice
- *     date; every collection written since records a date (RecordCollectionModal
- *     defaults it to today and gates submit on it).
+ *   - an invoice with no date at all, which is skipped entirely (a collection on
+ *     it would then be counted by collectionEventsInRange but not here).
+ *
+ * Collections with no date are NOT a break case: they fall back to the invoice's
+ * date, so `ending` converges to the same figure as arStatus/Total Pending.
  */
 export function arRollForward<T extends ArRollForwardDoc>(
   docs: T[],
@@ -272,17 +272,31 @@ export function arRollForward<T extends ArRollForwardDoc>(
   const rows = new Map<string, Acc>();
   for (const t of docs) {
     const arTotal = cents(paymentSplit(t).ar);
-    if (arTotal <= 0 || !t.date) continue;
+    const invoiceDate = t.date;
+    if (arTotal <= 0 || !invoiceDate) continue;
 
-    const events = arCollectionEvents(t).filter(
-      (e): e is ArCollectionEventLike & { date: string } => !e.voided && !!e.date);
+    // A collection with no date falls back to the invoice's own date. Those are
+    // legacy docs marked paid with no record of when; attributing them to the
+    // month the invoice was raised is an assumption, but excluding them instead
+    // leaves `ending` permanently above the real balance by their total — and
+    // visibly disagreeing with Total Pending on the sibling tab.
+    //
+    // Deliberately applied HERE rather than by writing collectedDate onto the
+    // docs: collectionEventsOnDate feeds the Sales Report's drawer-cash figure
+    // and matches on a real date, so a stored date turns a credit sale into a
+    // same-day cash collection and reports a false shortage for that day.
+    // Keeping the fallback in the read path makes that impossible by
+    // construction, because those events still carry no date in the data.
+    const events = arCollectionEvents(t)
+      .filter((e) => !e.voided)
+      .map((e) => ({ amount: e.amount || 0, date: e.date || invoiceDate }));
     const sumWhere = (pred: (d: string) => boolean) =>
-      events.reduce((sum, e) => sum + (pred(e.date) ? cents(e.amount || 0) : 0), 0);
+      events.reduce((sum, e) => sum + (pred(e.date) ? cents(e.amount) : 0), 0);
 
-    const beginning = t.date < startDate ? Math.max(0, arTotal - sumWhere((d) => d < startDate)) : 0;
-    const added = t.date >= startDate && t.date <= endDate ? arTotal : 0;
+    const beginning = invoiceDate < startDate ? Math.max(0, arTotal - sumWhere((d) => d < startDate)) : 0;
+    const added = invoiceDate >= startDate && invoiceDate <= endDate ? arTotal : 0;
     const collected = sumWhere((d) => d >= startDate && d <= endDate);
-    const ending = t.date <= endDate ? Math.max(0, arTotal - sumWhere((d) => d <= endDate)) : 0;
+    const ending = invoiceDate <= endDate ? Math.max(0, arTotal - sumWhere((d) => d <= endDate)) : 0;
 
     const key = customerKey(t.customerName || "Unknown");
     const row = rows.get(key)
