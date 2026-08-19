@@ -202,12 +202,19 @@ export function collectionEventsInRange<T extends ArStatusLike>(
 export interface ArRollForwardRow {
   /** customerKey() — stable grouping id, also safe as a React key. */
   key: string;
-  /** First-seen display spelling of the name, not the normalized key. */
+  /** One doc's display spelling of the name, not the normalized key. Which one
+   *  depends on the input order (useReceivablesData sorts createdAt desc, so in
+   *  practice the most recent), matching TopDebtorsChart's behavior. */
   name: string;
   beginning: number;
   added: number;
   collected: number;
   ending: number;
+  /** beginning + added - collected - ending. Zero for every row in clean data;
+   *  non-zero means one of the break cases in arRollForward's docstring has
+   *  occurred, and the UI must say so rather than print an equation that
+   *  doesn't add up. */
+  drift: number;
 }
 
 export interface ArRollForwardDoc extends ArStatusLike {
@@ -220,8 +227,14 @@ export interface ArRollForwardDoc extends ArStatusLike {
  *
  *   beginning + added - collected === ending
  *
- * The identity holds by construction, so the four figures read as one equation
- * rather than four unrelated numbers. Each term sits on the axis it belongs on:
+ * The four figures are meant to read as one equation rather than four unrelated
+ * numbers. The identity is NOT guaranteed by construction — it holds only while
+ * the write paths keep out the three inputs listed below — so every row also
+ * carries `drift`, and the UI surfaces any row where it is non-zero. Note that
+ * per-customer netting can hide a per-invoice break, which is why drift is
+ * computed per row and not just on the totals.
+ *
+ * Each term sits on the axis it belongs on:
  *   beginning — owed on invoices dated BEFORE startDate, net of collections
  *               dated before startDate (a point-in-time balance)
  *   added     — A/R portion of invoices dated inside the period (invoice axis)
@@ -235,8 +248,9 @@ export interface ArRollForwardDoc extends ArStatusLike {
  * (verified across June/July/August 2026 — drift 0.00 each month):
  *   - an invoice collected for MORE than its A/R portion, since the two
  *     balance terms clamp at 0 per invoice while `collected` does not;
- *   - a collection dated before its own invoice, which recordArCollection
- *     rejects (see useReceivablesData's tooEarlyFor check);
+ *   - a collection dated before its own invoice. recordArCollection rejects this
+ *     for writes made since its tooEarlyFor check landed, but legacy docs
+ *     predate the check and are unguarded;
  *   - a collection carrying no date at all, which is counted nowhere here and
  *     so leaves `ending` permanently above the true live balance. The 72
  *     pre-event-tracking docs in that state were backfilled to their invoice
@@ -248,23 +262,27 @@ export function arRollForward<T extends ArRollForwardDoc>(
   startDate: string,
   endDate: string,
 ): ArRollForwardRow[] {
-  const rows = new Map<string, ArRollForwardRow>();
+  // Accumulated in whole centavos, the same way allocateFifo works below.
+  // Rounding the four terms on different boundaries is what lets the on-screen
+  // equation visibly fail — paymentSplit's `payments` branch does not round, so
+  // a split-payment doc can carry float residue into arTotal and drift a
+  // centavo per invoice.
+  const cents = (n: number) => Math.round(n * 100);
+  type Acc = { key: string; name: string; beginning: number; added: number; collected: number; ending: number };
+  const rows = new Map<string, Acc>();
   for (const t of docs) {
-    const arTotal = paymentSplit(t).ar;
-    if (arTotal <= EPSILON || !t.date) continue;
+    const arTotal = cents(paymentSplit(t).ar);
+    if (arTotal <= 0 || !t.date) continue;
 
-    const events = arCollectionEvents(t).filter((e) => !e.voided && !!e.date);
+    const events = arCollectionEvents(t).filter(
+      (e): e is ArCollectionEventLike & { date: string } => !e.voided && !!e.date);
     const sumWhere = (pred: (d: string) => boolean) =>
-      events.reduce((sum, e) => sum + (pred(e.date as string) ? (e.amount || 0) : 0), 0);
+      events.reduce((sum, e) => sum + (pred(e.date) ? cents(e.amount || 0) : 0), 0);
 
-    const beginning = t.date < startDate
-      ? Math.max(0, round2(arTotal - sumWhere((d) => d < startDate)))
-      : 0;
+    const beginning = t.date < startDate ? Math.max(0, arTotal - sumWhere((d) => d < startDate)) : 0;
     const added = t.date >= startDate && t.date <= endDate ? arTotal : 0;
     const collected = sumWhere((d) => d >= startDate && d <= endDate);
-    const ending = t.date <= endDate
-      ? Math.max(0, round2(arTotal - sumWhere((d) => d <= endDate)))
-      : 0;
+    const ending = t.date <= endDate ? Math.max(0, arTotal - sumWhere((d) => d <= endDate)) : 0;
 
     const key = customerKey(t.customerName || "Unknown");
     const row = rows.get(key)
@@ -277,13 +295,15 @@ export function arRollForward<T extends ArRollForwardDoc>(
   }
   return Array.from(rows.values())
     .map((r) => ({
-      ...r,
-      beginning: round2(r.beginning), added: round2(r.added),
-      collected: round2(r.collected), ending: round2(r.ending),
+      key: r.key, name: r.name,
+      beginning: r.beginning / 100, added: r.added / 100,
+      collected: r.collected / 100, ending: r.ending / 100,
+      drift: (r.beginning + r.added - r.collected - r.ending) / 100,
     }))
-    // An all-zero row is noise on a screen meant for chasing balances.
+    // An all-zero row is noise on a screen meant for chasing balances. This also
+    // removes rows for invoices dated after endDate, which produce four zeros.
     .filter((r) => r.beginning > EPSILON || r.added > EPSILON
-      || r.collected > EPSILON || r.ending > EPSILON)
+      || r.collected > EPSILON || r.ending > EPSILON || Math.abs(r.drift) > EPSILON)
     .sort((a, b) => b.ending - a.ending || b.added - a.added);
 }
 

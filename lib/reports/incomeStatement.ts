@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx-js-style";
 import { titleCaseCategory } from "../utils";
-import { customerKey } from "../hooks/useCustomersData";
+import { customerKey } from "../customers";
 import { paymentSplit } from "../payments";
 import { collectionEventsInRange } from "../receivables";
 import type { SaleTransaction, Swap, Refund, Purchase, Expense } from "../types";

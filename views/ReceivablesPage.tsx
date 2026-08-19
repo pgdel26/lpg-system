@@ -177,7 +177,7 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
         ))}
       </div>
 
-      <div className={styles.subTabCard}>
+      <div className={styles.card}>
       {subTab === "summary" && <ArSummaryTab arTransactions={arTransactions} />}
 
       {subTab === "transactions" && (
@@ -404,9 +404,6 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
       )}
       </div>
 
-      {/* Modals live outside the subtab switch: they are driven by state the
-          Transactions tab sets, but unmounting them mid-flow on a tab change
-          would drop a half-completed confirmation. */}
       {recordModalOpen && (
         <RecordCollectionModal
           arTransactions={arTransactions}

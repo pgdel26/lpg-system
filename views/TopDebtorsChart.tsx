@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { fmt } from "../lib/utils";
 import { arStatus } from "../lib/receivables";
-import { customerKey } from "../lib/hooks/useCustomersData";
+import { customerKey } from "../lib/customers";
 import type { SaleTransaction } from "../lib/types";
 import styles from "./TopDebtorsChart.module.css";
 

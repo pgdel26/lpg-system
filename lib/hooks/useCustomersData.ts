@@ -9,10 +9,10 @@ import { customerKey } from "../customers";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
-// Canonical definition lives in lib/customers.ts (a plain module, so
-// server-side code can import it too); re-exported here because five callers
-// already import it from this path.
-export { customerKey } from "../customers";
+// customerKey now lives in lib/customers.ts — imported above. Deliberately NOT
+// re-exported: leaving the old path alive would keep the hazard reachable (this
+// module pulls in React, and lib/receivables + lib/reports are imported by the
+// admin-SDK cron route, where that fails the build).
 
 // Phone is deliberately excluded from matching: most walk-in sales never
 // capture one, so requiring a phone match created a new record on every visit.

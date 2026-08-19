@@ -12,7 +12,12 @@
   font-size: 13px;
   font-weight: 700;
   font-family: inherit;
+  /* border-radius: 0 is required, not cosmetic — globals.css has no button
+     reset, so without it the UA default radius applies and this bar alone
+     would have rounded corners. Matches the four sibling subtab bars. */
+  border-radius: 0;
   border: 1px solid rgba(200, 210, 220, 0.5);
+  border-bottom: 1px solid rgba(200, 210, 220, 0.5);
   background: transparent;
   color: var(--text-dim);
   position: relative;
@@ -28,11 +33,12 @@
   z-index: 1;
 }
 
-.subTabCard {
+/* Named and sized to match the sibling screens' wrapper rather than inventing a
+   third convention. No margin-bottom: no sibling has one. */
+.card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  padding: 20px;
-  margin-bottom: 20px;
+  padding: 24px;
 }
 
 .summaryCard {

@@ -82,6 +82,18 @@
   color: var(--text-secondary);
 }
 
+/* Loud on purpose: it means the four figures above do not add up. */
+.driftWarning {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid var(--accent-red);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .tableCard {
   background: var(--bg-card);
   border-radius: 12px;

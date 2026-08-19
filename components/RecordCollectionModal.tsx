@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { fmt, today, formatDateShort } from "../lib/utils";
-import { customerKey } from "../lib/hooks/useCustomersData";
+import { customerKey } from "../lib/customers";
 import { arStatus, allocateFifo, type FifoTarget } from "../lib/receivables";
 import { XIcon } from "./Icons";
 import type { SaleTransaction, Branch } from "../lib/types";

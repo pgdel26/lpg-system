@@ -18,6 +18,10 @@
  * and no doc is migrated to the arCollections[] shape — recordArCollection does
  * that lazily the next time a doc is actually collected against.
  *
+ * Idempotent: a re-run skips every doc the previous run touched, so recovering
+ * from a mid-loop batch failure (which leaves an applied prefix) is just a
+ * re-run.
+ *
  * Usage:
  *   FIREBASE_SERVICE_ACCOUNT='{...}' node scripts/backfill-collection-dates.mjs --dry-run
  *   FIREBASE_SERVICE_ACCOUNT='{...}' node scripts/backfill-collection-dates.mjs
@@ -33,6 +37,9 @@ db.settings({ preferRest: true });
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const r2 = (n) => Math.round(n * 100) / 100;
+// Explicit currency + 2dp: these figures are used to sign off a live-data
+// migration, so "787,290" vs "787,290.00" must not be ambiguous.
+const peso = (n) => `PHP ${r2(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Mirrors lib/payments.ts paymentSplit().ar
 function arPortion(t) {
@@ -67,8 +74,8 @@ async function main() {
   }
 
   console.log(`  dateless legacy collections: ${targets.length}`);
-  console.log(`  will be dated to their invoice date: ${fixable.length}  (${total.toLocaleString()})`);
-  console.log(`  landing per month: ${JSON.stringify(byMonth)}`);
+  console.log(`  will be dated to their invoice date: ${fixable.length}  (${peso(total)})`);
+  console.log(`  landing per month: ${Object.entries(byMonth).sort().map(([m, v]) => `${m} ${peso(v)}`).join("   ")}`);
   if (undatable.length) {
     console.log(`  SKIPPED — no invoice date either: ${undatable.length} (${undatable.map((t) => t.id).join(", ")})`);
   }

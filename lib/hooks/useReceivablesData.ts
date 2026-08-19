@@ -4,7 +4,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { fmt, today } from "../utils";
-import { customerKey } from "./useCustomersData";
+import { customerKey } from "../customers";
 import { arCollectionEvents, arStatus, allocateFifo, type FifoTarget } from "../receivables";
 import type { SaleTransaction, ArCollectionEvent } from "../types";
 
