@@ -38,7 +38,7 @@ export default function PurchasesRoutePage() {
     <>
       <PurchasesPage
         purchaseTransactions={data.purchaseTransactions}
-        purchaseDailyCosts={data.purchaseDailyCosts}
+        purchaseDeliveries={data.purchaseDeliveries}
         branches={data.branches}
         hasMorePurchases={data.hasMorePurchases}
         loadingMorePurchases={data.loadingMorePurchases}

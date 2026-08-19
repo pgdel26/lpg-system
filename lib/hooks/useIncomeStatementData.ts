@@ -1,14 +1,14 @@
 import { useState, useCallback } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase";
-import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDailyCost } from "../types";
+import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDelivery } from "../types";
 
 export interface IncomeStatementRangeData {
   saleTransactions: SaleTransaction[];
   swaps: Swap[];
   refunds: Refund[];
   purchases: Purchase[];
-  purchaseDailyCosts: PurchaseDailyCost[];
+  purchaseDeliveries: PurchaseDelivery[];
   expenses: Expense[];
 }
 
@@ -39,15 +39,15 @@ export function useIncomeStatementData(): UseIncomeStatementData {
     setLoading(true);
     setError(null);
     try {
-      const [saleTransactions, swaps, refunds, purchases, purchaseDailyCosts, expenses] = await Promise.all([
+      const [saleTransactions, swaps, refunds, purchases, purchaseDeliveries, expenses] = await Promise.all([
         fetchRangeCollection<SaleTransaction>("saleTransactions", startDate, endDate),
         fetchRangeCollection<Swap>("swaps", startDate, endDate),
         fetchRangeCollection<Refund>("refunds", startDate, endDate),
         fetchRangeCollection<Purchase>("purchases", startDate, endDate),
-        fetchRangeCollection<PurchaseDailyCost>("purchaseDailyCost", startDate, endDate),
+        fetchRangeCollection<PurchaseDelivery>("purchaseDelivery", startDate, endDate),
         fetchRangeCollection<Expense>("expenses", startDate, endDate),
       ]);
-      setData({ saleTransactions, swaps, refunds, purchases, purchaseDailyCosts, expenses });
+      setData({ saleTransactions, swaps, refunds, purchases, purchaseDeliveries, expenses });
     } catch (err) {
       console.error("Income statement range fetch error:", err);
       setError("Failed to load income statement data.");

@@ -7,7 +7,7 @@ import { collectionEventsInRange } from "../../lib/receivables";
 import IncomeStatementBreakdown from "./IncomeStatementBreakdown";
 import DiscountsByCustomerCard from "./DiscountsByCustomerCard";
 import { LoadingIcon, DownloadIcon } from "../../components/Icons";
-import type { SaleTransaction, Swap, Refund, Purchase, Expense, Branch, PurchaseDailyCost } from "../../lib/types";
+import type { SaleTransaction, Swap, Refund, Purchase, Expense, Branch, PurchaseDelivery } from "../../lib/types";
 import styles from "./IncomeStatementPage.module.css";
 
 interface IncomeStatementPageProps {
@@ -20,7 +20,7 @@ interface IncomeStatementPageProps {
   swaps: Swap[];
   refunds: Refund[];
   purchases: Purchase[];
-  purchaseDailyCosts: PurchaseDailyCost[];
+  purchaseDeliveries: PurchaseDelivery[];
   expenses: Expense[];
   branches: Branch[];
   /** Unbounded, live AR doc list — NOT date-ranged. See IncomeStatementInput. */
@@ -42,7 +42,7 @@ export default function IncomeStatementPage({
   swaps,
   refunds,
   purchases,
-  purchaseDailyCosts,
+  purchaseDeliveries,
   expenses,
   branches,
   arTransactions,
@@ -50,8 +50,8 @@ export default function IncomeStatementPage({
   const [activeTab, setActiveTab] = useState<string>("all");
 
   const combinedResult = useMemo(
-    () => computeIncomeStatement({ saleTransactions, swaps, refunds, purchases, purchaseDailyCosts, expenses, arTransactions, startDate, endDate }),
-    [saleTransactions, swaps, refunds, purchases, purchaseDailyCosts, expenses, arTransactions, startDate, endDate],
+    () => computeIncomeStatement({ saleTransactions, swaps, refunds, purchases, purchaseDeliveries, expenses, arTransactions, startDate, endDate }),
+    [saleTransactions, swaps, refunds, purchases, purchaseDeliveries, expenses, arTransactions, startDate, endDate],
   );
 
   // Partition each collection by branch from a single unfiltered fetch — never
@@ -81,7 +81,7 @@ export default function IncomeStatementPage({
         // Passed UNPARTITIONED: computeIncomeStatement narrows these by its own
         // `branch` argument (they carry a branch field, unlike the doc lists
         // partitioned above).
-        purchaseDailyCosts,
+        purchaseDeliveries,
         expenses: expensesPart.byBranch[branch.id],
         arTransactions,
         startDate,
@@ -104,7 +104,7 @@ export default function IncomeStatementPage({
       + unassignedCollections;
 
     return { perBranchResults: perBranch, unassignedCount: unassigned };
-  }, [saleTransactions, swaps, refunds, purchases, purchaseDailyCosts, expenses, branches, arTransactions, startDate, endDate]);
+  }, [saleTransactions, swaps, refunds, purchases, purchaseDeliveries, expenses, branches, arTransactions, startDate, endDate]);
 
   // Includes AR collections — a period whose only money event is a
   // collection (invoice sold earlier, paid this period) still has real cash

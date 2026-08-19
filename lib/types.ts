@@ -147,10 +147,13 @@ export interface Purchase {
   /** Per-line cost is only present on docs recorded before 2026-08 (and on any
    *  future itemization). The supplier does not break a delivery down at
    *  purchase time — only the day's total is known — so new purchase lines
-   *  carry quantity with no cost, and the cost lives in purchaseDailyCost.
+   *  carry quantity with no cost, and the cost lives in purchaseDelivery.
    *  See lib/reports/purchaseCost.ts for the one rule that reads both. */
   unitCost?: number;
   totalCost?: number;
+  /** Links this line to its purchaseDelivery, which carries the cost. Absent on
+   *  docs from the per-line era. */
+  deliveryId?: string;
   date: string;
   // Purchases aren't a separate screen per outlet, but each doc still carries
   // which outlet bought the stock so per-outlet Inventory's PURCHASES column
@@ -167,14 +170,17 @@ export interface Purchase {
   createdAt: Timestamp;
 }
 
-// purchaseDailyCost collection — one doc per date+branch, id `{date}_{branch}`
-// (same keying as dailyInventory / dailyReport). Holds the amount payable for
-// that day's delivery, which is all the operator knows at purchase time.
-export interface PurchaseDailyCost {
+// purchaseDelivery collection — one doc per delivery (auto id), holding the
+// amount payable for it. That total is all the operator knows at purchase time:
+// the supplier bills a delivery total and itemizes a month later, if at all.
+// Two deliveries on one date are two docs, so neither has to be a running total.
+// Purchase line docs point back via `deliveryId`.
+export interface PurchaseDelivery {
+  id: string;
   date: string;
   branch: BranchId;
   totalCost: number;
-  updatedAt: Timestamp;
+  createdAt: Timestamp;
 }
 
 // refunds collection

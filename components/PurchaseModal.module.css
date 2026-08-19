@@ -301,3 +301,80 @@
   font-weight: 700;
   font-family: inherit;
 }
+
+/* ---- Quantity list (replaces the add-a-line item cards) ---- */
+
+/* Scrolls internally so a long product list never pushes the Record button off
+   the dialog. */
+.quantityList {
+  max-height: 42vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sectionBlock:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 12px;
+  background: rgba(241, 245, 249, 0.96);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.subgroupHeader {
+  padding: 5px 12px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.productRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 12px;
+}
+
+.productName {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.qtyInput {
+  width: 72px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-align: right;
+  outline: none;
+}
+
+/* A filled row is tinted so the few products actually delivered are findable in
+   a list of every product the shop stocks. */
+.qtyInputFilled {
+  border-color: var(--accent-blue);
+  background: rgba(37, 99, 235, 0.06);
+  font-weight: 700;
+}
+
+.qtyInput:focus {
+  border-color: var(--accent-blue);
+}

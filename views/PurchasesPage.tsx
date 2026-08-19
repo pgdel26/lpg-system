@@ -3,7 +3,7 @@ import { fmt, today, presetThisMonth, presetLastMonth, formatDateShort } from ".
 import { PlusIcon, EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import { purchaseCost } from "../lib/reports/purchaseCost";
-import type { Purchase, Branch, PurchaseDailyCost } from "../lib/types";
+import type { Purchase, Branch, PurchaseDelivery } from "../lib/types";
 import styles from "./PurchasesPage.module.css";
 
 interface EditData {
@@ -23,10 +23,17 @@ interface DisplayRow {
   transferLabel?: string;
   isTransfer: boolean;
   quantity: number;
-  /** Undefined when the delivery was costed as a day total rather than per line
-   *  — rendered as "—", never as 0, which would read as free stock. */
+  /** Legacy per-line costs. Absent on anything recorded since cost moved to the
+   *  delivery — rendered as "—", never 0, which would read as free stock. */
   unitCost?: number;
   totalCost?: number;
+  /** The figure actually shown in the cost column: this line's delivery total on
+   *  the delivery's FIRST line, its own legacy totalCost for pre-delivery docs,
+   *  and undefined on a delivery's subsequent lines so the total is not repeated
+   *  (and cannot be mistaken for a per-product amount, or summed by eye). */
+  deliveryCost?: number;
+  /** Which purchaseDelivery this line belongs to; absent for pre-delivery docs. */
+  deliveryId?: string;
   /** Present for real purchases (and the legacy-fallback transfer case) — drives Edit/Delete. */
   purchase?: Purchase;
   /** Present for a properly-paired transfer — Delete removes both docs via this. */
@@ -45,7 +52,7 @@ const subTabs = [
 
 interface PurchasesPageProps {
   purchaseTransactions: Purchase[];
-  purchaseDailyCosts: PurchaseDailyCost[];
+  purchaseDeliveries: PurchaseDelivery[];
   branches: Branch[];
   hasMorePurchases: boolean;
   loadingMorePurchases: boolean;
@@ -61,7 +68,7 @@ interface PurchasesPageProps {
 }
 
 export default function PurchasesPage({
-  purchaseTransactions, purchaseDailyCosts,
+  purchaseTransactions, purchaseDeliveries,
   branches,
   hasMorePurchases,
   loadingMorePurchases,
@@ -136,13 +143,13 @@ export default function PurchasesPage({
   // Real purchases only — transfers move existing stock, they don't add to
   // how much was actually bought/spent.
   // purchaseCost() rather than a local sum, so this footer can never disagree
-  // with the Income Statement: a day costed as a day total contributes its
-  // purchaseDailyCost doc, and older per-line days contribute their line costs.
-  // The day docs are narrowed to the dates actually on screen.
-  const visibleDates = new Set(filtered.map((t) => t.date));
+  // with the Income Statement. Deliveries are matched by the ids the visible
+  // lines actually reference — not by date — so a delivery whose lines are off
+  // screen (paginated away) can't inflate the figure shown.
+  const visibleDeliveryIds = new Set(filtered.map((t) => t.deliveryId).filter(Boolean));
   const totalCost = purchaseCost(
     filtered,
-    purchaseDailyCosts.filter((d) => visibleDates.has(d.date)),
+    purchaseDeliveries.filter((d) => visibleDeliveryIds.has(d.id)),
   ).total;
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
   // A range query is always complete, so "Total" is accurate there. With no
@@ -174,7 +181,10 @@ export default function PurchasesPage({
           isTransfer: false,
           quantity: t.quantity,
           unitCost: t.unitCost,
-          totalCost: t.totalCost || 0,
+          // Not `|| 0`: absent must stay absent so the cost column can show "—"
+          // instead of a zero that reads as free stock.
+          totalCost: t.totalCost,
+          deliveryId: t.deliveryId,
           purchase: t,
         });
         continue;
@@ -241,11 +251,23 @@ export default function PurchasesPage({
   const activeRows = useMemo(() => {
     const base = subTab === "purchases" ? purchaseRows : transferRows;
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...base].sort((a, b) => {
+    const sorted = [...base].sort((a, b) => {
       if (a.date !== b.date) return dir * a.date.localeCompare(b.date);
       return dir * (a.createdAtSeconds - b.createdAtSeconds);
     });
-  }, [subTab, purchaseRows, transferRows, sortDir]);
+
+    // The delivery total is attached AFTER sorting, so it lands on whichever of
+    // the delivery's lines the operator actually sees first. Doing it during the
+    // build would leave the cost stranded mid-group once the sort flips.
+    const costById = new Map(purchaseDeliveries.map((d) => [d.id, d.totalCost]));
+    const seen = new Set<string>();
+    return sorted.map((row) => {
+      if (!row.deliveryId) return { ...row, deliveryCost: row.totalCost };
+      if (seen.has(row.deliveryId)) return { ...row, deliveryCost: undefined };
+      seen.add(row.deliveryId);
+      return { ...row, deliveryCost: costById.get(row.deliveryId) };
+    });
+  }, [subTab, purchaseRows, transferRows, sortDir, purchaseDeliveries]);
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
@@ -392,8 +414,11 @@ export default function PurchasesPage({
               {subTab === "purchases" ? (
                 <>
                   <th className={styles.alignCenter}>Qty</th>
-                  <th className={styles.alignRight}>Unit Cost</th>
-                  <th className={styles.alignRight}>Total</th>
+                  {/* One cost per DELIVERY, not per line — the supplier bills a
+                      delivery total and does not itemize it. Shown on the first
+                      line of each delivery and dashed on the rest, so the column
+                      never reads as a per-product price. */}
+                  <th className={styles.alignRight}>Delivery Cost</th>
                   <th className={styles.alignCenter}>Actions</th>
                 </>
               ) : (
@@ -450,8 +475,9 @@ export default function PurchasesPage({
                     <td className={styles.dateCell}>{formatDateShort(row.date)}</td>
                     <td className={styles.productName}>{row.product}</td>
                     <td className={styles.qtyCell}>{row.quantity}</td>
-                    <td className={styles.unitCostCell}>{row.unitCost == null ? "—" : fmt(row.unitCost)}</td>
-                    <td className={styles.totalCostCell}>{row.totalCost == null ? "—" : fmt(row.totalCost)}</td>
+                    <td className={styles.totalCostCell}>
+                      {row.deliveryCost == null ? "—" : fmt(row.deliveryCost)}
+                    </td>
                     <td>
                       <div className={styles.actionsCell}>
                         <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">

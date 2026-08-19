@@ -3,7 +3,7 @@ import { titleCaseCategory } from "../utils";
 import { customerKey } from "../customers";
 import { paymentSplit } from "../payments";
 import { collectionEventsInRange } from "../receivables";
-import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDailyCost } from "../types";
+import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDelivery } from "../types";
 import { purchaseCost } from "./purchaseCost";
 
 export interface IncomeStatementLine {
@@ -17,9 +17,9 @@ export interface IncomeStatementInput {
   swaps?: Swap[];
   refunds?: Refund[];
   purchases?: Purchase[];
-  /** purchaseDailyCost docs. Cost is recorded per day now, not per line — see
+  /** purchaseDelivery docs. Cost is recorded per day now, not per line — see
    *  lib/reports/purchaseCost.ts for the rule that spans both eras. */
-  purchaseDailyCosts?: PurchaseDailyCost[];
+  purchaseDeliveries?: PurchaseDelivery[];
   expenses?: Expense[];
   /**
    * The UNBOUNDED, live AR doc list (e.g. useReceivablesData's
@@ -225,7 +225,7 @@ export function computeIncomeStatement({
   swaps = [],
   refunds = [],
   purchases = [],
-  purchaseDailyCosts = [],
+  purchaseDeliveries = [],
   expenses = [],
   arTransactions = [],
   startDate,
@@ -262,33 +262,33 @@ export function computeIncomeStatement({
   const realPurchases = purchases.filter((p) => !p.isTransfer);
   const transferPurchases = purchases.filter((p) => p.isTransfer);
 
-  // Cost now comes from purchaseCost(), which prefers a day's purchaseDailyCost
-  // doc and falls back to that day's per-line costs. Narrow the day docs to this
-  // report's period/branch first — `purchases` arrives already narrowed by the
-  // caller, and mixing a scoped list with an unscoped one would over-count.
-  const scopedDailyCosts = (purchaseDailyCosts || []).filter((d) => {
+  // Cost comes from purchaseCost(): a delivery's own doc, or a legacy line's own
+  // totalCost. Narrow deliveries to this report's period/branch by THEIR date and
+  // branch — `purchases` arrives already narrowed by the caller, so mixing a
+  // scoped list with an unscoped one would over-count.
+  const scopedDeliveries = (purchaseDeliveries || []).filter((d) => {
     if (startDate && d.date < startDate) return false;
     if (endDate && d.date > endDate) return false;
     if (branch !== undefined && d.branch !== branch) return false;
     return true;
   });
-  const costBreakdown = purchaseCost(realPurchases, scopedDailyCosts);
+  const costBreakdown = purchaseCost(realPurchases, scopedDeliveries);
   const totalCostOfPurchases = costBreakdown.total;
 
-  // Per-category cost only exists for days that still carry per-line costs.
-  // Days costed as a day total contribute a single undifferentiated line —
-  // the supplier does not itemize, so inventing a split would be fiction.
+  // Per-category cost only exists for the per-line era. A delivery costed as one
+  // total contributes a single undifferentiated line — the supplier does not
+  // itemize, so inventing a split would be fiction.
   const costLines: IncomeStatementLine[] = [
     ...groupByLine(
-      realPurchases.filter((p) => !scopedDailyCosts.some((d) => d.date === p.date && d.branch === p.branch)),
+      realPurchases.filter((p) => !p.deliveryId),
       (p) => p.purchaseSection,
       (p) => p.totalCost || 0,
     ),
-    ...(costBreakdown.fromDailyTotals > 0
+    ...(costBreakdown.fromDeliveries > 0
       ? [{
           label: "Purchases",
-          amount: costBreakdown.fromDailyTotals,
-          count: costBreakdown.dailyTotalDays,
+          amount: costBreakdown.fromDeliveries,
+          count: costBreakdown.deliveryCount,
         }]
       : []),
   ];
