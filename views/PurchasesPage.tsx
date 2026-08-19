@@ -40,6 +40,13 @@ interface DisplayRow {
   transferGroupId?: string;
 }
 
+/** The table renders a flat list of these: a delivery contributes one header
+ *  carrying its cost plus one row per product; a pre-delivery purchase
+ *  contributes a single row carrying its own line cost. */
+type DisplayItem =
+  | { kind: "deliveryHeader"; key: string; date: string; totalCost?: number; lineCount: number; itemCount: number }
+  | { kind: "row"; row: DisplayRow };
+
 interface PendingDelete {
   message: string;
   onConfirm: () => void;
@@ -256,17 +263,36 @@ export default function PurchasesPage({
       return dir * (a.createdAtSeconds - b.createdAtSeconds);
     });
 
-    // The delivery total is attached AFTER sorting, so it lands on whichever of
-    // the delivery's lines the operator actually sees first. Doing it during the
-    // build would leave the cost stranded mid-group once the sort flips.
+    // Grouped into display items: a delivery becomes a header carrying the cost
+    // followed by its product lines; a pre-delivery row stands alone with its own
+    // line cost. Grouping is explicit (by deliveryId) rather than relying on the
+    // sort leaving a delivery's lines adjacent — every line of one delivery
+    // shares a createdAt to the second, so two deliveries in the same second
+    // would otherwise interleave.
     const costById = new Map(purchaseDeliveries.map((d) => [d.id, d.totalCost]));
-    const seen = new Set<string>();
-    return sorted.map((row) => {
-      if (!row.deliveryId) return { ...row, deliveryCost: row.totalCost };
-      if (seen.has(row.deliveryId)) return { ...row, deliveryCost: undefined };
-      seen.add(row.deliveryId);
-      return { ...row, deliveryCost: costById.get(row.deliveryId) };
-    });
+    const items: DisplayItem[] = [];
+    const emitted = new Set<string>();
+    for (const row of sorted) {
+      if (!row.deliveryId) {
+        items.push({ kind: "row", row: { ...row, deliveryCost: row.totalCost } });
+        continue;
+      }
+      if (emitted.has(row.deliveryId)) continue;
+      emitted.add(row.deliveryId);
+      const lines = sorted.filter((r) => r.deliveryId === row.deliveryId);
+      items.push({
+        kind: "deliveryHeader",
+        key: `d-${row.deliveryId}`,
+        date: row.date,
+        // undefined (not 0) when the delivery doc is missing from the loaded
+        // window — "—" is honest, a zero would read as a free delivery.
+        totalCost: costById.get(row.deliveryId),
+        lineCount: lines.length,
+        itemCount: lines.reduce((s, r) => s + (r.quantity || 0), 0),
+      });
+      lines.forEach((r) => items.push({ kind: "row", row: r }));
+    }
+    return items;
   }, [subTab, purchaseRows, transferRows, sortDir, purchaseDeliveries]);
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
@@ -414,11 +440,10 @@ export default function PurchasesPage({
               {subTab === "purchases" ? (
                 <>
                   <th className={styles.alignCenter}>Qty</th>
-                  {/* One cost per DELIVERY, not per line — the supplier bills a
-                      delivery total and does not itemize it. Shown on the first
-                      line of each delivery and dashed on the rest, so the column
-                      never reads as a per-product price. */}
-                  <th className={styles.alignRight}>Delivery Cost</th>
+                  {/* Cost sits on the delivery header row above its products.
+                      This column only carries a figure for pre-delivery docs,
+                      which were costed per line (most of July). */}
+                  <th className={styles.alignRight}>Cost</th>
                   <th className={styles.alignCenter}>Actions</th>
                 </>
               ) : (
@@ -432,10 +457,30 @@ export default function PurchasesPage({
           </thead>
           <tbody>
             {activeRows.length > 0 ? (
-              activeRows.map((row) => (
+              activeRows.map((item) => (
+                /* A delivery header spans the table and carries the one cost
+                   figure for that delivery; its product rows below show quantity
+                   only, so the cost can never read as a per-product price. */
+                item.kind === "deliveryHeader" ? (
+                  <tr key={item.key} className={styles.deliveryHeaderRow}>
+                    <td className={styles.deliveryHeaderDate}>{formatDateShort(item.date)}</td>
+                    <td colSpan={2} className={styles.deliveryHeaderLabel}>
+                      Delivery
+                      <span className={styles.deliveryHeaderMeta}>
+                        {item.itemCount} item{item.itemCount !== 1 ? "s" : ""} · {item.lineCount} product{item.lineCount !== 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td className={styles.deliveryHeaderCost}>
+                      {item.totalCost == null ? "—" : fmt(item.totalCost)}
+                    </td>
+                    <td />
+                  </tr>
+                ) : (() => {
+                const row = item.row;
+                return (
                 editingId === row.key ? (
                   <tr key={row.key}>
-                    <td colSpan={subTab === "purchases" ? 6 : 5} className={styles.editCell}>
+                    <td colSpan={5} className={styles.editCell}>
                       <div className={styles.editFields}>
                         <div className={styles.editFieldProduct}>
                           <span className={styles.editFieldLabel}>Product</span>
@@ -450,19 +495,27 @@ export default function PurchasesPage({
                             setEditData((p) => ({ ...p, quantity: qty, totalCost: qty * (p.unitCost || 0) }));
                           }} className={styles.editInput} />
                         </div>
-                        <div className={styles.editFieldMed}>
-                          <span className={styles.editFieldLabel}>Unit Cost</span>
-                          <input type="number" value={editData.unitCost} onChange={(e) => {
-                            const uc = parseFloat(e.target.value) || 0;
-                            setEditData((p) => ({ ...p, unitCost: uc, totalCost: (p.quantity || 0) * uc }));
-                          }} className={styles.editInput} />
-                        </div>
-                        <div className={styles.editFieldMed}>
-                          <span className={styles.editFieldLabel}>Total</span>
-                          <div className={styles.editTotalValue}>
-                            {fmt(editData.totalCost)}
-                          </div>
-                        </div>
+                        {/* Cost fields only for pre-delivery docs. A delivery
+                            line has no cost of its own — writing one here would
+                            be ignored by purchaseCost() and read as a real
+                            per-product price by anyone looking at the doc. */}
+                        {!row.deliveryId && (
+                          <>
+                            <div className={styles.editFieldMed}>
+                              <span className={styles.editFieldLabel}>Unit Cost</span>
+                              <input type="number" value={editData.unitCost} onChange={(e) => {
+                                const uc = parseFloat(e.target.value) || 0;
+                                setEditData((p) => ({ ...p, unitCost: uc, totalCost: (p.quantity || 0) * uc }));
+                              }} className={styles.editInput} />
+                            </div>
+                            <div className={styles.editFieldMed}>
+                              <span className={styles.editFieldLabel}>Total</span>
+                              <div className={styles.editTotalValue}>
+                                {fmt(editData.totalCost)}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className={styles.editActions}>
                         <button onClick={cancelEdit} className={styles.cancelButton}>Cancel</button>
@@ -472,8 +525,14 @@ export default function PurchasesPage({
                   </tr>
                 ) : subTab === "purchases" ? (
                   <tr key={row.key}>
-                    <td className={styles.dateCell}>{formatDateShort(row.date)}</td>
-                    <td className={styles.productName}>{row.product}</td>
+                    {/* A delivery's date is on its header row; repeating it on
+                        every child line just adds noise. */}
+                    <td className={styles.dateCell}>
+                      {row.deliveryId ? "" : formatDateShort(row.date)}
+                    </td>
+                    <td className={`${styles.productName} ${row.deliveryId ? styles.deliveryChildProduct : ""}`}>
+                      {row.product}
+                    </td>
                     <td className={styles.qtyCell}>{row.quantity}</td>
                     <td className={styles.totalCostCell}>
                       {row.deliveryCost == null ? "—" : fmt(row.deliveryCost)}
@@ -504,10 +563,12 @@ export default function PurchasesPage({
                     </td>
                   </tr>
                 )
+                );
+                })()
               ))
             ) : (
               <tr>
-                <td colSpan={subTab === "purchases" ? 6 : 5} className={styles.emptyState}>
+                <td colSpan={5} className={styles.emptyState}>
                   {rangeError
                     ? "Couldn't load purchases for this range. Please try again."
                     : rangeLoading
@@ -525,7 +586,6 @@ export default function PurchasesPage({
                 <tr>
                   <td colSpan={2} className={styles.grandTotalLabel}>{totalLabel}</td>
                   <td className={styles.grandTotalQty}>{totalItems}</td>
-                  <td />
                   <td className={styles.grandTotalCost}>{fmt(totalCost)}</td>
                   <td />
                 </tr>
