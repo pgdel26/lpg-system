@@ -5,15 +5,14 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import type { Customer, CustomerTransaction } from "../types";
+import { customerKey } from "../customers";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
-// Exported so any other surface that groups by "same customer" (e.g.
-// TopDebtorsChart) uses this exact identity rule instead of a second,
-// driftable copy of it.
-export function customerKey(name: string): string {
-  return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
-}
+// Canonical definition lives in lib/customers.ts (a plain module, so
+// server-side code can import it too); re-exported here because five callers
+// already import it from this path.
+export { customerKey } from "../customers";
 
 // Phone is deliberately excluded from matching: most walk-in sales never
 // capture one, so requiring a phone match created a new record on every visit.

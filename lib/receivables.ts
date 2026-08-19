@@ -13,6 +13,7 @@
 // lib/reports/salesReport.ts, called from the admin-SDK cron route with plain
 // objects typed by its own local interface.
 import { paymentSplit, type PaymentSplitLike } from "./payments";
+import { customerKey } from "./customers";
 
 export interface ArCollectionEventLike {
   amount?: number;
@@ -196,6 +197,94 @@ export function collectionEventsInRange<T extends ArStatusLike>(
     }
   }
   return results;
+}
+
+export interface ArRollForwardRow {
+  /** customerKey() — stable grouping id, also safe as a React key. */
+  key: string;
+  /** First-seen display spelling of the name, not the normalized key. */
+  name: string;
+  beginning: number;
+  added: number;
+  collected: number;
+  ending: number;
+}
+
+export interface ArRollForwardDoc extends ArStatusLike {
+  date?: string;
+  customerName?: string;
+}
+
+/**
+ * Per-customer A/R roll-forward over [startDate, endDate]:
+ *
+ *   beginning + added - collected === ending
+ *
+ * The identity holds by construction, so the four figures read as one equation
+ * rather than four unrelated numbers. Each term sits on the axis it belongs on:
+ *   beginning — owed on invoices dated BEFORE startDate, net of collections
+ *               dated before startDate (a point-in-time balance)
+ *   added     — A/R portion of invoices dated inside the period (invoice axis)
+ *   collected — collection events dated inside the period (payment axis)
+ *   ending    — the same point-in-time balance, computed at endDate
+ *
+ * Comparisons are lexicographic on YYYY-MM-DD strings, so "before startDate"
+ * is a plain `< startDate`: no date arithmetic, no timezone to get wrong.
+ *
+ * Three things would break the identity; none occurs in the data today
+ * (verified across June/July/August 2026 — drift 0.00 each month):
+ *   - an invoice collected for MORE than its A/R portion, since the two
+ *     balance terms clamp at 0 per invoice while `collected` does not;
+ *   - a collection dated before its own invoice, which recordArCollection
+ *     rejects (see useReceivablesData's tooEarlyFor check);
+ *   - a collection carrying no date at all, which is counted nowhere here and
+ *     so leaves `ending` permanently above the true live balance. The 72
+ *     pre-event-tracking docs in that state were backfilled to their invoice
+ *     date; every collection written since records a date (RecordCollectionModal
+ *     defaults it to today and gates submit on it).
+ */
+export function arRollForward<T extends ArRollForwardDoc>(
+  docs: T[],
+  startDate: string,
+  endDate: string,
+): ArRollForwardRow[] {
+  const rows = new Map<string, ArRollForwardRow>();
+  for (const t of docs) {
+    const arTotal = paymentSplit(t).ar;
+    if (arTotal <= EPSILON || !t.date) continue;
+
+    const events = arCollectionEvents(t).filter((e) => !e.voided && !!e.date);
+    const sumWhere = (pred: (d: string) => boolean) =>
+      events.reduce((sum, e) => sum + (pred(e.date as string) ? (e.amount || 0) : 0), 0);
+
+    const beginning = t.date < startDate
+      ? Math.max(0, round2(arTotal - sumWhere((d) => d < startDate)))
+      : 0;
+    const added = t.date >= startDate && t.date <= endDate ? arTotal : 0;
+    const collected = sumWhere((d) => d >= startDate && d <= endDate);
+    const ending = t.date <= endDate
+      ? Math.max(0, round2(arTotal - sumWhere((d) => d <= endDate)))
+      : 0;
+
+    const key = customerKey(t.customerName || "Unknown");
+    const row = rows.get(key)
+      || { key, name: t.customerName || "Unknown", beginning: 0, added: 0, collected: 0, ending: 0 };
+    row.beginning += beginning;
+    row.added += added;
+    row.collected += collected;
+    row.ending += ending;
+    rows.set(key, row);
+  }
+  return Array.from(rows.values())
+    .map((r) => ({
+      ...r,
+      beginning: round2(r.beginning), added: round2(r.added),
+      collected: round2(r.collected), ending: round2(r.ending),
+    }))
+    // An all-zero row is noise on a screen meant for chasing balances.
+    .filter((r) => r.beginning > EPSILON || r.added > EPSILON
+      || r.collected > EPSILON || r.ending > EPSILON)
+    .sort((a, b) => b.ending - a.ending || b.added - a.added);
 }
 
 export function collectionsOnDate<T extends ArStatusLike>(

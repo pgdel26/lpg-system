@@ -1,0 +1,175 @@
+/* Follows ReceivablesPage.module.css's card/table conventions so the two
+   subtabs read as one screen. */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.controlLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.monthSelect {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.controlHint {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+/* The operators between cards are what make the row read as an equation rather
+   than four independent stats — without them the numbers invite being summed. */
+.summaryRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.summaryCard {
+  flex: 1;
+  min-width: 130px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.summaryCardTotal {
+  border-color: var(--accent-red);
+}
+
+.summaryOp {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.summaryLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.summaryValue {
+  font-size: 17px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.tableCard {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.tableHeader,
+.row,
+.totalRow {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 9px 14px;
+}
+
+.tableHeader {
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.row {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+}
+
+.totalRow {
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+  font-size: 12px;
+}
+
+.totalLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.customerCell {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.numCell {
+  text-align: right;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.valueOrange {
+  color: var(--accent-orange);
+}
+
+.valueGreen {
+  color: var(--accent-green);
+}
+
+.valueRed {
+  color: var(--accent-red);
+}
+
+.valueDim {
+  color: var(--text-dim);
+}
+
+.empty {
+  padding: 32px;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .summaryOp {
+    display: none;
+  }
+}

@@ -6,6 +6,7 @@ import { EditIcon, TrashIcon, PlusIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import RecordCollectionModal from "../components/RecordCollectionModal";
 import TopDebtorsChart from "./TopDebtorsChart";
+import ArSummaryTab from "./receivables/ArSummaryTab";
 import type { SaleTransaction, Branch } from "../lib/types";
 import type { RecordArCollectionInput } from "../lib/hooks/useReceivablesData";
 import styles from "./ReceivablesPage.module.css";
@@ -39,7 +40,13 @@ interface ReceivablesPageProps {
   onDeleteSale: (saleId: string) => Promise<void>;
 }
 
+const subTabs = [
+  { key: "summary", label: "Summary" },
+  { key: "transactions", label: "Transactions" },
+];
+
 export default function ReceivablesPage({ arTransactions, branches, onRecordCollection, onVoidCollection, onUpdateSale, onDeleteSale }: ReceivablesPageProps) {
+  const [subTab, setSubTab] = useState("summary");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("outstanding"); // "all", "outstanding", "pending", "partial", "collected"
@@ -158,6 +165,23 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
 
   return (
     <div className="animate-fade">
+      <div className={styles.subTabs}>
+        {subTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSubTab(t.key)}
+            className={`${styles.subTab} ${subTab === t.key ? styles.subTabActive : ""}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.subTabCard}>
+      {subTab === "summary" && <ArSummaryTab arTransactions={arTransactions} />}
+
+      {subTab === "transactions" && (
+      <>
       {/* Summary */}
       <div className={styles.summaryCard}>
         <div className={styles.summaryLabel}>Total Pending (All Outlets)</div>
@@ -376,7 +400,13 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
 
         <TopDebtorsChart arTransactions={arTransactions} />
       </div>
+      </>
+      )}
+      </div>
 
+      {/* Modals live outside the subtab switch: they are driven by state the
+          Transactions tab sets, but unmounting them mid-flow on a tab change
+          would drop a half-completed confirmation. */}
       {recordModalOpen && (
         <RecordCollectionModal
           arTransactions={arTransactions}
