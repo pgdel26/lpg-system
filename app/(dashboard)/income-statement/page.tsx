@@ -28,6 +28,7 @@ export default function IncomeStatementRoutePage() {
       swaps={data?.swaps || []}
       refunds={data?.refunds || []}
       purchases={data?.purchases || []}
+      purchaseDailyCosts={data?.purchaseDailyCosts || []}
       expenses={data?.expenses || []}
       branches={branches}
       arTransactions={arTransactions}

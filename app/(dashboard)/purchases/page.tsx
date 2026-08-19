@@ -22,10 +22,11 @@ export default function PurchasesRoutePage() {
 
   // ---- Record-mutation wrapper ----
   const handleRecordPurchase = async (
-    items: Array<{ section: string; product: string; qty: string | number; price: string | number }>,
+    items: Array<{ section: string; product: string; qty: string | number }>,
+    totalCost: string,
   ) => {
     setPurchaseModalError("");
-    const err = await data.recordPurchase({ items, date: purchaseModalDate });
+    const err = await data.recordPurchase({ items, totalCost, date: purchaseModalDate });
     if (err) {
       setPurchaseModalError(err);
       return;
@@ -37,6 +38,7 @@ export default function PurchasesRoutePage() {
     <>
       <PurchasesPage
         purchaseTransactions={data.purchaseTransactions}
+        purchaseDailyCosts={data.purchaseDailyCosts}
         branches={data.branches}
         hasMorePurchases={data.hasMorePurchases}
         loadingMorePurchases={data.loadingMorePurchases}

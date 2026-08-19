@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { fmt, today, presetThisMonth, presetLastMonth, formatDateShort } from "../lib/utils";
 import { PlusIcon, EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
-import type { Purchase, Branch } from "../lib/types";
+import { purchaseCost } from "../lib/reports/purchaseCost";
+import type { Purchase, Branch, PurchaseDailyCost } from "../lib/types";
 import styles from "./PurchasesPage.module.css";
 
 interface EditData {
@@ -22,8 +23,10 @@ interface DisplayRow {
   transferLabel?: string;
   isTransfer: boolean;
   quantity: number;
-  unitCost: number;
-  totalCost: number;
+  /** Undefined when the delivery was costed as a day total rather than per line
+   *  — rendered as "—", never as 0, which would read as free stock. */
+  unitCost?: number;
+  totalCost?: number;
   /** Present for real purchases (and the legacy-fallback transfer case) — drives Edit/Delete. */
   purchase?: Purchase;
   /** Present for a properly-paired transfer — Delete removes both docs via this. */
@@ -42,6 +45,7 @@ const subTabs = [
 
 interface PurchasesPageProps {
   purchaseTransactions: Purchase[];
+  purchaseDailyCosts: PurchaseDailyCost[];
   branches: Branch[];
   hasMorePurchases: boolean;
   loadingMorePurchases: boolean;
@@ -57,7 +61,7 @@ interface PurchasesPageProps {
 }
 
 export default function PurchasesPage({
-  purchaseTransactions,
+  purchaseTransactions, purchaseDailyCosts,
   branches,
   hasMorePurchases,
   loadingMorePurchases,
@@ -131,7 +135,15 @@ export default function PurchasesPage({
 
   // Real purchases only — transfers move existing stock, they don't add to
   // how much was actually bought/spent.
-  const totalCost = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.totalCost || 0), 0);
+  // purchaseCost() rather than a local sum, so this footer can never disagree
+  // with the Income Statement: a day costed as a day total contributes its
+  // purchaseDailyCost doc, and older per-line days contribute their line costs.
+  // The day docs are narrowed to the dates actually on screen.
+  const visibleDates = new Set(filtered.map((t) => t.date));
+  const totalCost = purchaseCost(
+    filtered,
+    purchaseDailyCosts.filter((d) => visibleDates.has(d.date)),
+  ).total;
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
   // A range query is always complete, so "Total" is accurate there. With no
   // filter, purchaseTransactions is just the paginated recent window — flag
@@ -161,7 +173,7 @@ export default function PurchasesPage({
           product: t.product,
           isTransfer: false,
           quantity: t.quantity,
-          unitCost: t.unitCost || 0,
+          unitCost: t.unitCost,
           totalCost: t.totalCost || 0,
           purchase: t,
         });
@@ -438,8 +450,8 @@ export default function PurchasesPage({
                     <td className={styles.dateCell}>{formatDateShort(row.date)}</td>
                     <td className={styles.productName}>{row.product}</td>
                     <td className={styles.qtyCell}>{row.quantity}</td>
-                    <td className={styles.unitCostCell}>{fmt(row.unitCost || 0)}</td>
-                    <td className={styles.totalCostCell}>{fmt(row.totalCost || 0)}</td>
+                    <td className={styles.unitCostCell}>{row.unitCost == null ? "—" : fmt(row.unitCost)}</td>
+                    <td className={styles.totalCostCell}>{row.totalCost == null ? "—" : fmt(row.totalCost)}</td>
                     <td>
                       <div className={styles.actionsCell}>
                         <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">

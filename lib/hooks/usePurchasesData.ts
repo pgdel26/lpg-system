@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import {
+  setDoc,
   collection, onSnapshot, query, where, orderBy, limit, getDocs,
   addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch,
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { buildPurchaseSections, DEFAULT_BRANCH_ID } from "../constants";
-import type { Purchase, BranchId } from "../types";
+import type { Purchase, BranchId, PurchaseDailyCost } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
@@ -28,9 +29,11 @@ export interface RecordPurchaseInput {
     product: string;
     /** Quantity as a string (from input) or number. */
     qty: string | number;
-    /** Unit cost as a string (from input) or number. */
-    price: string | number;
   }>;
+  /** Amount payable for the whole day's delivery. The supplier does not itemize
+   *  at purchase time, so this is the only cost figure the operator has. Stored
+   *  once in purchaseDailyCost, never split across the lines. */
+  totalCost: string | number;
   /** The date selected in the purchase modal (YYYY-MM-DD). */
   date: string;
 }
@@ -130,6 +133,10 @@ export interface UsePurchasesData {
    *   • each item qty must be > 0
    *   • each item unitCost must be >= 0
    */
+  /** Every purchaseDailyCost doc. Low volume (one per purchase day), and the
+   *  Income Statement needs arbitrary historical ranges, so this is unbounded
+   *  rather than date-scoped. */
+  purchaseDailyCosts: PurchaseDailyCost[];
   recordPurchase: (input: RecordPurchaseInput) => Promise<string | null>;
   /**
    * Moves stock between two outlets by writing a matched pair of purchase
@@ -213,6 +220,21 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
   // ---- FIREBASE: date+branch-scoped listener (feeds resolvedInventory) ----
   // Always complete for the viewed date, regardless of how much of the
   // paginated purchaseTransactions list above has been loaded.
+  const [purchaseDailyCosts, setPurchaseDailyCosts] = useState<PurchaseDailyCost[]>([]);
+
+  // ---- FIREBASE: per-day purchase cost listener ----
+  // Unbounded on purpose: one doc per purchase day (a few hundred at most), and
+  // the Income Statement reports arbitrary historical ranges, so a date-scoped
+  // listener would make it silently under-report older periods.
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "purchaseDailyCost"), (snapshot) => {
+      const list: PurchaseDailyCost[] = [];
+      snapshot.forEach((d) => list.push(d.data() as PurchaseDailyCost));
+      setPurchaseDailyCosts(list);
+    });
+    return () => unsub();
+  }, []);
+
   const [datePurchaseTransactions, setDatePurchaseTransactions] = useState<Purchase[]>([]);
   // True once the CURRENT scope's first snapshot has arrived. AppDataProvider's
   // debounced auto-save effect should skip saving while this is false, so a
@@ -259,10 +281,16 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
 
     for (const item of items) {
       const qty = parseInt(String(item.qty)) || 0;
-      const unitCost = parseFloat(String(item.price)) || 0;
       if (qty <= 0) return "Each item must have a quantity of at least 1.";
-      if (unitCost < 0) return "Each item must have a valid purchase price.";
     }
+    const dayTotal = parseFloat(String(input.totalCost));
+    // Empty is rejected but 0 is allowed: a delivery genuinely billed at zero
+    // (a supplier replacement, say) is a real thing, and silently treating a
+    // blank as 0 is how a month ends up uncosted without anyone noticing.
+    if (String(input.totalCost).trim() === "" || Number.isNaN(dayTotal)) {
+      return "Enter the total cost for this delivery.";
+    }
+    if (dayTotal < 0) return "Total cost can't be negative.";
 
     try {
       const now = Timestamp.now();
@@ -271,15 +299,15 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
       for (const item of items) {
         const sec = purchaseSections.find((s) => s.key === item.section);
         const qty = parseInt(String(item.qty)) || 1;
-        const unitCost = parseFloat(String(item.price)) || 0;
 
         await addDoc(collection(db, "purchases"), {
           purchaseSection: item.section,
           product: item.product,
           productCategory: sec?.productCategory || "cylinder",
           quantity: qty,
-          unitCost,
-          totalCost: qty * unitCost,
+          // No unitCost/totalCost: cost is not known per product at purchase
+          // time. lib/reports/purchaseCost.ts reads purchaseDailyCost for this
+          // day instead. Writing 0 here would look like free stock.
           date,
           // Purchases aren't outlet-scoped (one shared screen/collection), but
           // every doc still gets a default branch stamp for schema consistency
@@ -289,6 +317,17 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
         });
         totalItems += qty;
       }
+
+      // The day's amount payable, keyed `{date}_{branch}` like dailyInventory and
+      // dailyReport. setDoc (not addDoc) so a second delivery recorded on the
+      // same date updates the day's figure rather than creating a rival doc that
+      // purchaseCost() would have to choose between. That means the operator
+      // types the running total for the day, not each delivery in isolation.
+      await setDoc(
+        doc(db, "purchaseDailyCost", `${date}_${DEFAULT_BRANCH_ID}`),
+        { date, branch: DEFAULT_BRANCH_ID, totalCost: dayTotal, updatedAt: now },
+        { merge: true },
+      );
 
       onToast({
         type: "success",
@@ -421,6 +460,7 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
     loadMorePurchases,
     fetchPurchasesInRange,
     purchasesVersion,
+    purchaseDailyCosts,
     recordPurchase,
     recordTransfer,
     updatePurchase,

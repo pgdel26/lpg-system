@@ -3,7 +3,8 @@ import { titleCaseCategory } from "../utils";
 import { customerKey } from "../customers";
 import { paymentSplit } from "../payments";
 import { collectionEventsInRange } from "../receivables";
-import type { SaleTransaction, Swap, Refund, Purchase, Expense } from "../types";
+import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDailyCost } from "../types";
+import { purchaseCost } from "./purchaseCost";
 
 export interface IncomeStatementLine {
   label: string;
@@ -16,6 +17,9 @@ export interface IncomeStatementInput {
   swaps?: Swap[];
   refunds?: Refund[];
   purchases?: Purchase[];
+  /** purchaseDailyCost docs. Cost is recorded per day now, not per line — see
+   *  lib/reports/purchaseCost.ts for the rule that spans both eras. */
+  purchaseDailyCosts?: PurchaseDailyCost[];
   expenses?: Expense[];
   /**
    * The UNBOUNDED, live AR doc list (e.g. useReceivablesData's
@@ -221,6 +225,7 @@ export function computeIncomeStatement({
   swaps = [],
   refunds = [],
   purchases = [],
+  purchaseDailyCosts = [],
   expenses = [],
   arTransactions = [],
   startDate,
@@ -257,12 +262,36 @@ export function computeIncomeStatement({
   const realPurchases = purchases.filter((p) => !p.isTransfer);
   const transferPurchases = purchases.filter((p) => p.isTransfer);
 
-  const costLines = groupByLine(
-    realPurchases,
-    (p) => p.purchaseSection,
-    (p) => p.totalCost || 0,
-  );
-  const totalCostOfPurchases = costLines.reduce((sum, l) => sum + l.amount, 0);
+  // Cost now comes from purchaseCost(), which prefers a day's purchaseDailyCost
+  // doc and falls back to that day's per-line costs. Narrow the day docs to this
+  // report's period/branch first — `purchases` arrives already narrowed by the
+  // caller, and mixing a scoped list with an unscoped one would over-count.
+  const scopedDailyCosts = (purchaseDailyCosts || []).filter((d) => {
+    if (startDate && d.date < startDate) return false;
+    if (endDate && d.date > endDate) return false;
+    if (branch !== undefined && d.branch !== branch) return false;
+    return true;
+  });
+  const costBreakdown = purchaseCost(realPurchases, scopedDailyCosts);
+  const totalCostOfPurchases = costBreakdown.total;
+
+  // Per-category cost only exists for days that still carry per-line costs.
+  // Days costed as a day total contribute a single undifferentiated line —
+  // the supplier does not itemize, so inventing a split would be fiction.
+  const costLines: IncomeStatementLine[] = [
+    ...groupByLine(
+      realPurchases.filter((p) => !scopedDailyCosts.some((d) => d.date === p.date && d.branch === p.branch)),
+      (p) => p.purchaseSection,
+      (p) => p.totalCost || 0,
+    ),
+    ...(costBreakdown.fromDailyTotals > 0
+      ? [{
+          label: "Purchases",
+          amount: costBreakdown.fromDailyTotals,
+          count: costBreakdown.dailyTotalDays,
+        }]
+      : []),
+  ];
 
   const transferInQty = transferPurchases
     .filter((p) => (p.quantity || 0) > 0)

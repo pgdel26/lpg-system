@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
-import { fmt } from "../lib/utils";
 import styles from "./PurchaseModal.module.css";
 import type { RecordPurchaseInput } from "../lib/hooks/usePurchasesData";
 
@@ -24,7 +23,7 @@ interface PurchaseModalProps {
   error: string;
   purchaseSections: PurchaseSection[];
   onClose: () => void;
-  onSubmit: (items: PurchaseItem[]) => void;
+  onSubmit: (items: PurchaseItem[], totalCost: string) => void;
 }
 
 export default function PurchaseModal({
@@ -43,8 +42,11 @@ export default function PurchaseModal({
   const defaultProduct = getProductsForSection(defaultSection)[0] || "";
 
   const [items, setItems] = useState<PurchaseItem[]>([
-    { section: defaultSection, product: defaultProduct, qty: "1", price: "" },
+    { section: defaultSection, product: defaultProduct, qty: "1" },
   ]);
+  // One figure for the whole delivery. The supplier bills a total and only
+  // itemizes a month later (if ever), so a per-line price would be invented.
+  const [totalCost, setTotalCost] = useState("");
 
   const updateItem = (index: number, field: string, value: string | number) => {
     setItems((prev) => {
@@ -61,7 +63,7 @@ export default function PurchaseModal({
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { section: defaultSection, product: defaultProduct, qty: "1", price: "" },
+      { section: defaultSection, product: defaultProduct, qty: "1" },
     ]);
   };
 
@@ -69,16 +71,10 @@ export default function PurchaseModal({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const getLineTotal = (item: PurchaseItem): number => {
-    const qty = parseInt(String(item.qty)) || 0;
-    const price = parseFloat(String(item.price)) || 0;
-    return qty * price;
-  };
-
-  const grandTotal = items.reduce((sum, item) => sum + getLineTotal(item), 0);
+  const totalItems = items.reduce((sum, i) => sum + (parseInt(String(i.qty)) || 0), 0);
 
   const handleSubmit = () => {
-    onSubmit(items);
+    onSubmit(items, totalCost);
   };
 
   return (
@@ -111,7 +107,6 @@ export default function PurchaseModal({
 
           {items.map((item, idx) => {
             const products = getProductsForSection(String(item.section));
-            const lineTotal = getLineTotal(item);
 
             return (
               <div key={idx} className={styles.itemCard}>
@@ -142,7 +137,7 @@ export default function PurchaseModal({
                   )}
                 </div>
 
-                {/* Row 2: Qty + Price + Line total */}
+                {/* Row 2: Qty only — cost is entered once for the whole delivery */}
                 <div className={styles.itemRow2}>
                   <div className={styles.qtyGroup}>
                     <span className={styles.dimLabel}>Qty</span>
@@ -164,24 +159,6 @@ export default function PurchaseModal({
                       className={styles.stepButton}
                     >+</button>
                   </div>
-                  <span className={styles.multiplySign}>×</span>
-                  <div className={styles.priceGroup}>
-                    <span className={styles.dimLabel}>₱</span>
-                    <input
-                      type="number"
-                      value={String(item.price)}
-                      onChange={(e) => updateItem(idx, "price", e.target.value)}
-                      placeholder="0"
-                      className={styles.priceInput}
-                    />
-                  </div>
-                  {/* lineTotal color is runtime-dynamic */}
-                  <span
-                    className={styles.lineTotal}
-                    style={{ color: lineTotal > 0 ? "var(--accent-gold)" : "var(--text-dim)" }}
-                  >
-                    {lineTotal > 0 ? fmt(lineTotal) : "—"}
-                  </span>
                 </div>
               </div>
             );
@@ -192,16 +169,26 @@ export default function PurchaseModal({
           </button>
         </div>
 
-        {/* Total Cost */}
+        {/* Total Cost — typed, not computed. This is the amount payable for the
+            whole day's delivery; per-product cost is unknown at this point. */}
         <div className={styles.totalCard}>
-          <span className={styles.totalLabel}>Total Cost</span>
-          {/* grandTotal color is runtime-dynamic */}
-          <span
-            className={styles.totalValue}
-            style={{ color: grandTotal > 0 ? "var(--accent-blue)" : "var(--text-dim)" }}
-          >
-            {fmt(grandTotal)}
-          </span>
+          <label className={styles.totalLabel} htmlFor="purchase-total">
+            Total Cost for this delivery *
+          </label>
+          <input
+            id="purchase-total"
+            type="number"
+            min="0"
+            step="0.01"
+            value={totalCost}
+            onChange={(e) => setTotalCost(e.target.value)}
+            placeholder="0.00"
+            className={styles.totalInput}
+          />
+        </div>
+        <div className={styles.totalHint}>
+          {totalItems} item{totalItems !== 1 ? "s" : ""} across {items.length} line{items.length !== 1 ? "s" : ""}.
+          Quantities are recorded per product; the cost is recorded for the day as a whole.
         </div>
 
         {error && <div className={styles.error}>{error}</div>}

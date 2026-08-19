@@ -234,6 +234,33 @@
   font-family: var(--font-mono);
 }
 
+/* The total is now typed, not computed, so it needs an input styled to sit in
+   the same card the computed figure used to occupy. */
+.totalInput {
+  width: 140px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-align: right;
+  outline: none;
+}
+
+.totalInput:focus {
+  border-color: var(--accent-blue);
+}
+
+.totalHint {
+  margin: -8px 0 14px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
 .error {
   padding: 8px 12px;
   border-radius: 8px;
