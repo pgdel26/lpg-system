@@ -376,6 +376,12 @@
 .deliveryHeaderRow {
   background: rgba(37, 99, 235, 0.05);
   border-top: 1px solid rgba(37, 99, 235, 0.18);
+  /* The whole row toggles its products, so it has to look like it does. */
+  cursor: pointer;
+}
+
+.deliveryHeaderRow:hover {
+  background: rgba(37, 99, 235, 0.1);
 }
 
 .deliveryHeaderDate {
@@ -479,4 +485,12 @@
   font-family: inherit;
   text-align: right;
   white-space: normal;
+}
+
+.deliveryCaret {
+  display: inline-block;
+  width: 12px;
+  margin-right: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
 }

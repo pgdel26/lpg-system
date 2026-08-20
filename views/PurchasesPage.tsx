@@ -110,6 +110,11 @@ export default function PurchasesPage({
   /** Whether the line being edited belongs to a delivery — if so, Save must send
    *  quantity only and leave the historical cost figures untouched. */
   const [editingLinked, setEditingLinked] = useState(false);
+  /** Which deliveries are showing their product lines. Collapsed is the default:
+   *  a delivery's header already carries the figures that matter (date, item and
+   *  product counts, cost), and 90 deliveries expanded at once is 570 rows of
+   *  quantities nobody scrolled here to read. */
+  const [expandedDeliveries, setExpandedDeliveries] = useState<Set<string>>(new Set());
   // Delivery cost editing is separate state from the line editor: they live on
   // different rows, edit different documents, and must never be open at once.
   const [editingDeliveryId, setEditingDeliveryId] = useState<string | null>(null);
@@ -354,7 +359,40 @@ export default function PurchasesPage({
     return [...items].sort((a, b) => dir * itemDate(a).localeCompare(itemDate(b)));
   }, [subTab, purchaseRows, transferRows, sortDir, visibleDeliveries]);
 
+  // Delivery ids currently on screen — what Expand/Collapse all acts on, so the
+  // control never claims to affect deliveries outside the active filter.
+  const deliveryIdsInView = useMemo(
+    () => activeRows.flatMap((i) => (i.kind === "deliveryHeader" ? [i.deliveryId] : [])),
+    [activeRows],
+  );
+  const allExpanded = deliveryIdsInView.length > 0
+    && deliveryIdsInView.every((id) => expandedDeliveries.has(id));
+
+  const toggleAllDeliveries = () => {
+    setExpandedDeliveries(allExpanded ? new Set() : new Set(deliveryIdsInView));
+  };
+
+  // A collapsed delivery's product lines are dropped from the rendered list
+  // rather than hidden with CSS, so a 90-delivery view mounts 90 rows and not
+  // 660. Headers always survive: collapsing must never hide that money exists.
+  const visibleItems = useMemo(
+    () => activeRows.filter((i) =>
+      i.kind === "deliveryHeader"
+      || !i.row.deliveryId
+      || expandedDeliveries.has(i.row.deliveryId)),
+    [activeRows, expandedDeliveries],
+  );
+
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+
+  const toggleDelivery = (deliveryId: string) => {
+    setExpandedDeliveries((prev) => {
+      const next = new Set(prev);
+      if (next.has(deliveryId)) next.delete(deliveryId);
+      else next.add(deliveryId);
+      return next;
+    });
+  };
 
   const startDeliveryEdit = (deliveryId: string, currentCost?: number, pending?: boolean) => {
     setEditingId(null);
@@ -488,6 +526,11 @@ export default function PurchasesPage({
               Clear
             </button>
           )}
+          {subTab === "purchases" && deliveryIdsInView.length > 0 && (
+            <button onClick={toggleAllDeliveries} className={styles.presetButton}>
+              {allExpanded ? "Collapse all" : "Expand all"}
+            </button>
+          )}
           {subTab === "purchases" && (
             <button
               onClick={onOpenPurchaseModal}
@@ -551,14 +594,25 @@ export default function PurchasesPage({
             </tr>
           </thead>
           <tbody>
-            {activeRows.length > 0 ? (
-              activeRows.map((item) => (
+            {visibleItems.length > 0 ? (
+              visibleItems.map((item) => (
                 /* A delivery header spans the table and carries the one cost
                    figure for that delivery; its product rows below show quantity
                    only, so the cost can never read as a per-product price. */
                 item.kind === "deliveryHeader" ? (
-                  <tr key={item.key} className={styles.deliveryHeaderRow}>
-                    <td className={styles.deliveryHeaderDate}>{formatDateShort(item.date)}</td>
+                  <tr
+                    key={item.key}
+                    className={styles.deliveryHeaderRow}
+                    onClick={() => toggleDelivery(item.deliveryId)}
+                    aria-expanded={expandedDeliveries.has(item.deliveryId)}
+                    title={expandedDeliveries.has(item.deliveryId) ? "Hide products" : "Show products"}
+                  >
+                    <td className={styles.deliveryHeaderDate}>
+                      <span className={styles.deliveryCaret} aria-hidden="true">
+                        {expandedDeliveries.has(item.deliveryId) ? "▾" : "▸"}
+                      </span>
+                      {formatDateShort(item.date)}
+                    </td>
                     <td colSpan={2} className={styles.deliveryHeaderLabel}>
                       Delivery
                       <span className={styles.deliveryHeaderMeta}>
@@ -571,7 +625,10 @@ export default function PurchasesPage({
                         (placeholder 0 — must never render as ₱0.00, and carries
                         the action that resolves it), and a doc that simply isn't
                         loaded (nothing to edit — no id to write to). */}
-                    <td className={styles.deliveryHeaderCost}>
+                    <td
+                      className={styles.deliveryHeaderCost}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {editingDeliveryId === item.deliveryId ? (
                         <>
                           <input
@@ -612,7 +669,7 @@ export default function PurchasesPage({
                         </button>
                       )}
                     </td>
-                    <td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       {editingDeliveryId === item.deliveryId && (
                         <div className={styles.actionsCell}>
                           <button
