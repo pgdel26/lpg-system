@@ -182,7 +182,9 @@ export interface UsePurchasesData {
   fetchDeliveryLines: (deliveryId: string) => Promise<DeliveryLine[]>;
   /**
    * Applies a delivery's whole intended end state: its cost, its date, and its
-   * product quantities. Diffs against what is stored — quantities that changed
+   * product quantities. A blank cost leaves the stored cost alone (and a pending
+   * delivery still pending), so fixing a quantity never requires inventing a
+   * figure. Diffs against what is stored — quantities that changed
    * are updated, products that gained a quantity are created, products whose
    * quantity is gone are deleted — so untouched lines keep their own docs and
    * `createdAt`.
@@ -488,15 +490,19 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
     const { deliveryId, items, date } = input;
 
     if (!date) return "Please select a date.";
-    for (const item of items) {
-      const qty = parseInt(String(item.qty)) || 0;
-      if (qty <= 0) return "Each item must have a quantity of at least 1.";
+
+    // Blank cost means "leave the cost as it is" — NOT an error, unlike
+    // recordPurchase where a blank would silently create an uncosted delivery.
+    // Here the delivery already has whatever cost it has, and someone editing a
+    // quantity on one of the uncosted deliveries must not be forced to invent a
+    // figure to get past the form. A pending delivery therefore stays pending.
+    const rawCost = String(input.totalCost).trim();
+    const costGiven = rawCost !== "";
+    const deliveryTotal = costGiven ? parseFloat(rawCost) : 0;
+    if (costGiven && Number.isNaN(deliveryTotal)) {
+      return "Total cost must be a number, or blank to leave it unchanged.";
     }
-    const deliveryTotal = parseFloat(String(input.totalCost));
-    if (String(input.totalCost).trim() === "" || Number.isNaN(deliveryTotal)) {
-      return "Enter the total cost for this delivery.";
-    }
-    if (deliveryTotal < 0) return "Total cost can't be negative.";
+    if (costGiven && deliveryTotal < 0) return "Total cost can't be negative.";
 
     try {
       // Read the stored lines here rather than accepting them from the caller —
@@ -559,11 +565,11 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
       }
       for (const id of duplicates) batch.delete(doc(db, "purchases", id));
 
-      batch.update(doc(db, "purchaseDelivery", deliveryId), {
-        date,
-        totalCost: deliveryTotal,
-        costPending: deleteField(),
-      });
+      // The date always applies; the cost only when one was actually given, so a
+      // blank leaves both totalCost and costPending exactly as they were.
+      batch.update(doc(db, "purchaseDelivery", deliveryId), costGiven
+        ? { date, totalCost: deliveryTotal, costPending: deleteField() }
+        : { date });
 
       // One batch for the delivery and all its lines: a partial apply could leave
       // the cost on one date and the stock on another.

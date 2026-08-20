@@ -118,7 +118,9 @@ export default function PurchaseModal({
             delivery; the supplier does not itemize it at purchase time. */}
         <div className={styles.totalCard}>
           <label className={styles.totalLabel} htmlFor="purchase-total">
-            Total Cost for this delivery *
+            {editing
+              ? "Total Cost for this delivery"
+              : "Total Cost for this delivery *"}
           </label>
           <input
             id="purchase-total"
@@ -169,7 +171,7 @@ export default function PurchaseModal({
         <div className={styles.totalHint}>
           {totalItems} item{totalItems !== 1 ? "s" : ""} across {items.length} product{items.length !== 1 ? "s" : ""}.
           Quantities are recorded per product; the cost is recorded for the delivery as a whole.
-          {editing && " Clearing a quantity removes that product from this delivery; the delivery and its cost remain."}
+          {editing && " Clearing a quantity removes that product from this delivery; the delivery and its cost remain. Leave the cost blank to keep it unchanged."}
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
