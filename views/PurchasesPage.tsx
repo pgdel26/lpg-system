@@ -27,10 +27,11 @@ interface DisplayRow {
    *  delivery — rendered as "—", never 0, which would read as free stock. */
   unitCost?: number;
   totalCost?: number;
-  /** The figure actually shown in the cost column: this line's delivery total on
-   *  the delivery's FIRST line, its own legacy totalCost for pre-delivery docs,
-   *  and undefined on a delivery's subsequent lines so the total is not repeated
-   *  (and cannot be mistaken for a per-product amount, or summed by eye). */
+  /** A legacy per-line cost to show in the cost column, for the pre-delivery docs
+   *  that carried one. Undefined for anything on a delivery — and the cell then
+   *  renders EMPTY, not "—": a placeholder in a cost column implies a line could
+   *  have a cost, and under the delivery model it cannot. The backfill left no
+   *  such lines behind, so this is now only a path for restored-from-backup docs. */
   deliveryCost?: number;
   /** Which purchaseDelivery this line belongs to; absent for pre-delivery docs. */
   deliveryId?: string;
@@ -47,6 +48,8 @@ type DisplayItem =
   | {
       kind: "deliveryHeader";
       key: string;
+      /** The purchaseDelivery doc id — what the cost editor writes to. */
+      deliveryId: string;
       date: string;
       totalCost?: number;
       /** No cost entered for this delivery yet — the header says so instead of
@@ -79,7 +82,8 @@ interface PurchasesPageProps {
   /** Bumped by the hook after any mutation — refetches the active range query so it doesn't go stale after an edit/delete. */
   purchasesVersion: number;
   onOpenPurchaseModal: () => void;
-  onUpdatePurchase: (purchaseId: string, data: { quantity: number; unitCost: number; totalCost: number }) => Promise<void>;
+  onUpdatePurchase: (purchaseId: string, data: { quantity: number; unitCost?: number; totalCost?: number }) => Promise<void>;
+  onUpdateDeliveryCost: (deliveryId: string, totalCost: string) => Promise<string | null>;
   onDeletePurchase: (purchaseId: string) => Promise<void>;
   onDeleteTransfer: (transferGroupId: string) => Promise<void>;
 }
@@ -94,6 +98,7 @@ export default function PurchasesPage({
   purchasesVersion,
   onOpenPurchaseModal,
   onUpdatePurchase,
+  onUpdateDeliveryCost,
   onDeletePurchase,
   onDeleteTransfer,
 }: PurchasesPageProps) {
@@ -102,6 +107,15 @@ export default function PurchasesPage({
   const [filterTo, setFilterTo] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData>({ quantity: 0, unitCost: 0, totalCost: 0 });
+  /** Whether the line being edited belongs to a delivery — if so, Save must send
+   *  quantity only and leave the historical cost figures untouched. */
+  const [editingLinked, setEditingLinked] = useState(false);
+  // Delivery cost editing is separate state from the line editor: they live on
+  // different rows, edit different documents, and must never be open at once.
+  const [editingDeliveryId, setEditingDeliveryId] = useState<string | null>(null);
+  const [deliveryCostInput, setDeliveryCostInput] = useState("");
+  const [deliveryCostError, setDeliveryCostError] = useState("");
+  const [savingDeliveryCost, setSavingDeliveryCost] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const isRangeActive = !!(filterFrom || filterTo);
@@ -303,6 +317,7 @@ export default function PurchasesPage({
       items.push({
         kind: "deliveryHeader",
         key: `d-${deliveryId}`,
+        deliveryId,
         date: byId.get(deliveryId)?.date || fallbackDate,
         // undefined (not 0) when the doc isn't loaded — "—" is honest, a zero
         // would read as a free delivery.
@@ -341,9 +356,40 @@ export default function PurchasesPage({
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
+  const startDeliveryEdit = (deliveryId: string, currentCost?: number, pending?: boolean) => {
+    setEditingId(null);
+    setEditingDeliveryId(deliveryId);
+    // A pending delivery opens blank rather than at "0": prefilling 0 invites
+    // saving it unread, which would assert a zero-billed delivery.
+    setDeliveryCostInput(pending || currentCost == null ? "" : String(currentCost));
+    setDeliveryCostError("");
+  };
+
+  const cancelDeliveryEdit = () => {
+    setEditingDeliveryId(null);
+    setDeliveryCostInput("");
+    setDeliveryCostError("");
+  };
+
+  const saveDeliveryCost = async () => {
+    if (!editingDeliveryId || savingDeliveryCost) return;
+    setSavingDeliveryCost(true);
+    const err = await onUpdateDeliveryCost(editingDeliveryId, deliveryCostInput);
+    setSavingDeliveryCost(false);
+    // Error keeps the editor open with what was typed still in it, so a typo is
+    // corrected rather than re-entered.
+    if (err) {
+      setDeliveryCostError(err);
+      return;
+    }
+    cancelDeliveryEdit();
+  };
+
   const startEdit = (row: DisplayRow) => {
     if (!row.purchase) return;
+    cancelDeliveryEdit();
     setEditingId(row.key);
+    setEditingLinked(!!row.deliveryId);
     setEditData({
       quantity: row.purchase.quantity || 0,
       unitCost: row.purchase.unitCost || 0,
@@ -353,7 +399,12 @@ export default function PurchasesPage({
 
   const saveEdit = () => {
     if (!editingId) return;
-    onUpdatePurchase(editingId, editData);
+    // A delivery line's cost is not the operator's to set from here, and the
+    // recomputed editData.totalCost is derived from a back-computed unit cost —
+    // sending it would overwrite the only record of the original figure.
+    onUpdatePurchase(editingId, editingLinked
+      ? { quantity: editData.quantity }
+      : editData);
     setEditingId(null);
     setEditData({ quantity: 0, unitCost: 0, totalCost: 0 });
   };
@@ -514,16 +565,67 @@ export default function PurchasesPage({
                         {item.itemCount} item{item.itemCount !== 1 ? "s" : ""} · {item.lineCount} product{item.lineCount !== 1 ? "s" : ""}
                       </span>
                     </td>
-                    {/* Three distinct states, and collapsing any two of them
-                        would misreport money: a real total, a delivery nobody
-                        has costed yet (placeholder 0 — must not render as
-                        ₱0.00), and a doc that simply isn't loaded. */}
-                    <td className={`${styles.deliveryHeaderCost} ${item.costPending ? styles.deliveryHeaderCostPending : ""}`}>
-                      {item.costPending
-                        ? "Not yet costed"
-                        : item.totalCost == null ? "—" : fmt(item.totalCost)}
+                    {/* Four states, and collapsing any two would either misreport
+                        money or hide the way to fix it: being edited, a real
+                        total (click to correct), a delivery nobody has costed yet
+                        (placeholder 0 — must never render as ₱0.00, and carries
+                        the action that resolves it), and a doc that simply isn't
+                        loaded (nothing to edit — no id to write to). */}
+                    <td className={styles.deliveryHeaderCost}>
+                      {editingDeliveryId === item.deliveryId ? (
+                        <>
+                          <input
+                            type="number"
+                            step="0.01"
+                            autoFocus
+                            value={deliveryCostInput}
+                            placeholder="0.00"
+                            onChange={(e) => { setDeliveryCostInput(e.target.value); setDeliveryCostError(""); }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveDeliveryCost();
+                              if (e.key === "Escape") cancelDeliveryEdit();
+                            }}
+                            className={styles.deliveryCostInput}
+                          />
+                          {deliveryCostError && (
+                            <div className={styles.deliveryCostError}>{deliveryCostError}</div>
+                          )}
+                        </>
+                      ) : item.costPending ? (
+                        <button
+                          type="button"
+                          onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, true)}
+                          className={styles.addCostButton}
+                        >
+                          + Add cost
+                        </button>
+                      ) : item.totalCost == null ? (
+                        "—"
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, false)}
+                          className={styles.editCostButton}
+                          title="Edit delivery cost"
+                        >
+                          {fmt(item.totalCost)}
+                        </button>
+                      )}
                     </td>
-                    <td />
+                    <td>
+                      {editingDeliveryId === item.deliveryId && (
+                        <div className={styles.actionsCell}>
+                          <button
+                            onClick={saveDeliveryCost}
+                            disabled={savingDeliveryCost}
+                            className={styles.saveButton}
+                          >
+                            {savingDeliveryCost ? "Saving…" : "Save"}
+                          </button>
+                          <button onClick={cancelDeliveryEdit} className={styles.cancelButton}>Cancel</button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ) : (() => {
                 const row = item.row;
@@ -584,8 +686,11 @@ export default function PurchasesPage({
                       {row.product}
                     </td>
                     <td className={styles.qtyCell}>{row.quantity}</td>
+                    {/* Empty, not "—": a placeholder here implies a line could
+                        carry a cost, and under the delivery model it cannot. Only
+                        a legacy pre-delivery doc ever puts a figure in this cell. */}
                     <td className={styles.totalCostCell}>
-                      {row.deliveryCost == null ? "—" : fmt(row.deliveryCost)}
+                      {row.deliveryCost == null ? "" : fmt(row.deliveryCost)}
                     </td>
                     <td>
                       <div className={styles.actionsCell}>

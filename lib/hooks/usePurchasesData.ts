@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   collection, onSnapshot, query, where, orderBy, limit, getDocs,
-  addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch,
+  addDoc, updateDoc, deleteDoc, deleteField, doc, Timestamp, writeBatch,
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../firebase";
@@ -147,10 +147,24 @@ export interface UsePurchasesData {
    * success (caller closes it).
    */
   recordTransfer: (input: RecordTransferInput) => Promise<string | null>;
+  /**
+   * Edits a purchase line. Cost fields are optional and only written when
+   * supplied: a line belonging to a delivery has no cost of its own, so a
+   * quantity edit on one must leave its (inert, historical) cost figures alone
+   * rather than recomputing them from a unit cost nobody was ever billed.
+   */
   updatePurchase: (
     purchaseId: string,
-    data: { quantity: string | number; unitCost: string | number; totalCost: string | number },
+    data: { quantity: string | number; unitCost?: string | number; totalCost?: string | number },
   ) => Promise<void>;
+  /**
+   * Sets what a delivery was billed, and clears `costPending` — the operator
+   * naming a figure is exactly the event that flag was waiting for.
+   *
+   * Control-flow contract mirrors recordPurchase: non-null error string on
+   * validation failure (caller keeps the editor open), null on success.
+   */
+  updateDeliveryCost: (deliveryId: string, totalCost: string | number) => Promise<string | null>;
   deletePurchase: (purchaseId: string) => Promise<void>;
   /** Deletes both docs of a transfer pair together, atomically, by their shared transferGroupId. */
   deleteTransfer: (transferGroupId: string) => Promise<void>;
@@ -404,19 +418,58 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
   // ---- updatePurchase ----
   const updatePurchase = useCallback(async (
     purchaseId: string,
-    data: { quantity: string | number; unitCost: string | number; totalCost: string | number },
+    data: { quantity: string | number; unitCost?: string | number; totalCost?: string | number },
   ): Promise<void> => {
     try {
-      await updateDoc(doc(db, "purchases", purchaseId), {
+      // Absent cost fields are left untouched rather than coerced to 0 — the
+      // caller omits them precisely because this line's cost lives on its
+      // delivery, and writing 0 here would read as free stock if the link were
+      // ever lost.
+      const patch: Record<string, number> = {
         quantity: parseInt(String(data.quantity)) || 0,
-        unitCost: parseFloat(String(data.unitCost)) || 0,
-        totalCost: parseFloat(String(data.totalCost)) || 0,
-      });
+      };
+      if (data.unitCost !== undefined) patch.unitCost = parseFloat(String(data.unitCost)) || 0;
+      if (data.totalCost !== undefined) patch.totalCost = parseFloat(String(data.totalCost)) || 0;
+      await updateDoc(doc(db, "purchases", purchaseId), patch);
       onToast({ type: "success", message: "Purchase updated." });
       setPurchasesVersion((v) => v + 1);
     } catch (error) {
       console.error("Update purchase error:", error);
       onToast({ type: "error", message: "Failed to update purchase." });
+    }
+  }, [onToast]);
+
+  // ---- updateDeliveryCost ----
+  const updateDeliveryCost = useCallback(async (
+    deliveryId: string,
+    totalCost: string | number,
+  ): Promise<string | null> => {
+    // Same rule as recordPurchase: blank is rejected but 0 is accepted. Treating
+    // a blank as 0 is how a delivery ends up looking costed at nothing, which is
+    // the exact confusion costPending exists to prevent — while a genuine
+    // zero-billed delivery (a supplier replacement) must still be recordable.
+    const value = parseFloat(String(totalCost));
+    if (String(totalCost).trim() === "" || Number.isNaN(value)) {
+      return "Enter the total cost for this delivery.";
+    }
+    if (value < 0) return "Total cost can't be negative.";
+
+    try {
+      await updateDoc(doc(db, "purchaseDelivery", deliveryId), {
+        totalCost: value,
+        // deleteField, not `false`: absent is the normal state for a costed
+        // delivery, and every doc carrying costPending:false forever would be
+        // noise. Someone just told us the amount, so it is no longer pending —
+        // including when that amount is 0, which is now an assertion rather
+        // than a placeholder.
+        costPending: deleteField(),
+      });
+      onToast({ type: "success", message: "Delivery cost updated." });
+      setPurchasesVersion((v) => v + 1);
+      return null;
+    } catch (error) {
+      console.error("Update delivery cost error:", error);
+      return "Failed to update delivery cost.";
     }
   }, [onToast]);
 
@@ -460,6 +513,7 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
     recordPurchase,
     recordTransfer,
     updatePurchase,
+    updateDeliveryCost,
     deletePurchase,
     deleteTransfer,
   };

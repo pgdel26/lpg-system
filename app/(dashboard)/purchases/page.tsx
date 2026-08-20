@@ -47,6 +47,7 @@ export default function PurchasesRoutePage() {
         purchasesVersion={data.purchasesVersion}
         onOpenPurchaseModal={handleOpenPurchaseModal}
         onUpdatePurchase={data.updatePurchase}
+        onUpdateDeliveryCost={data.updateDeliveryCost}
         onDeletePurchase={data.deletePurchase}
         onDeleteTransfer={data.deleteTransfer}
       />
