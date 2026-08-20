@@ -733,7 +733,10 @@ export default function PurchasesPage({
                     </td>
                   </tr>
                 ) : subTab === "purchases" ? (
-                  <tr key={row.key}>
+                  <tr
+                    key={row.key}
+                    className={row.deliveryId ? styles.deliveryChildRow : ""}
+                  >
                     {/* A delivery's date is on its header row; repeating it on
                         every child line just adds noise. */}
                     <td className={styles.dateCell}>

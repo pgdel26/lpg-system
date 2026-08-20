@@ -373,15 +373,24 @@
 /* ---- Delivery header row ---- */
 /* Reads as a band above its product lines rather than as another data row, so
    the one cost figure is visibly the delivery's and not a product's. */
+/* The delivery header sits on the card's own white — the tint belongs to its
+   product lines, so the group reads as "heading, then its contents" rather than
+   two competing bands of colour. The top border still marks where one delivery
+   ends and the next begins. */
 .deliveryHeaderRow {
-  background: rgba(37, 99, 235, 0.05);
   border-top: 1px solid rgba(37, 99, 235, 0.18);
   /* The whole row toggles its products, so it has to look like it does. */
   cursor: pointer;
 }
 
 .deliveryHeaderRow:hover {
-  background: rgba(37, 99, 235, 0.1);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+/* Product lines belonging to a delivery are tinted as a block, which is what
+   visually attaches them to the header above them when expanded. */
+.deliveryChildRow {
+  background: rgba(37, 99, 235, 0.05);
 }
 
 .deliveryHeaderDate {
