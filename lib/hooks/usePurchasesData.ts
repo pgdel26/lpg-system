@@ -37,6 +37,20 @@ export interface RecordPurchaseInput {
   date: string;
 }
 
+/** Input for updateDelivery — the edit counterpart of RecordPurchaseInput. Carries
+ *  the delivery's whole intended end state, and the mutation diffs it against
+ *  what is stored rather than trusting the caller to say what changed. */
+export interface UpdateDeliveryInput extends RecordPurchaseInput {
+  deliveryId: string;
+}
+
+/** One existing line of a delivery, in the shape the purchase modal prefills from. */
+export interface DeliveryLine {
+  section: string;
+  product: string;
+  qty: number;
+}
+
 // Input for recordTransfer — moves stock between two outlets.
 export interface RecordTransferInput {
   fromBranch: BranchId;
@@ -158,13 +172,28 @@ export interface UsePurchasesData {
     data: { quantity: string | number; unitCost?: string | number; totalCost?: string | number },
   ) => Promise<void>;
   /**
-   * Sets what a delivery was billed, and clears `costPending` — the operator
-   * naming a figure is exactly the event that flag was waiting for.
+   * The lines currently stored for a delivery, read straight from Firestore.
    *
-   * Control-flow contract mirrors recordPurchase: non-null error string on
-   * validation failure (caller keeps the editor open), null on success.
+   * The purchases table is a paginated window, so the lines it happens to be
+   * showing are NOT necessarily all of them. Prefilling an edit form from the
+   * screen would make the save diff treat never-loaded lines as deleted — hence
+   * this authoritative read.
    */
-  updateDeliveryCost: (deliveryId: string, totalCost: string | number) => Promise<string | null>;
+  fetchDeliveryLines: (deliveryId: string) => Promise<DeliveryLine[]>;
+  /**
+   * Applies a delivery's whole intended end state: its cost, its date, and its
+   * product quantities. Diffs against what is stored — quantities that changed
+   * are updated, products that gained a quantity are created, products whose
+   * quantity is gone are deleted — so untouched lines keep their own docs and
+   * `createdAt`.
+   *
+   * A date change cascades to every line, because inventory's PURCHASES column
+   * is scoped by the LINE's date: moving the delivery alone would show the stock
+   * arriving on one day and its cost on another.
+   *
+   * Control-flow contract mirrors recordPurchase: error string, or null on success.
+   */
+  updateDelivery: (input: UpdateDeliveryInput) => Promise<string | null>;
   deletePurchase: (purchaseId: string) => Promise<void>;
   /** Deletes both docs of a transfer pair together, atomically, by their shared transferGroupId. */
   deleteTransfer: (transferGroupId: string) => Promise<void>;
@@ -439,39 +468,118 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
     }
   }, [onToast]);
 
-  // ---- updateDeliveryCost ----
-  const updateDeliveryCost = useCallback(async (
-    deliveryId: string,
-    totalCost: string | number,
-  ): Promise<string | null> => {
-    // Same rule as recordPurchase: blank is rejected but 0 is accepted. Treating
-    // a blank as 0 is how a delivery ends up looking costed at nothing, which is
-    // the exact confusion costPending exists to prevent — while a genuine
-    // zero-billed delivery (a supplier replacement) must still be recordable.
-    const value = parseFloat(String(totalCost));
-    if (String(totalCost).trim() === "" || Number.isNaN(value)) {
+  // ---- fetchDeliveryLines ----
+  const fetchDeliveryLines = useCallback(async (deliveryId: string): Promise<DeliveryLine[]> => {
+    const snap = await getDocs(
+      query(collection(db, "purchases"), where("deliveryId", "==", deliveryId)),
+    );
+    return snap.docs.map((d) => {
+      const o = d.data();
+      return {
+        section: o.purchaseSection as string,
+        product: o.product as string,
+        qty: (o.quantity as number) || 0,
+      };
+    });
+  }, []);
+
+  // ---- updateDelivery ----
+  const updateDelivery = useCallback(async (input: UpdateDeliveryInput): Promise<string | null> => {
+    const { deliveryId, items, date } = input;
+
+    if (!date) return "Please select a date.";
+    for (const item of items) {
+      const qty = parseInt(String(item.qty)) || 0;
+      if (qty <= 0) return "Each item must have a quantity of at least 1.";
+    }
+    const deliveryTotal = parseFloat(String(input.totalCost));
+    if (String(input.totalCost).trim() === "" || Number.isNaN(deliveryTotal)) {
       return "Enter the total cost for this delivery.";
     }
-    if (value < 0) return "Total cost can't be negative.";
+    if (deliveryTotal < 0) return "Total cost can't be negative.";
 
     try {
-      await updateDoc(doc(db, "purchaseDelivery", deliveryId), {
-        totalCost: value,
-        // deleteField, not `false`: absent is the normal state for a costed
-        // delivery, and every doc carrying costPending:false forever would be
-        // noise. Someone just told us the amount, so it is no longer pending —
-        // including when that amount is 0, which is now an assertion rather
-        // than a placeholder.
+      // Read the stored lines here rather than accepting them from the caller —
+      // the diff decides what to delete, so it must be computed against what is
+      // actually in Firestore.
+      const snap = await getDocs(
+        query(collection(db, "purchases"), where("deliveryId", "==", deliveryId)),
+      );
+      const existing = new Map<string, { id: string; quantity: number; date: string }>();
+      const duplicates: string[] = [];
+      for (const d of snap.docs) {
+        const o = d.data();
+        const key = `${o.purchaseSection}\u0000${o.product}`;
+        // One product should appear once per delivery. If history holds two docs
+        // for the same product, the first is edited and the rest removed rather
+        // than leaving a line the form cannot represent.
+        if (existing.has(key)) duplicates.push(d.id);
+        else existing.set(key, { id: d.id, quantity: (o.quantity as number) || 0, date: o.date as string });
+      }
+
+      const now = Timestamp.now();
+      const batch = writeBatch(db);
+      const wanted = new Set<string>();
+      let totalItems = 0;
+
+      for (const item of items) {
+        const key = `${item.section}\u0000${item.product}`;
+        wanted.add(key);
+        const qty = parseInt(String(item.qty)) || 0;
+        totalItems += qty;
+        const prior = existing.get(key);
+        if (prior) {
+          // Only write when something actually differs — an untouched line keeps
+          // its document exactly as it was.
+          if (prior.quantity !== qty || prior.date !== date) {
+            batch.update(doc(db, "purchases", prior.id), { quantity: qty, date });
+          }
+        } else {
+          const sec = purchaseSections.find((s) => s.key === item.section);
+          batch.set(doc(collection(db, "purchases")), {
+            purchaseSection: item.section,
+            product: item.product,
+            productCategory: sec?.productCategory || "cylinder",
+            quantity: qty,
+            // No unitCost/totalCost, same as recordPurchase: cost is the
+            // delivery's, and a 0 here would read as free stock.
+            deliveryId,
+            date,
+            branch: DEFAULT_BRANCH_ID,
+            createdAt: now,
+          });
+        }
+      }
+
+      // Cleared quantities mean the product was not part of this delivery after
+      // all. The delivery itself survives with its cost — deleting lines adjusts
+      // inventory, it does not unbill the supplier.
+      for (const [key, prior] of existing) {
+        if (!wanted.has(key)) batch.delete(doc(db, "purchases", prior.id));
+      }
+      for (const id of duplicates) batch.delete(doc(db, "purchases", id));
+
+      batch.update(doc(db, "purchaseDelivery", deliveryId), {
+        date,
+        totalCost: deliveryTotal,
         costPending: deleteField(),
       });
-      onToast({ type: "success", message: "Delivery cost updated." });
+
+      // One batch for the delivery and all its lines: a partial apply could leave
+      // the cost on one date and the stock on another.
+      await batch.commit();
+
+      onToast({
+        type: "success",
+        message: `Delivery updated: ${totalItems} item${totalItems !== 1 ? "s" : ""}`,
+      });
       setPurchasesVersion((v) => v + 1);
       return null;
     } catch (error) {
-      console.error("Update delivery cost error:", error);
-      return "Failed to update delivery cost.";
+      console.error("Update delivery error:", error);
+      return "Failed to update delivery.";
     }
-  }, [onToast]);
+  }, [purchaseSections, onToast]);
 
   // ---- deletePurchase ----
   const deletePurchase = useCallback(async (purchaseId: string): Promise<void> => {
@@ -513,7 +621,8 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
     recordPurchase,
     recordTransfer,
     updatePurchase,
-    updateDeliveryCost,
+    fetchDeliveryLines,
+    updateDelivery,
     deletePurchase,
     deleteTransfer,
   };

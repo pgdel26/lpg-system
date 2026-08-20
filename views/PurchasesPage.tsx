@@ -83,7 +83,10 @@ interface PurchasesPageProps {
   purchasesVersion: number;
   onOpenPurchaseModal: () => void;
   onUpdatePurchase: (purchaseId: string, data: { quantity: number; unitCost?: number; totalCost?: number }) => Promise<void>;
-  onUpdateDeliveryCost: (deliveryId: string, totalCost: string) => Promise<string | null>;
+  /** Opens the Edit Delivery modal. The page owns it, because prefilling needs a
+   *  fresh read of the delivery's lines — the table is a paginated window and may
+   *  not be showing all of them. */
+  onEditDelivery: (deliveryId: string) => void;
   onDeletePurchase: (purchaseId: string) => Promise<void>;
   onDeleteTransfer: (transferGroupId: string) => Promise<void>;
 }
@@ -98,7 +101,7 @@ export default function PurchasesPage({
   purchasesVersion,
   onOpenPurchaseModal,
   onUpdatePurchase,
-  onUpdateDeliveryCost,
+  onEditDelivery,
   onDeletePurchase,
   onDeleteTransfer,
 }: PurchasesPageProps) {
@@ -115,12 +118,6 @@ export default function PurchasesPage({
    *  product counts, cost), and 90 deliveries expanded at once is 570 rows of
    *  quantities nobody scrolled here to read. */
   const [expandedDeliveries, setExpandedDeliveries] = useState<Set<string>>(new Set());
-  // Delivery cost editing is separate state from the line editor: they live on
-  // different rows, edit different documents, and must never be open at once.
-  const [editingDeliveryId, setEditingDeliveryId] = useState<string | null>(null);
-  const [deliveryCostInput, setDeliveryCostInput] = useState("");
-  const [deliveryCostError, setDeliveryCostError] = useState("");
-  const [savingDeliveryCost, setSavingDeliveryCost] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const isRangeActive = !!(filterFrom || filterTo);
@@ -394,38 +391,8 @@ export default function PurchasesPage({
     });
   };
 
-  const startDeliveryEdit = (deliveryId: string, currentCost?: number, pending?: boolean) => {
-    setEditingId(null);
-    setEditingDeliveryId(deliveryId);
-    // A pending delivery opens blank rather than at "0": prefilling 0 invites
-    // saving it unread, which would assert a zero-billed delivery.
-    setDeliveryCostInput(pending || currentCost == null ? "" : String(currentCost));
-    setDeliveryCostError("");
-  };
-
-  const cancelDeliveryEdit = () => {
-    setEditingDeliveryId(null);
-    setDeliveryCostInput("");
-    setDeliveryCostError("");
-  };
-
-  const saveDeliveryCost = async () => {
-    if (!editingDeliveryId || savingDeliveryCost) return;
-    setSavingDeliveryCost(true);
-    const err = await onUpdateDeliveryCost(editingDeliveryId, deliveryCostInput);
-    setSavingDeliveryCost(false);
-    // Error keeps the editor open with what was typed still in it, so a typo is
-    // corrected rather than re-entered.
-    if (err) {
-      setDeliveryCostError(err);
-      return;
-    }
-    cancelDeliveryEdit();
-  };
-
   const startEdit = (row: DisplayRow) => {
     if (!row.purchase) return;
-    cancelDeliveryEdit();
     setEditingId(row.key);
     setEditingLinked(!!row.deliveryId);
     setEditData({
@@ -621,35 +588,13 @@ export default function PurchasesPage({
                         {item.itemCount} item{item.itemCount !== 1 ? "s" : ""} · {item.lineCount} product{item.lineCount !== 1 ? "s" : ""}
                       </span>
                     </td>
-                    {/* Four states, and collapsing any two of them would misreport
-                        money: being edited, a real total, a delivery nobody has
+                    {/* Three states, and collapsing any two of them would
+                        misreport money: a real total, a delivery nobody has
                         costed yet (placeholder 0 — must never render as ₱0.00),
-                        and a doc that simply isn't loaded (which is why the Edit
-                        pencil is withheld — there would be nothing to write to). */}
-                    <td
-                      className={styles.deliveryHeaderCost}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {editingDeliveryId === item.deliveryId ? (
-                        <>
-                          <input
-                            type="number"
-                            step="0.01"
-                            autoFocus
-                            value={deliveryCostInput}
-                            placeholder="0.00"
-                            onChange={(e) => { setDeliveryCostInput(e.target.value); setDeliveryCostError(""); }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveDeliveryCost();
-                              if (e.key === "Escape") cancelDeliveryEdit();
-                            }}
-                            className={styles.deliveryCostInput}
-                          />
-                          {deliveryCostError && (
-                            <div className={styles.deliveryCostError}>{deliveryCostError}</div>
-                          )}
-                        </>
-                      ) : item.costPending ? (
+                        and a doc that simply isn't loaded, which is also why the
+                        pencil is withheld there: nothing to edit. */}
+                    <td className={styles.deliveryHeaderCost}>
+                      {item.costPending ? (
                         <span className={styles.deliveryHeaderCostPending}>Not yet costed</span>
                       ) : item.totalCost == null ? (
                         "—"
@@ -657,26 +602,15 @@ export default function PurchasesPage({
                         fmt(item.totalCost)
                       )}
                     </td>
+                    {/* Stops the row's accordion toggle: the pencil opens the
+                        editor, it does not also collapse what you are editing. */}
                     <td onClick={(e) => e.stopPropagation()}>
-                      {editingDeliveryId === item.deliveryId ? (
+                      {item.totalCost != null && (
                         <div className={styles.actionsCell}>
                           <button
-                            onClick={saveDeliveryCost}
-                            disabled={savingDeliveryCost}
-                            className={styles.saveButton}
-                          >
-                            {savingDeliveryCost ? "Saving…" : "Save"}
-                          </button>
-                          <button onClick={cancelDeliveryEdit} className={styles.cancelButton}>Cancel</button>
-                        </div>
-                      ) : item.totalCost != null && (
-                        /* Only when the delivery doc is actually loaded — with no
-                           doc there is nothing to write the cost to. */
-                        <div className={styles.actionsCell}>
-                          <button
-                            onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, item.costPending)}
+                            onClick={() => onEditDelivery(item.deliveryId)}
                             className={styles.iconButton}
-                            title={item.costPending ? "Add delivery cost" : "Edit delivery cost"}
+                            title={item.costPending ? "Add cost and edit products" : "Edit delivery"}
                           >
                             <EditIcon />
                           </button>
@@ -752,15 +686,23 @@ export default function PurchasesPage({
                     <td className={styles.totalCostCell}>
                       {row.deliveryCost == null ? "" : fmt(row.deliveryCost)}
                     </td>
+                    {/* A delivery's products are edited through its own Edit
+                        Delivery modal — quantities there, and clearing one
+                        removes the line. Per-line icons here would be a second
+                        route to the same writes. Legacy pre-delivery rows keep
+                        theirs: they belong to no delivery, so nothing else can
+                        reach them. */}
                     <td>
-                      <div className={styles.actionsCell}>
-                        <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">
-                          <EditIcon />
-                        </button>
-                        <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
-                          <TrashIcon />
-                        </button>
-                      </div>
+                      {!row.deliveryId && (
+                        <div className={styles.actionsCell}>
+                          <button onClick={() => startEdit(row)} className={styles.iconButton} title="Edit">
+                            <EditIcon />
+                          </button>
+                          <button onClick={() => requestDelete(row)} className={styles.iconButton} title="Delete">
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ) : (

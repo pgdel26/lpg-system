@@ -443,29 +443,6 @@
   color: var(--text-muted);
 }
 
-.deliveryCostInput {
-  width: 110px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: rgba(241, 245, 249, 0.8);
-  border: 1px solid var(--accent-blue);
-  color: var(--text-secondary);
-  font-size: 11px;
-  outline: none;
-  font-family: var(--font-mono);
-  text-align: right;
-}
-
-.deliveryCostError {
-  margin-top: 3px;
-  color: var(--accent-red);
-  font-size: 10px;
-  font-weight: 600;
-  font-family: inherit;
-  text-align: right;
-  white-space: normal;
-}
-
 .deliveryCaret {
   display: inline-block;
   width: 12px;
