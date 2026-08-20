@@ -19,6 +19,14 @@ interface RecordCollectionModalProps {
   branches: Branch[];
   onSubmit: (input: RecordArCollectionInput) => Promise<string | null>;
   onClose: () => void;
+  /** Collection date to start on. Receivables omits it and gets today; the Daily
+   *  Sales tab passes the day being viewed, because that is the day whose books
+   *  are being worked on — and the collection date decides which day's Expected
+   *  Cash Remit the money lands in. */
+  defaultDate?: string;
+  /** Outlet to start on. Omitted on Receivables ON PURPOSE (see below); passed
+   *  from a branch-scoped screen, which already knows the outlet. */
+  defaultBranch?: string;
 }
 
 const METHODS: Array<{ value: "cash" | "check" | "gcash"; label: string; color: string }> = [
@@ -29,16 +37,20 @@ const METHODS: Array<{ value: "cash" | "check" | "gcash"; label: string; color: 
 
 export default function RecordCollectionModal({
   arTransactions, branches, onSubmit, onClose,
+  defaultDate, defaultBranch,
 }: RecordCollectionModalProps) {
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "check" | "gcash">("cash");
-  const [date, setDate] = useState(today());
-  // No default — Receivables is a company-wide, not branch-scoped, page, so
-  // pre-selecting an outlet (e.g. always the first one) would let a clerk
-  // submit without noticing, misattributing cash between PILI/CADLAN.
-  const [branch, setBranch] = useState("");
+  const [date, setDate] = useState(defaultDate || today());
+  // Defaults to nothing when the caller doesn't supply one: Receivables is a
+  // company-wide page, so pre-selecting an outlet (e.g. always the first one)
+  // would let a clerk submit without noticing, misattributing cash between
+  // PILI/CADLAN. A branch-scoped caller is the opposite case — the page already
+  // knows which outlet took the money, so making the clerk re-pick it is the
+  // more likely source of a wrong answer.
+  const [branch, setBranch] = useState(defaultBranch || "");
   const [checkDate, setCheckDate] = useState("");
   const [checkNumber, setCheckNumber] = useState("");
   const [error, setError] = useState("");

@@ -7,6 +7,7 @@ import TransactionsPage from "../../../../views/transactions/TransactionsPage";
 import SaleModal from "../../../../components/SaleModal";
 import SwapModal from "../../../../components/SwapModal";
 import RefundModal from "../../../../components/RefundModal";
+import RecordCollectionModal from "../../../../components/RecordCollectionModal";
 
 import type { RecordRefundInput } from "../../../../lib/hooks/useRefundsData";
 import type { RecordSaleInput, RecordSalePaymentInput } from "../../../../lib/hooks/useSalesData";
@@ -142,6 +143,12 @@ export default function SalesPage() {
     setRefundModalOpen(false);
   };
 
+  // ---- A/R collection modal ----
+  // Same component and same mutation as the Receivables page: a collection is
+  // one event, and a second implementation would be a second set of FIFO rules
+  // to keep in step.
+  const [collectionModalOpen, setCollectionModalOpen] = useState(false);
+
   return (
     <>
       <TransactionsPage
@@ -161,6 +168,7 @@ export default function SalesPage() {
         onOpenSaleModal={handleOpenSaleModal}
         onOpenSwapModal={handleOpenSwapModal}
         onOpenRefundModal={handleOpenRefundModal}
+        onOpenCollectionModal={() => setCollectionModalOpen(true)}
         onUpdateSale={data.updateSale}
         onUpdateSwap={data.updateSwap}
         onUpdateRefund={data.updateRefund}
@@ -217,6 +225,19 @@ export default function SalesPage() {
           salesSections={data.salesSections}
           onClose={() => setSaleModalOpen(false)}
           onSubmit={handleRecordSale}
+        />
+      )}
+
+      {collectionModalOpen && (
+        <RecordCollectionModal
+          arTransactions={data.arTransactions}
+          branches={data.branches}
+          // Scoped to what this screen already knows: the day on display and
+          // the outlet in the URL. Both stay editable in the modal.
+          defaultDate={data.inventoryDate}
+          defaultBranch={branch}
+          onSubmit={data.recordArCollection}
+          onClose={() => setCollectionModalOpen(false)}
         />
       )}
 

@@ -20,6 +20,9 @@ interface DailySalesTabProps {
   onOpenSaleModal: () => void;
   onOpenSwapModal: () => void;
   onOpenRefundModal: () => void;
+  /** Opens the same RecordCollectionModal the Receivables page uses — collecting
+   *  on an invoice is the same event wherever it is entered from. */
+  onOpenCollectionModal: () => void;
   onViewInventory: () => void;
   onExportFullReport: () => void;
   // Shared inline-edit state (owned by parent)
@@ -40,7 +43,7 @@ export default function DailySalesTab({
   sorted, swaps, refunds,
   swapTotal, refundTotal, grandTotal,
   saleTypeLabel,
-  onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
+  onOpenSaleModal, onOpenSwapModal, onOpenRefundModal, onOpenCollectionModal,
   onViewInventory, onExportFullReport,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
@@ -73,6 +76,12 @@ export default function DailySalesTab({
         <div className={styles.toolbarActions}>
           <button onClick={() => onOpenSaleModal()} className={styles.primaryButton}>
             <PlusIcon /> Add Sale
+          </button>
+          {/* Sits beside Add Sale: money coming in on an old invoice is part of
+              the same day's takings, so it belongs on the day's own screen
+              rather than only on Receivables. */}
+          <button onClick={onOpenCollectionModal} className={styles.primaryButton}>
+            <PlusIcon /> Add AR Collection
           </button>
           <button onClick={onViewInventory} className={styles.primaryButton}>
             View Inventory

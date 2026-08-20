@@ -33,6 +33,7 @@ interface TransactionsPageProps {
   onOpenSaleModal: () => void;
   onOpenSwapModal: () => void;
   onOpenRefundModal: () => void;
+  onOpenCollectionModal: () => void;
   onUpdateSale: UpdateSaleFn;
   onUpdateSwap: UpdateSwapFn;
   onUpdateRefund: UpdateRefundFn;
@@ -57,7 +58,7 @@ export default function TransactionsPage({
   expenses,
   staff, dailyReport, onUpdateDailyStaff,
   allRefunds, arTransactions, branch,
-  onOpenSaleModal, onOpenSwapModal, onOpenRefundModal,
+  onOpenSaleModal, onOpenSwapModal, onOpenRefundModal, onOpenCollectionModal,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
@@ -218,6 +219,7 @@ export default function TransactionsPage({
             onOpenSaleModal={onOpenSaleModal}
             onOpenSwapModal={onOpenSwapModal}
             onOpenRefundModal={onOpenRefundModal}
+            onOpenCollectionModal={onOpenCollectionModal}
             onViewInventory={onViewInventory}
             onExportFullReport={handleExportFullReport}
             editingId={editingId}
