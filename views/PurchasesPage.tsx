@@ -184,7 +184,8 @@ export default function PurchasesPage({
 
   // purchaseCost() rather than a local sum, so this footer can never disagree
   // with the Income Statement.
-  const totalCost = purchaseCost(filtered, visibleDeliveries).total;
+  const costBreakdown = purchaseCost(filtered, visibleDeliveries);
+  const totalCost = costBreakdown.total;
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
 
   // Merge each transfer's source/destination doc pair into a single row.
@@ -411,7 +412,11 @@ export default function PurchasesPage({
       });
     } else if (purchase) {
       setPendingDelete({
-        message: `Delete purchase of ${row.quantity}x ${row.product} (${fmt(row.totalCost || 0)})? This cannot be undone.`,
+        // No amount for a delivery line: its cost lives on the delivery, so
+        // printing ₱0.00 in a destructive prompt would read as free stock.
+        message: row.deliveryId
+          ? `Delete purchase of ${row.quantity}x ${row.product}? The delivery and its cost stay. This cannot be undone.`
+          : `Delete purchase of ${row.quantity}x ${row.product} (${fmt(row.totalCost || 0)})? This cannot be undone.`,
         onConfirm: () => onDeletePurchase(purchase.id),
       });
     }
@@ -698,14 +703,28 @@ export default function PurchasesPage({
             <tfoot>
               {subTab === "purchases" ? (
                 <tr>
-                  <td colSpan={2} className={styles.grandTotalLabel}>Total</td>
+                  <td colSpan={2} className={styles.grandTotalLabel}>
+                    {/* Says so when the total is a floor. "Total ₱0.00" beside a
+                        column of "Not yet costed" rows invites reading it as
+                        nothing having been spent. */}
+                    {costBreakdown.pendingCount > 0
+                      ? `Total (excludes ${costBreakdown.pendingCount} uncosted)`
+                      : "Total"}
+                  </td>
                   <td className={styles.grandTotalQty}>{totalItems}</td>
                   <td className={styles.grandTotalCost}>{fmt(totalCost)}</td>
                   <td />
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={2} className={styles.grandTotalLabel}>Total</td>
+                  <td colSpan={2} className={styles.grandTotalLabel}>
+                    {/* Says so when the total is a floor. "Total ₱0.00" beside a
+                        column of "Not yet costed" rows invites reading it as
+                        nothing having been spent. */}
+                    {costBreakdown.pendingCount > 0
+                      ? `Total (excludes ${costBreakdown.pendingCount} uncosted)`
+                      : "Total"}
+                  </td>
                   <td />
                   <td className={styles.grandTotalQty}>{totalTransferItems}</td>
                   <td />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { XIcon } from "./Icons";
 import styles from "./PurchaseModal.module.css";
+import { purchaseLineKey } from "../lib/purchases";
 import type { RecordPurchaseInput } from "../lib/hooks/usePurchasesData";
 
 type PurchaseItem = RecordPurchaseInput["items"][number];
@@ -28,22 +29,12 @@ interface PurchaseModalProps {
    *  edit share this component deliberately: same fields, same rules. Only the
    *  wording, the starting values, and what onSubmit does differ. */
   editing?: boolean;
-  /** Starting quantities, keyed by cellKey(). A product absent from the map
+  /** Starting quantities, keyed by purchaseLineKey(). A product absent from the map
    *  starts blank, which still means "not part of this delivery". */
   initialQuantities?: Record<string, string>;
   initialTotalCost?: string;
 }
 
-/** Composite key: the same product can be bought under more than one section
- *  (a cylinder as "FULL CYLINDER" or as "REFILL ONLY"), so the product name
- *  alone would collide and make two rows share one input. NUL separates the two
- *  parts because no product name can contain it, so no pair of section+product
- *  can collide with another.
- *
- *  Exported because a caller prefilling an edit must key its map identically — a
- *  mismatch would show every quantity as blank, and saving that would read as
- *  "every line deleted". */
-export const cellKey = (sectionKey: string, product: string) => `${sectionKey}\u0000${product}`;
 
 export default function PurchaseModal({
   date, setDate,
@@ -65,7 +56,7 @@ export default function PurchaseModal({
   const [totalCost, setTotalCost] = useState(initialTotalCost || "");
 
   const setQty = (sectionKey: string, product: string, value: string) => {
-    setQuantities((prev) => ({ ...prev, [cellKey(sectionKey, product)]: value }));
+    setQuantities((prev) => ({ ...prev, [purchaseLineKey(sectionKey, product)]: value }));
   };
 
   const rowsFor = (section: PurchaseSection): Array<{ label?: string; products: string[] }> =>
@@ -79,7 +70,7 @@ export default function PurchaseModal({
         .map((product) => ({
           section: section.key,
           product,
-          qty: parseInt(quantities[cellKey(section.key, product)] || "") || 0,
+          qty: parseInt(quantities[purchaseLineKey(section.key, product)] || "") || 0,
         }))
         .filter((i) => i.qty > 0),
     ),
@@ -144,7 +135,7 @@ export default function PurchaseModal({
                 <div key={group.label || gi}>
                   {group.label && <div className={styles.subgroupHeader}>{group.label}</div>}
                   {group.products.map((product) => {
-                    const key = cellKey(section.key, product);
+                    const key = purchaseLineKey(section.key, product);
                     const value = quantities[key] || "";
                     return (
                       <div key={key} className={styles.productRow}>

@@ -53,7 +53,15 @@ export function purchaseCost(
   purchases: Purchase[],
   deliveries: PurchaseDelivery[],
 ): PurchaseCostBreakdown {
-  const fromDeliveries = deliveries.reduce((s, d) => s + (d.totalCost || 0), 0);
+  // Excludes costPending explicitly rather than relying on their totalCost
+  // happening to be 0. That is a data convention, not an invariant — a
+  // merge-write, a restored backup, or a cost-entry path that forgets to clear
+  // the flag could produce costPending with a real amount, which would then be
+  // counted in the total AND reported as uncosted, making the "this is a floor"
+  // caveat false. Filtering makes counted and pending structurally disjoint.
+  const fromDeliveries = deliveries
+    .filter((d) => !d.costPending)
+    .reduce((s, d) => s + (d.totalCost || 0), 0);
   const fromLineCosts = purchases
     .filter((p) => !p.isTransfer && !p.deliveryId)
     .reduce((s, p) => s + (p.totalCost || 0), 0);

@@ -105,6 +105,24 @@ export interface IncomeStatementResult {
    * historical data.
    */
   totalBilled: number;
+  /**
+   * totalBilled − (grossSales + deliveryRevenue − totalDiscounts): the payments
+   * side measured against the revenue side. Zero for everything recordSale
+   * writes, which validates the two to the centavo before saving.
+   *
+   * Kept because netCashMovement's meaning depends on this identity, and the
+   * redefinition made a break here WORSE than it used to be. paymentSplit's
+   * legacy fallback is `totalAmount || finalPrice`, and finalPrice is per unit —
+   * so a legacy A/R doc with no totalAmount and qty 3 contributes 3 units to
+   * grossSales while salesAr backs out only 1, and netCashMovement counts the
+   * remainder as money nobody paid. Under the old physical-cash definition the
+   * same doc contributed zero error.
+   *
+   * Measured 2026-08-20: 5 docs across all history, worth ₱9.00 net in August
+   * and ₱0 in July. Surfaced under Total Billed (not under Net Cash Movement,
+   * which would wrongly imply the walk fails to foot) whenever it is nonzero.
+   */
+  billingIdentityGap: number;
 
   /** AR collected THIS period (any invoice date), split by how it was collected.
    *  All three are included in netCashMovement: a check is encashed into the
@@ -352,6 +370,12 @@ export function computeIncomeStatement({
   const salesGcash = paymentTotals.gcash;
   const salesAr = paymentTotals.ar;
   const totalBilled = salesCash + salesGcash + salesAr;
+  // Independently derived: the payments side against the revenue side. Never
+  // reconcile a money figure against a restatement of itself.
+  // Rounded to the centavo: this is a float subtraction of two large sums, and an
+  // unrounded 9.000000001 would trip the > 0.01 display test with noise.
+  const billingIdentityGap =
+    Math.round((totalBilled - (grossSales + deliveryRevenue - totalDiscounts)) * 100) / 100;
 
   // AR collected THIS period, from any invoice regardless of when it was
   // sold — collectionEventsInRange takes the unbounded arTransactions list
@@ -413,6 +437,7 @@ export function computeIncomeStatement({
     arCollectedCheck,
     netCashMovement,
     arCollectedTotal,
+    billingIdentityGap,
   };
 }
 
@@ -653,6 +678,9 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["Total Billed", ...amountsFor((res) => res.totalBilled)]);
   totalRows.push(r);
+  if (allResults.some((res) => Math.abs(res.billingIdentityGap) > 0.01)) {
+    data.push(["  Does not match sales revenue by this much — a few legacy records predate the per-sale payment breakdown, and Net Cash Movement is off by the same amount", ...amountsFor((res) => res.billingIdentityGap)]);
+  }
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!merges"] = merges;

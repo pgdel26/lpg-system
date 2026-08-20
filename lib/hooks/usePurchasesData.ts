@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { buildPurchaseSections, DEFAULT_BRANCH_ID } from "../constants";
+import { purchaseLineKey } from "../purchases";
 import type { Purchase, BranchId, PurchaseDelivery } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
@@ -471,18 +472,28 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
   }, [onToast]);
 
   // ---- fetchDeliveryLines ----
+  // Groups by section+product and SUMS. 19 of the 90 backfilled deliveries hold
+  // more than one doc for the same product, because the migration grouped lines
+  // by (branch, date) and two recording sessions on one day collapsed into one
+  // delivery. Showing one of the two docs' quantities would understate the
+  // delivery — and saving that understatement would delete the rest.
   const fetchDeliveryLines = useCallback(async (deliveryId: string): Promise<DeliveryLine[]> => {
     const snap = await getDocs(
       query(collection(db, "purchases"), where("deliveryId", "==", deliveryId)),
     );
-    return snap.docs.map((d) => {
+    const summed = new Map<string, DeliveryLine>();
+    for (const d of snap.docs) {
       const o = d.data();
-      return {
+      const key = purchaseLineKey(o.purchaseSection as string, o.product as string);
+      const prior = summed.get(key);
+      if (prior) prior.qty += (o.quantity as number) || 0;
+      else summed.set(key, {
         section: o.purchaseSection as string,
         product: o.product as string,
         qty: (o.quantity as number) || 0,
-      };
-    });
+      });
+    }
+    return [...summed.values()];
   }, []);
 
   // ---- updateDelivery ----
@@ -511,16 +522,40 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
       const snap = await getDocs(
         query(collection(db, "purchases"), where("deliveryId", "==", deliveryId)),
       );
+      // quantity is the SUM across every doc sharing this section+product, not the
+      // first one found. 19 backfilled deliveries hold duplicates (the migration
+      // grouped by (branch, date), so two sessions on one day merged), together
+      // holding 1,041 units that a first-doc-wins diff would have discarded on a
+      // Save that changed nothing.
       const existing = new Map<string, { id: string; quantity: number; date: string }>();
       const duplicates: string[] = [];
       for (const d of snap.docs) {
         const o = d.data();
-        const key = `${o.purchaseSection}\u0000${o.product}`;
-        // One product should appear once per delivery. If history holds two docs
-        // for the same product, the first is edited and the rest removed rather
-        // than leaving a line the form cannot represent.
-        if (existing.has(key)) duplicates.push(d.id);
-        else existing.set(key, { id: d.id, quantity: (o.quantity as number) || 0, date: o.date as string });
+        const key = purchaseLineKey(o.purchaseSection as string, o.product as string);
+        const prior = existing.get(key);
+        if (prior) {
+          prior.quantity += (o.quantity as number) || 0;
+          // The survivor carries the whole quantity, so the extra docs go — but
+          // only after their units have been counted into it.
+          duplicates.push(d.id);
+        } else {
+          existing.set(key, { id: d.id, quantity: (o.quantity as number) || 0, date: o.date as string });
+        }
+      }
+
+      // Only lines the form could actually show are candidates for deletion.
+      // `items` carries just what the modal rendered, and the modal renders from
+      // purchaseSections — which excludes hidden categories (borrowed,
+      // cylinder_deposit) and any product since deleted. Treating "absent from
+      // the form" as "the operator removed it" would silently delete a line the
+      // operator was never shown. No live data hits this today, but it is this
+      // repo's most common bug class — see .claude/skills/safe-category-change.md.
+      const representable = new Set<string>();
+      for (const sec of purchaseSections) {
+        const products = sec.subgroups
+          ? sec.subgroups.flatMap((g) => g.products)
+          : (sec.products || []);
+        for (const product of products) representable.add(purchaseLineKey(sec.key, product));
       }
 
       const now = Timestamp.now();
@@ -529,7 +564,7 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
       let totalItems = 0;
 
       for (const item of items) {
-        const key = `${item.section}\u0000${item.product}`;
+        const key = purchaseLineKey(item.section, item.product);
         wanted.add(key);
         const qty = parseInt(String(item.qty)) || 0;
         totalItems += qty;
@@ -561,7 +596,9 @@ export function usePurchasesData(deps: UsePurchasesDataDeps): UsePurchasesData {
       // all. The delivery itself survives with its cost — deleting lines adjusts
       // inventory, it does not unbill the supplier.
       for (const [key, prior] of existing) {
-        if (!wanted.has(key)) batch.delete(doc(db, "purchases", prior.id));
+        if (!wanted.has(key) && representable.has(key)) {
+          batch.delete(doc(db, "purchases", prior.id));
+        }
       }
       for (const id of duplicates) batch.delete(doc(db, "purchases", id));
 

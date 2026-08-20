@@ -81,9 +81,9 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
       {result.uncostedDeliveryCount > 0 && (
         <div className={styles.cashMemo}>
           {result.uncostedDeliveryCount} deliver{result.uncostedDeliveryCount === 1 ? "y" : "ies"} received
-          this period {result.uncostedDeliveryCount === 1 ? "has" : "have"} no cost entered yet, so the figure
-          above is a floor — Gross Profit below is overstated until {result.uncostedDeliveryCount === 1 ? "it is" : "they are"} costed
-          on the Purchases screen.
+          this period {result.uncostedDeliveryCount === 1 ? "has" : "have"} no cost entered yet, so this is a
+          floor — Gross Profit AND Net Cash Movement below are both overstated until
+          {result.uncostedDeliveryCount === 1 ? " it is" : " they are"} costed on the Purchases screen.
         </div>
       )}
 
@@ -188,9 +188,21 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           {fmt(result.netCashMovement)}
         </span>
       </div>
+      {/* Repeated at the headline on purpose. Cost of Purchases feeds this figure
+          through Operating Result, so an uncosted month overstates it by the whole
+          month's purchase spend — millions of pesos — and this is the number the
+          page presents as the answer. A caveat 200px further up is not where the
+          eye lands. Conditional, so it is absent whenever it would be noise. */}
+      {result.uncostedDeliveryCount > 0 && (
+        <div className={styles.cashMemo}>
+          Overstated: {result.uncostedDeliveryCount} deliver{result.uncostedDeliveryCount === 1 ? "y" : "ies"} this
+          period still {result.uncostedDeliveryCount === 1 ? "has" : "have"} no cost entered, so that spend is
+          missing from this figure.
+        </div>
+      )}
       {isPerBranchView && (
         <div className={styles.cashMemo}>
-          Purchases are paid from shared profit across outlets, not this outlet&apos;s own till — Net Cash Movement isn&apos;t reliable per outlet. Check &quot;All Outlets&quot; for the real total.
+          Every purchase is recorded against the main outlet, so Cost of Purchases, Gross Profit and Net Cash Movement are not meaningful per outlet — a non-main outlet shows no cost at all and its margin reads far too high. Check &quot;All Outlets&quot; for the real figures.
         </div>
       )}
 
@@ -215,6 +227,16 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         <span className={styles.totalLabel}>Total Billed</span>
         <span className={styles.totalValue}>{fmt(result.totalBilled)}</span>
       </div>
+      {/* The detector, not an explainer — it renders only when the two sides of
+          the identity actually disagree, and Net Cash Movement is wrong by the
+          same amount when they do. */}
+      {Math.abs(result.billingIdentityGap) > 0.01 && (
+        <div className={styles.cashMemo}>
+          {fmt(Math.abs(result.billingIdentityGap))} {result.billingIdentityGap > 0 ? "more" : "less"} than
+          this period&apos;s sales revenue — a few legacy records predate the per-sale payment breakdown.
+          Net Cash Movement is off by the same amount.
+        </div>
+      )}
     </div>
   );
 }

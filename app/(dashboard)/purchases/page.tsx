@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
 import PurchasesPage from "../../../views/PurchasesPage";
-import PurchaseModal, { cellKey } from "../../../components/PurchaseModal";
+import PurchaseModal from "../../../components/PurchaseModal";
+import { purchaseLineKey } from "../../../lib/purchases";
 import { today } from "../../../lib/utils";
 
 export default function PurchasesRoutePage() {
@@ -41,7 +42,7 @@ export default function PurchasesRoutePage() {
     // those omissions as deletions.
     const lines = await data.fetchDeliveryLines(deliveryId);
     const quantities: Record<string, string> = {};
-    for (const l of lines) quantities[cellKey(l.section, l.product)] = String(l.qty);
+    for (const l of lines) quantities[purchaseLineKey(l.section, l.product)] = String(l.qty);
     setEditDeliveryError("");
     setEditDelivery({
       deliveryId,
