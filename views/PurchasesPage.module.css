@@ -425,43 +425,13 @@
   padding-left: 24px;
 }
 
-/* An uncosted delivery's action lives where its amount would be, so the thing
-   that resolves it is the thing you were already looking at. Tinted rather than
-   solid: it repeats once per uncosted delivery, and 75 solid blue buttons down a
-   column would shout over the costed figures that are real data. */
-.addCostButton {
-  padding: 3px 9px;
-  border: 1px dashed var(--accent-blue);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--accent-blue) 10%, transparent);
-  color: var(--accent-blue);
-  font-size: 11px;
-  font-weight: 700;
+/* A delivery nobody has costed yet. Muted and non-mono so it reads as a note
+   rather than a figure — the placeholder 0 behind it is not money. */
+.deliveryHeaderCostPending {
   font-family: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.addCostButton:hover {
-  background: color-mix(in srgb, var(--accent-blue) 20%, transparent);
-  border-style: solid;
-}
-
-/* A costed delivery's amount is editable, but it is data first — no button
-   chrome until hover, so the column still reads as a column of figures. */
-.editCostButton {
-  padding: 2px 4px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.editCostButton:hover {
-  border-color: var(--accent-blue);
-  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .deliveryCostInput {

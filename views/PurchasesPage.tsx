@@ -547,13 +547,15 @@ export default function PurchasesPage({
         <table className={styles.table}>
           <colgroup>
             {subTab === "purchases" ? (
+              /* Five columns for five cells — Date, Product, Qty, Cost, Actions.
+                 A sixth <col> here rendered as a permanently empty strip down the
+                 right edge. */
               <>
                 <col style={{ width: "14%" }} />
-                <col style={{ width: "34%" }} />
+                <col style={{ width: "38%" }} />
                 <col style={{ width: "12%" }} />
-                <col style={{ width: "16%" }} />
-                <col style={{ width: "16%" }} />
-                <col style={{ width: "8%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "18%" }} />
               </>
             ) : (
               <>
@@ -619,12 +621,11 @@ export default function PurchasesPage({
                         {item.itemCount} item{item.itemCount !== 1 ? "s" : ""} · {item.lineCount} product{item.lineCount !== 1 ? "s" : ""}
                       </span>
                     </td>
-                    {/* Four states, and collapsing any two would either misreport
-                        money or hide the way to fix it: being edited, a real
-                        total (click to correct), a delivery nobody has costed yet
-                        (placeholder 0 — must never render as ₱0.00, and carries
-                        the action that resolves it), and a doc that simply isn't
-                        loaded (nothing to edit — no id to write to). */}
+                    {/* Four states, and collapsing any two of them would misreport
+                        money: being edited, a real total, a delivery nobody has
+                        costed yet (placeholder 0 — must never render as ₱0.00),
+                        and a doc that simply isn't loaded (which is why the Edit
+                        pencil is withheld — there would be nothing to write to). */}
                     <td
                       className={styles.deliveryHeaderCost}
                       onClick={(e) => e.stopPropagation()}
@@ -649,28 +650,15 @@ export default function PurchasesPage({
                           )}
                         </>
                       ) : item.costPending ? (
-                        <button
-                          type="button"
-                          onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, true)}
-                          className={styles.addCostButton}
-                        >
-                          + Add cost
-                        </button>
+                        <span className={styles.deliveryHeaderCostPending}>Not yet costed</span>
                       ) : item.totalCost == null ? (
                         "—"
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, false)}
-                          className={styles.editCostButton}
-                          title="Edit delivery cost"
-                        >
-                          {fmt(item.totalCost)}
-                        </button>
+                        fmt(item.totalCost)
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {editingDeliveryId === item.deliveryId && (
+                      {editingDeliveryId === item.deliveryId ? (
                         <div className={styles.actionsCell}>
                           <button
                             onClick={saveDeliveryCost}
@@ -680,6 +668,18 @@ export default function PurchasesPage({
                             {savingDeliveryCost ? "Saving…" : "Save"}
                           </button>
                           <button onClick={cancelDeliveryEdit} className={styles.cancelButton}>Cancel</button>
+                        </div>
+                      ) : item.totalCost != null && (
+                        /* Only when the delivery doc is actually loaded — with no
+                           doc there is nothing to write the cost to. */
+                        <div className={styles.actionsCell}>
+                          <button
+                            onClick={() => startDeliveryEdit(item.deliveryId, item.totalCost, item.costPending)}
+                            className={styles.iconButton}
+                            title={item.costPending ? "Add delivery cost" : "Edit delivery cost"}
+                          >
+                            <EditIcon />
+                          </button>
                         </div>
                       )}
                     </td>
