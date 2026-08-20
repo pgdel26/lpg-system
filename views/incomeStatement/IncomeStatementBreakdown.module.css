@@ -125,34 +125,32 @@
   font-family: var(--font-mono);
 }
 
+/* The page's headline. Deliberately outsized against .totalValue (18px) — with
+   every total the same size the reader has to work out which one is the answer. */
 .finalTotalRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 20px;
   background: rgba(241, 245, 249, 0.5);
   border-top: 2px solid var(--border);
 }
 
 .finalTotalLabel {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.finalTotalSub {
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--text-dim);
-  margin-top: 2px;
-}
-
 .finalTotalValue {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 800;
   font-family: var(--font-mono);
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .cashMemo {

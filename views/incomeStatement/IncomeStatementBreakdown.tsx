@@ -89,14 +89,6 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           on the Purchases screen.
         </div>
       )}
-      {result.hasTransferActivity && (
-        <div className={styles.cashMemo}>
-          Stock transferred in: {result.transferInQty} · out: {result.transferOutQty} (units, not valued).
-          {isPerBranchView
-            ? " Transferred stock is zero-cost here, so this outlet's Gross Profit may be overstated (if received) or understated (if sent) by the transferred amount."
-            : " Nets to zero cost company-wide."}
-        </div>
-      )}
 
       <div className={styles.totalRow}>
         <span className={styles.totalLabel}>Gross Profit</span>
@@ -149,9 +141,6 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           {fmt(result.operatingResult)}
         </span>
       </div>
-      <div className={styles.cashMemo}>
-        Starting from Operating Result above: period movements, not a running balance. The two adjustments are the A/R movement — credit billed out, collections in. Assumes swap fees and expenses are settled in cash.
-      </div>
 
       {/* A/R collected this period, checks included. The channel lines beneath
           are informational — every one is already inside the figure above, and
@@ -192,18 +181,12 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         </span>
       </div>
 
-      {/* The bottom line of the whole page — nothing renders after this
-          total, so any exclusion the reader needs is attached directly below
-          it rather than in a separate memo section further down. */}
+      {/* The headline figure of the page, set larger than every other total so
+          it reads as the answer rather than one more subtotal. Its caveats live
+          on netCashMovement's field comment and in the Excel export, not here —
+          on-screen notes were going unread. */}
       <div className={styles.finalTotalRow}>
-        <div>
-          <span className={styles.finalTotalLabel}>Net Cash Movement This Period</span>
-          <div className={styles.finalTotalSub}>
-            Everything received minus everything paid — no credit sale counts as money until collected.
-            Received by the business, not the till: GCash and encashed checks both count.
-            Net of stock purchases (paid COD) — differs from the Sales Report&apos;s Expected Cash Remit, which excludes purchases.
-          </div>
-        </div>
+        <span className={styles.finalTotalLabel}>Net Cash Movement This Period</span>
         <span className={`${styles.finalTotalValue} ${result.netCashMovement >= 0 ? styles.valueGreen : styles.valueRed}`}>
           {fmt(result.netCashMovement)}
         </span>
