@@ -19,11 +19,6 @@ interface IncomeStatementBreakdownProps {
 
 export default function IncomeStatementBreakdown({ result, isPerBranchView }: IncomeStatementBreakdownProps) {
   const [expensesOpen, setExpensesOpen] = useState(false);
-  // Any A/R collected this period via GCash or check — broken out separately
-  // so those channels can be subtracted back out before the final cash
-  // total, instead of appearing in a memo section after it.
-  const arCollectedOther = result.arCollectedGcash + result.arCollectedCheck;
-  const hasCashReconciliationGap = Math.abs(result.cashReconciliationGap) > 0.01;
 
   return (
     <div className={styles.card}>
@@ -158,50 +153,32 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         Starting from Operating Result above: cash movements only, not a running balance. Assumes swap fees and expenses are settled in cash.
       </div>
 
-      <div className={styles.row}>
-        <div className={styles.rowLabel}>Less: GCash</div>
-        <span className={`${styles.rowValue} ${result.salesGcash > 0 ? styles.valueRed : styles.valueDim}`}>
-          {result.salesGcash > 0 ? `- ${fmt(result.salesGcash)}` : fmt(0)}
-        </span>
-      </div>
-      <div className={styles.row}>
-        <div className={styles.rowLabel}>Less: A/R (credit sales)</div>
-        <span className={`${styles.rowValue} ${result.salesAr > 0 ? styles.valueRed : styles.valueDim}`}>
-          {result.salesAr > 0 ? `- ${fmt(result.salesAr)}` : fmt(0)}
-        </span>
-      </div>
-
-      {/* A/R collected this period — always shown as its own line (how much
-          came back in on credit sales this month), broken out by channel so
-          GCash/check collections are subtracted back out BEFORE the final
-          cash total instead of appearing in a memo section below it. */}
+      {/* A/R collected this period, checks included. The channel lines beneath
+          are informational — every one is already inside the figure above, and
+          none is subtracted back out. A check is encashed to the bank, so it is
+          money received, not money pending. */}
       <div className={styles.row}>
         <div className={styles.rowLabel}>+ A/R Collected This Period</div>
-        <span className={`${styles.rowValue} ${result.arCollectedCash + arCollectedOther > 0 ? styles.valueNeutral : styles.valueDim}`}>
-          {fmt(result.arCollectedCash + arCollectedOther)}
+        <span className={`${styles.rowValue} ${result.arCollectedTotal > 0 ? styles.valueNeutral : styles.valueDim}`}>
+          {result.arCollectedTotal > 0 ? `+ ${fmt(result.arCollectedTotal)}` : fmt(0)}
         </span>
       </div>
-      {result.arCollectedGcash > 0 && (
+      {result.arCollectedCash > 0 && (
         <div className={`${styles.row} ${styles.channelRow}`}>
-          <div className={styles.channelLabel}>Less: collected via GCash</div>
-          <span className={`${styles.rowValue} ${styles.valueRed}`}>- {fmt(result.arCollectedGcash)}</span>
+          <div className={styles.channelLabel}>of which collected in cash</div>
+          <span className={`${styles.rowValue} ${styles.valueDim}`}>{fmt(result.arCollectedCash)}</span>
         </div>
       )}
       {result.arCollectedCheck > 0 && (
         <div className={`${styles.row} ${styles.channelRow}`}>
-          <div className={styles.channelLabel}>Less: collected by check (to deposit, not in drawer)</div>
-          <span className={`${styles.rowValue} ${styles.valueRed}`}>- {fmt(result.arCollectedCheck)}</span>
+          <div className={styles.channelLabel}>of which collected by check (encashed to bank)</div>
+          <span className={`${styles.rowValue} ${styles.valueDim}`}>{fmt(result.arCollectedCheck)}</span>
         </div>
       )}
-      {/* Only shown when there's an actual channel split to resolve —
-          otherwise this would be the exact same figure as "+ A/R Collected
-          This Period" above, reading as a duplicate rather than a subtotal. */}
-      {arCollectedOther > 0 && (
-        <div className={styles.totalRow}>
-          <span className={styles.totalLabel}>A/R Collected in Cash</span>
-          <span className={`${styles.totalValue} ${result.arCollectedCash > 0 ? styles.valueGreen : styles.valueNeutral}`}>
-            {fmt(result.arCollectedCash)}
-          </span>
+      {result.arCollectedGcash > 0 && (
+        <div className={`${styles.row} ${styles.channelRow}`}>
+          <div className={styles.channelLabel}>of which collected via GCash</div>
+          <span className={`${styles.rowValue} ${styles.valueDim}`}>{fmt(result.arCollectedGcash)}</span>
         </div>
       )}
 
@@ -212,7 +189,7 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         <div>
           <span className={styles.finalTotalLabel}>Net Cash Movement This Period</span>
           <div className={styles.finalTotalSub}>
-            Physical cash only, from this period&apos;s activity — GCash and checks not included.
+            Operating Result plus everything collected on invoices this period, checks included.
             Net of stock purchases (paid COD) — differs from the Sales Report&apos;s Expected Cash Remit, which excludes purchases.
           </div>
         </div>
@@ -225,11 +202,31 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           Purchases are paid from shared profit across outlets, not this outlet&apos;s own till — Net Cash Movement isn&apos;t reliable per outlet. Check &quot;All Outlets&quot; for the real total.
         </div>
       )}
-      {hasCashReconciliationGap && (
-        <div className={styles.cashMemo}>
-          The rows above sum to {fmt(result.cashBuildUp)}, {result.cashReconciliationGap > 0 ? "short of" : "over"} the total by {fmt(Math.abs(result.cashReconciliationGap))} — from a small number of older sales records saved before this app tracked a full payment breakdown per sale.
-        </div>
-      )}
+
+      {/* Memo, not components. These foot to Total Billed by construction and
+          NOT to Net Cash Movement above — purchases and expenses have no payment
+          channel, so that figure cannot be split this way. Labelled and totalled
+          separately so the two are never read as one sum. */}
+      <div className={styles.cardTitle}>How This Period&apos;s Sales Were Billed</div>
+      <div className={styles.cashMemo}>
+        Describes this period&apos;s sales by payment channel. Foots to Total Billed — not a breakdown of Net Cash Movement.
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowLabel}>Cash</div>
+        <span className={`${styles.rowValue} ${result.salesCash > 0 ? styles.valueNeutral : styles.valueDim}`}>{fmt(result.salesCash)}</span>
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowLabel}>GCash</div>
+        <span className={`${styles.rowValue} ${result.salesGcash > 0 ? styles.valueNeutral : styles.valueDim}`}>{fmt(result.salesGcash)}</span>
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowLabel}>A/R (on credit)</div>
+        <span className={`${styles.rowValue} ${result.salesAr > 0 ? styles.valueNeutral : styles.valueDim}`}>{fmt(result.salesAr)}</span>
+      </div>
+      <div className={styles.totalRow}>
+        <span className={styles.totalLabel}>Total Billed</span>
+        <span className={styles.totalValue}>{fmt(result.totalBilled)}</span>
+      </div>
     </div>
   );
 }

@@ -106,36 +106,39 @@ export interface IncomeStatementResult {
    */
   totalBilled: number;
 
-  /** AR collected THIS period (any invoice date), split by how it was collected. Check collections are money not yet cash — memo only, excluded from netCashMovement. */
+  /** AR collected THIS period (any invoice date), split by how it was collected.
+   *  All three are included in netCashMovement: a check is encashed into the
+   *  business's bank, so it is money received rather than money pending. */
   arCollectedCash: number;
   arCollectedGcash: number;
   arCollectedCheck: number;
+  /** arCollectedCash + arCollectedGcash + arCollectedCheck. */
+  arCollectedTotal: number;
 
   /**
-   * Net cash generated this period: salesCash + swapRevenue (assumed cash)
-   * + arCollectedCash − totalRefunds − totalExpenses − totalCostOfPurchases
-   * (totalCostOfPurchases excludes isTransfer docs — see realPurchases).
-   * Purchases are paid COD (confirmed business practice, not an assumption —
-   * if that ever changes, add a paymentMethod field to Purchase and subtract
-   * only cash-tagged docs). This is DIFFERENT from — and, once purchases
-   * were included, permanently diverges from — the Sales Report's per-day
-   * Expected Cash Remit, which deliberately excludes purchases (that figure
-   * reconciles against the physically-counted drawer, a different workflow).
-   * Do not "fix" that divergence by touching salesReport.ts's
-   * expectedCashRemit; see cashBuildUp for the other reason these two can
-   * differ.
+   * operatingResult + arCollectedTotal, per the owner's chosen definition
+   * (2026-08-20).
+   *
+   * Read it as "what the period earned, plus what came back in on invoices" —
+   * NOT as cash in the till, and not as profit. It deliberately does not
+   * subtract credit sales billed this period, so a sale invoiced and collected
+   * in the same period contributes to both terms, and a collection against an
+   * older invoice is money arriving now against revenue already recognised in
+   * an earlier period. The owner was shown that this differs from an
+   * accrual-to-cash bridge (which would add the CHANGE in A/R, not gross
+   * collections) and chose this sum deliberately.
+   *
+   * Consequence to preserve: this is not a channel-attributable figure — Cost
+   * of Purchases and Expenses have no payment channel — so the billing split
+   * shown beneath it foots to totalBilled and NOT to this number. Do not
+   * relabel that block as this figure's components.
+   *
+   * Still DIFFERENT from the Sales Report's per-day Expected Cash Remit, which
+   * excludes purchases entirely (that figure reconciles against the physically
+   * counted drawer, a different workflow). Do not "fix" that divergence by
+   * touching salesReport.ts.
    */
   netCashMovement: number;
-  /**
-   * The on-screen/Excel cash walk's build-up: operatingResult − salesGcash
-   * − salesAr + arCollectedCash. Equals netCashMovement exactly ONLY when
-   * totalBilled's identity holds for every doc in range (see totalBilled) —
-   * computed once here (not duplicated in the component and the workbook
-   * builder) so both surfaces read the same number instead of risking drift.
-   */
-  cashBuildUp: number;
-  /** netCashMovement − cashBuildUp. Nonzero only when a legacy doc breaks the totalBilled identity — see cashBuildUp. Surfaced on screen/Excel as a reconciliation note rather than left as a silent non-footing gap. */
-  cashReconciliationGap: number;
 }
 
 // "cylinderWithRefill"/"refill" get their established Sales Report labels;
@@ -352,19 +355,16 @@ export function computeIncomeStatement({
   // other while both quietly under-counting).
   const arCollectedCash = collectedTotal - arCollectedGcash - arCollectedCheck;
 
-  // Includes totalCostOfPurchases — purchases are paid COD (confirmed
-  // business practice), so treating the full cost as a cash outflow here is
-  // accurate, not an assumption (see the field comment on netCashMovement).
-  const netCashMovement = salesCash + swapRevenue + arCollectedCash - totalRefunds - totalExpenses - totalCostOfPurchases;
+  const arCollectedTotal = arCollectedCash + arCollectedGcash + arCollectedCheck;
 
-  // The on-screen/Excel cash walk (Operating Result − GCash − A/R + A/R
-  // Collected in Cash) only equals netCashMovement exactly when totalBilled's
-  // identity holds for every doc in range (see totalBilled's comment) — a
-  // legacy doc missing totalAmount can create a gap. Computed once here, not
-  // duplicated in the component and the workbook builder, so the two can't
-  // drift out of sync with each other.
-  const cashBuildUp = operatingResult - salesGcash - salesAr + arCollectedCash;
-  const cashReconciliationGap = netCashMovement - cashBuildUp;
+  // Operating Result + everything collected on invoices, checks included. See
+  // the field comment on netCashMovement for what this figure does and does not
+  // mean — it is the owner's definition, not an accrual-to-cash bridge, and the
+  // difference is deliberate.
+  //
+  // Operating Result already nets out Cost of Purchases (paid COD), Refunds and
+  // Expenses, so nothing here re-subtracts them.
+  const netCashMovement = operatingResult + arCollectedTotal;
 
   return {
     revenueLines,
@@ -396,8 +396,7 @@ export function computeIncomeStatement({
     arCollectedGcash,
     arCollectedCheck,
     netCashMovement,
-    cashBuildUp,
-    cashReconciliationGap,
+    arCollectedTotal,
   };
 }
 
@@ -572,64 +571,68 @@ export function buildIncomeStatementWorkbook({
   data.push([]);
 
   // ---- Cash position — a separate appendix, not part of the accrual
-  // statement above. These rows do NOT foot to Net Revenue or Gross
-  // Profit — see the field comments in IncomeStatementResult. Starts from
-  // Operating Result rather than rebuilding from Total Billed — Operating
-  // Result already nets out Cost of Purchases (paid COD), Refunds, and
-  // Expenses, so nothing here re-subtracts them. All that's left to adjust
-  // for is revenue that wasn't billed as cash (GCash, A/R), then A/R
-  // actually collected in cash this period. GCash and A/R are explicitly
-  // subtracted (mirroring the on-screen layout) rather than just never
-  // added, since GCash is reconciled by a separate account and this section
-  // exists specifically to answer "how much is in cash, only."
+  // statement above. These rows do NOT foot to Net Revenue or Gross Profit.
+  // Starts from Operating Result, which already nets out Cost of Purchases
+  // (paid COD), Refunds and Expenses, so nothing here re-subtracts them; the
+  // only addition is what was collected on invoices this period.
+  //
+  // The billing split below the total is a MEMO. It foots to Total Billed, not
+  // to Net Cash Movement — purchases and expenses have no payment channel, so
+  // Net Cash Movement is not channel-attributable. Kept as its own labelled
+  // block with its own total for exactly that reason.
   r = data.length;
   data.push(["CASH POSITION THIS PERIOD"]);
   sectionRows.push(r);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
-  data.push(["Cash movements only, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses. Assumes swap fees and expenses are settled in cash."]);
+  data.push(["Period movements, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses. Assumes swap fees and expenses are settled in cash."]);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
   data.push(["", ...columnLabels]);
   tableHeaderRows.push(r);
   data.push(["Operating Result", ...amountsFor((res) => res.operatingResult)]);
-  data.push(["Less: GCash", ...amountsFor((res) => (res.salesGcash > 0 ? -res.salesGcash : 0))]);
-  data.push(["Less: A/R (credit sales)", ...amountsFor((res) => (res.salesAr > 0 ? -res.salesAr : 0))]);
-  // A/R collected this period — always its own line (how much came back in
-  // on credit sales this month), broken out by channel so GCash/check
-  // collections are subtracted back out BEFORE the final cash total, instead
-  // of appearing in a memo section after it.
-  const hasArChannelSplit = allResults.some((res) => res.arCollectedGcash > 0 || res.arCollectedCheck > 0);
-  data.push(["+ A/R Collected This Period", ...amountsFor((res) => res.arCollectedCash + res.arCollectedGcash + res.arCollectedCheck)]);
-  if (hasArChannelSplit) {
-    if (allResults.some((res) => res.arCollectedGcash > 0)) {
-      data.push(["  Less: collected via GCash", ...amountsFor((res) => (res.arCollectedGcash > 0 ? -res.arCollectedGcash : 0))]);
-    }
-    if (allResults.some((res) => res.arCollectedCheck > 0)) {
-      data.push(["  Less: collected by check (to deposit, not in drawer)", ...amountsFor((res) => (res.arCollectedCheck > 0 ? -res.arCollectedCheck : 0))]);
-    }
-    // Only shown when there's an actual channel split to resolve — otherwise
-    // this would be the exact same figure as "+ A/R Collected This Period"
-    // one row up, reading as a duplicate rather than a subtotal.
-    r = data.length;
-    data.push(["A/R Collected in Cash", ...amountsFor((res) => res.arCollectedCash)]);
-    totalRows.push(r);
+  data.push(["+ A/R Collected This Period", ...amountsFor((res) => res.arCollectedTotal)]);
+  // Channel sub-lines are informational, not adjustments — every one of them is
+  // already inside the figure above, checks included.
+  if (allResults.some((res) => res.arCollectedCash > 0)) {
+    data.push(["  of which collected in cash", ...amountsFor((res) => res.arCollectedCash)]);
+  }
+  if (allResults.some((res) => res.arCollectedCheck > 0)) {
+    data.push(["  of which collected by check (encashed to bank)", ...amountsFor((res) => res.arCollectedCheck)]);
+  }
+  if (allResults.some((res) => res.arCollectedGcash > 0)) {
+    data.push(["  of which collected via GCash", ...amountsFor((res) => res.arCollectedGcash)]);
   }
   r = data.length;
   data.push(["NET CASH MOVEMENT THIS PERIOD", ...amountsFor((res) => res.netCashMovement)]);
   totalRows.push(r);
-  data.push(["  Physical cash only, from this period's activity — GCash and checks not included"]);
+  data.push(["  Operating Result plus everything collected on invoices this period. Not cash in the drawer, and not profit — a credit sale invoiced and collected in the same period counts in both terms"]);
   data.push(["  Net of stock purchases (paid COD) — differs from the Sales Report's Expected Cash Remit, which excludes purchases"]);
   if (branchResults.length > 0) {
     data.push(["  Per-outlet columns: purchases are paid from shared profit across outlets, not each outlet's own till — only the Combined column is a reliable cash figure"]);
   }
-  // cashReconciliationGap is computed once in computeIncomeStatement (not
-  // duplicated here) — nonzero only when a legacy doc breaks the totalBilled
-  // identity (see its field comment). Surface it rather than let the
-  // workbook silently not foot.
-  if (allResults.some((res) => Math.abs(res.cashReconciliationGap) > 0.01)) {
-    data.push(["  Rows above may not sum exactly to the total — a small number of older sales records predate this app's full payment breakdown per sale", ...amountsFor((res) => res.cashReconciliationGap)]);
-  }
+  data.push([]);
+
+  // Memo block: how the period's sales were billed. Foots to Total Billed by
+  // construction (totalBilled === salesCash + salesGcash + salesAr), so these
+  // rows always add up — unlike a channel split of Net Cash Movement, which
+  // could not.
+  r = data.length;
+  data.push(["HOW THIS PERIOD'S SALES WERE BILLED"]);
+  sectionRows.push(r);
+  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
+  r = data.length;
+  data.push(["Memo. Describes this period's sales by payment channel and foots to Total Billed — NOT a breakdown of Net Cash Movement above, which includes purchases and expenses that have no payment channel."]);
+  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
+  r = data.length;
+  data.push(["", ...columnLabels]);
+  tableHeaderRows.push(r);
+  data.push(["Cash", ...amountsFor((res) => res.salesCash)]);
+  data.push(["GCash", ...amountsFor((res) => res.salesGcash)]);
+  data.push(["A/R (on credit)", ...amountsFor((res) => res.salesAr)]);
+  r = data.length;
+  data.push(["Total Billed", ...amountsFor((res) => res.totalBilled)]);
+  totalRows.push(r);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!merges"] = merges;

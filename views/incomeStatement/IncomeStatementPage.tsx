@@ -112,7 +112,7 @@ export default function IncomeStatementPage({
   // of its own.
   const hasData = saleTransactions.length > 0 || swaps.length > 0 || purchases.length > 0
     || refunds.length > 0 || expenses.length > 0
-    || combinedResult.arCollectedCash + combinedResult.arCollectedGcash + combinedResult.arCollectedCheck > 0;
+    || combinedResult.arCollectedTotal > 0;
 
   const activeResult = activeTab === "all"
     ? combinedResult
