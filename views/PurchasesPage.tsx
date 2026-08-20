@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { fmt, today, presetThisMonth, presetLastMonth, formatDateShort } from "../lib/utils";
+import { fmt, today, formatDateShort } from "../lib/utils";
+import { monthBounds, monthLabel, monthOptions } from "../lib/months";
 import { PlusIcon, EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import { purchaseCost } from "../lib/reports/purchaseCost";
@@ -71,13 +72,11 @@ const subTabs = [
 ] as const;
 
 interface PurchasesPageProps {
-  purchaseTransactions: Purchase[];
+
   purchaseDeliveries: PurchaseDelivery[];
   branches: Branch[];
-  hasMorePurchases: boolean;
-  loadingMorePurchases: boolean;
-  onLoadMorePurchases: () => void;
-  /** One-time range query — see usePurchasesData's doc for why the From/To filters need this instead of filtering purchaseTransactions. */
+  /** One-time month query. See usePurchasesData for why the month filter needs
+   *  this rather than filtering the paginated purchaseTransactions window. */
   fetchPurchasesInRange: (from: string, to: string) => Promise<{ purchases: Purchase[]; truncated: boolean }>;
   /** Bumped by the hook after any mutation — refetches the active range query so it doesn't go stale after an edit/delete. */
   purchasesVersion: number;
@@ -92,11 +91,8 @@ interface PurchasesPageProps {
 }
 
 export default function PurchasesPage({
-  purchaseTransactions, purchaseDeliveries,
+  purchaseDeliveries,
   branches,
-  hasMorePurchases,
-  loadingMorePurchases,
-  onLoadMorePurchases,
   fetchPurchasesInRange,
   purchasesVersion,
   onOpenPurchaseModal,
@@ -106,8 +102,7 @@ export default function PurchasesPage({
   onDeleteTransfer,
 }: PurchasesPageProps) {
   const [subTab, setSubTab] = useState<"purchases" | "transfers">("purchases");
-  const [filterFrom, setFilterFrom] = useState("");
-  const [filterTo, setFilterTo] = useState("");
+  const [month, setMonth] = useState(() => today().slice(0, 7));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData>({ quantity: 0, unitCost: 0, totalCost: 0 });
   /** Whether the line being edited belongs to a delivery — if so, Save must send
@@ -120,34 +115,40 @@ export default function PurchasesPage({
   const [expandedDeliveries, setExpandedDeliveries] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
-  const isRangeActive = !!(filterFrom || filterTo);
+  const { start: monthStart, end: monthEnd } = monthBounds(month);
 
-  // A date range is a real Firestore query (fetchPurchasesInRange), not a
-  // filter over purchaseTransactions — that array only holds the recent
-  // paginated window, so filtering it client-side would silently miss any
-  // older history the range asks for.
+  // Selectable months come from purchaseDeliveries, not from the rows on screen.
+  // That collection is subscribed in full and unpaginated, so it spans the whole
+  // history — building the picker from the paginated window instead would hide
+  // exactly the old months this picker exists to reach.
+  const months = useMemo(
+    () => monthOptions(purchaseDeliveries.map((d) => d.date), today().slice(0, 7)),
+    [purchaseDeliveries],
+  );
+
+  // The month is a real Firestore query (fetchPurchasesInRange), not a filter
+  // over the paginated purchaseTransactions window — that array only holds recent
+  // window, so filtering it client-side would silently miss older history.
   const [rangeResults, setRangeResults] = useState<Purchase[] | null>(null);
   const [rangeTruncated, setRangeTruncated] = useState(false);
-  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeLoading, setRangeLoading] = useState(true);
   const [rangeError, setRangeError] = useState(false);
 
-  // Reset synchronously when the range changes (React's documented "adjust
-  // state during render" pattern, same as useSalesData's branch-switch reset)
-  // so stale results never flash under a new From/To before the fetch below resolves.
-  const filterKey = `${filterFrom}|${filterTo}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (prevFilterKey !== filterKey) {
-    setPrevFilterKey(filterKey);
+  // Reset synchronously when the month changes (React's documented "adjust state
+  // during render" pattern, same as useSalesData's branch-switch reset) so stale
+  // results never flash under a new month before the fetch below resolves.
+  const [prevMonth, setPrevMonth] = useState(month);
+  if (prevMonth !== month) {
+    setPrevMonth(month);
     setRangeResults(null);
     setRangeTruncated(false);
     setRangeError(false);
-    setRangeLoading(isRangeActive);
+    setRangeLoading(true);
   }
 
   useEffect(() => {
-    if (!isRangeActive) return;
     let cancelled = false;
-    fetchPurchasesInRange(filterFrom, filterTo)
+    fetchPurchasesInRange(monthStart, monthEnd)
       .then(({ purchases, truncated }) => {
         if (cancelled) return;
         setRangeResults(purchases);
@@ -156,53 +157,35 @@ export default function PurchasesPage({
       })
       .catch((error) => {
         if (cancelled) return;
-        console.error("Purchases range query error:", error);
+        console.error("Purchases month query error:", error);
         setRangeError(true);
       })
       .finally(() => { if (!cancelled) setRangeLoading(false); });
     return () => { cancelled = true; };
     // purchasesVersion isn't read in the body — it's a refetch trigger so an
-    // edit/delete made while a range filter is active doesn't leave stale results on screen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterFrom, filterTo, fetchPurchasesInRange, purchasesVersion]);
+    // edit or delete doesn't leave stale results on screen.
+  }, [monthStart, monthEnd, fetchPurchasesInRange, purchasesVersion]);
 
-  // Never fall back to the unfiltered recent window while a range is active —
-  // that would silently show the wrong data on a query error.
-  const filtered = useMemo(
-    () => (isRangeActive ? (rangeResults ?? []) : purchaseTransactions),
-    [isRangeActive, rangeResults, purchaseTransactions],
-  );
+  // Never fall back to the unfiltered recent window — that would silently show
+  // the wrong month's data on a query error.
+  const filtered = useMemo(() => rangeResults ?? [], [rangeResults]);
 
-  // Real purchases only — transfers move existing stock, they don't add to
-  // how much was actually bought/spent.
+  // Real purchases only — transfers move existing stock, they don't add to how
+  // much was actually bought/spent.
   // A purchaseDelivery stands on its own: it records what was paid, and deleting
   // its product lines only adjusts inventory. So the scope is by DATE, not by the
   // ids the visible lines happen to reference — otherwise a delivery whose lines
   // were all deleted would keep counting in the Income Statement while vanishing
   // from this table and its footer.
-  //
-  // With a range filter, that range is the scope. Without one, `filtered` is just
-  // the paginated recent window, so the scope is the date span it covers — a
-  // delivery older than everything on screen belongs to a page not yet loaded.
-  const visibleDeliveries = useMemo(() => {
-    if (isRangeActive) {
-      return purchaseDeliveries.filter((d) =>
-        (!filterFrom || d.date >= filterFrom) && (!filterTo || d.date <= filterTo));
-    }
-    if (filtered.length === 0) return [];
-    const dates = filtered.map((t) => t.date);
-    const earliest = dates.reduce((a, b) => (a < b ? a : b));
-    return purchaseDeliveries.filter((d) => d.date >= earliest);
-  }, [purchaseDeliveries, isRangeActive, filterFrom, filterTo, filtered]);
+  const visibleDeliveries = useMemo(
+    () => purchaseDeliveries.filter((d) => d.date >= monthStart && d.date <= monthEnd),
+    [purchaseDeliveries, monthStart, monthEnd],
+  );
 
   // purchaseCost() rather than a local sum, so this footer can never disagree
   // with the Income Statement.
   const totalCost = purchaseCost(filtered, visibleDeliveries).total;
   const totalItems = filtered.filter((t) => !t.isTransfer).reduce((sum, t) => sum + (t.quantity || 0), 0);
-  // A range query is always complete, so "Total" is accurate there. With no
-  // filter, purchaseTransactions is just the paginated recent window — flag
-  // that explicitly rather than let the total read as "all-time".
-  const totalLabel = !isRangeActive && hasMorePurchases ? "Total (recent)" : "Total";
 
   // Merge each transfer's source/destination doc pair into a single row.
   const rows = useMemo(() => {
@@ -455,44 +438,20 @@ export default function PurchasesPage({
       <div className={styles.card}>
         {/* Header with filters + Add button */}
         <div className={styles.toolbar}>
+          {/* One month at a time, not a free range. Every screen that reports by
+              month uses the same picker (see lib/months) so "August 2026" means
+              the same span everywhere. */}
           <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>From</label>
-            <input
-              type="date"
-              value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)}
-              className={styles.dateInput}
-            />
-          </div>
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>To</label>
-            <input
-              type="date"
-              value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)}
-              className={styles.dateInput}
-            />
-          </div>
-          <button
-            className={styles.presetButton}
-            onClick={() => { const r = presetThisMonth(today()); setFilterFrom(r.start); setFilterTo(r.end); }}
-          >
-            This Month
-          </button>
-          <button
-            className={styles.presetButton}
-            onClick={() => { const r = presetLastMonth(today()); setFilterFrom(r.start); setFilterTo(r.end); }}
-          >
-            Last Month
-          </button>
-          {(filterFrom || filterTo) && (
-            <button
-              onClick={() => { setFilterFrom(""); setFilterTo(""); }}
-              className={styles.clearButton}
+            <label className={styles.filterLabel} htmlFor="purchases-month">Month</label>
+            <select
+              id="purchases-month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className={styles.monthSelect}
             >
-              Clear
-            </button>
-          )}
+              {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
           {subTab === "purchases" && deliveryIdsInView.length > 0 && (
             <button onClick={toggleAllDeliveries} className={styles.presetButton}>
               {allExpanded ? "Collapse all" : "Expand all"}
@@ -727,12 +686,10 @@ export default function PurchasesPage({
               <tr>
                 <td colSpan={5} className={styles.emptyState}>
                   {rangeError
-                    ? "Couldn't load purchases for this range. Please try again."
+                    ? "Couldn't load purchases for this month. Please try again."
                     : rangeLoading
-                    ? "Searching…"
-                    : isRangeActive
-                    ? `No ${subTab === "purchases" ? "purchases" : "transfers"} in the selected date range.`
-                    : `No ${subTab === "purchases" ? "purchases" : "transfers"} recorded yet.`}
+                    ? "Loading…"
+                    : `No ${subTab === "purchases" ? "purchases" : "transfers"} in ${monthLabel(month)}.`}
                 </td>
               </tr>
             )}
@@ -741,14 +698,14 @@ export default function PurchasesPage({
             <tfoot>
               {subTab === "purchases" ? (
                 <tr>
-                  <td colSpan={2} className={styles.grandTotalLabel}>{totalLabel}</td>
+                  <td colSpan={2} className={styles.grandTotalLabel}>Total</td>
                   <td className={styles.grandTotalQty}>{totalItems}</td>
                   <td className={styles.grandTotalCost}>{fmt(totalCost)}</td>
                   <td />
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={2} className={styles.grandTotalLabel}>{totalLabel}</td>
+                  <td colSpan={2} className={styles.grandTotalLabel}>Total</td>
                   <td />
                   <td className={styles.grandTotalQty}>{totalTransferItems}</td>
                   <td />
@@ -760,21 +717,12 @@ export default function PurchasesPage({
         </div>
         </div>
 
-        {/* A date range is already a complete query — pagination only applies to the unfiltered recent view. */}
-        {!isRangeActive && hasMorePurchases && (
-          <div className={styles.loadMoreRow}>
-            <button
-              onClick={onLoadMorePurchases}
-              disabled={loadingMorePurchases}
-              className={styles.loadMoreButton}
-            >
-              {loadingMorePurchases ? "Loading…" : "Load older purchases"}
-            </button>
-          </div>
-        )}
-        {isRangeActive && rangeTruncated && (
+        {/* No "load older" button: a month query is complete by construction, and
+            the month picker — built from the fully-loaded delivery collection —
+            is how older purchases are reached. */}
+        {rangeTruncated && (
           <div className={styles.rangeTruncatedNote}>
-            Showing the first 500 matches — narrow the date range to see everything.
+            Showing the first 500 entries for {monthLabel(month)}. Some of this month is not on screen.
           </div>
         )}
       </div>

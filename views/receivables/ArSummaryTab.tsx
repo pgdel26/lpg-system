@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { fmt, today } from "../../lib/utils";
+import { monthBounds, monthLabel, monthOptions } from "../../lib/months";
 import { arRollForward } from "../../lib/receivables";
 import type { SaleTransaction } from "../../lib/types";
 import styles from "./ArSummaryTab.module.css";
@@ -8,59 +9,12 @@ interface ArSummaryTabProps {
   arTransactions: SaleTransaction[];
 }
 
-/** First and last day of a YYYY-MM month, as YYYY-MM-DD strings. Kept in string
- *  space so nothing downstream can pick up a local-timezone offset; lib/utils
- *  solves the same problem with Date.UTC + getUTCDate, which is equally safe. */
-function monthBounds(yyyymm: string): { start: string; end: string } {
-  const [y, m] = yyyymm.split("-").map(Number);
-  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
-  return { start: `${yyyymm}-01`, end: `${yyyymm}-${String(days).padStart(2, "0")}` };
-}
-
-/** Selectable months, newest first.
- *
- *  Spans the earliest invoice month through the LATER of the current month and
- *  the latest invoice month. Both bounds matter: sale dates are operator-typed
- *  (useSalesData's `date: saleDate || inventoryDate`), so a single mis-typed
- *  year can put an invoice outside the range — and a month that isn't
- *  selectable is money that appears in the Transactions tab's Total Pending but
- *  in no period here. The lower bound is clamped to 36 months so one 1970 typo
- *  can't generate a 600-option picker; the range is then bounded by
- *  construction rather than by a loop guard that fails silently. */
-const MAX_MONTHS = 36;
-function addMonths(yyyymm: string, delta: number): string {
-  const [y, m] = yyyymm.split("-").map(Number);
-  const total = y * 12 + (m - 1) + delta;
-  // ((n % 12) + 12) % 12 rather than n % 12: JS's remainder keeps the sign, so a
-  // negative total would otherwise yield a month of 0 or less. Unreachable with
-  // real dates, but the guard costs nothing and the failure would be silent.
-  const month = ((total % 12) + 12) % 12;
-  return `${Math.floor(total / 12)}-${String(month + 1).padStart(2, "0")}`;
-}
-function monthOptions(docs: SaleTransaction[]): string[] {
-  const current = today().slice(0, 7);
-  const dates = docs.map((t) => t.date).filter(Boolean).sort();
-  const last = dates.length ? (dates[dates.length - 1] as string).slice(0, 7) : current;
-  const newest = last > current ? last : current;
-  const first = dates.length ? (dates[0] as string).slice(0, 7) : current;
-  const floor = addMonths(newest, -(MAX_MONTHS - 1));
-  const earliest = first > floor ? first : floor;
-  const out: string[] = [];
-  for (let key = earliest; key <= newest; key = addMonths(key, 1)) out.push(key);
-  return out.reverse();
-}
-
-const MONTH_LABELS = ["January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"];
-const monthLabel = (yyyymm: string) => {
-  const [y, m] = yyyymm.split("-").map(Number);
-  return `${MONTH_LABELS[m - 1]} ${y}`;
-};
-
 export default function ArSummaryTab({ arTransactions }: ArSummaryTabProps) {
   const [month, setMonth] = useState(() => today().slice(0, 7));
-  const months = useMemo(() => monthOptions(arTransactions), [arTransactions]);
+  const months = useMemo(
+    () => monthOptions(arTransactions.map((t) => t.date), today().slice(0, 7)),
+    [arTransactions],
+  );
   const { start, end } = monthBounds(month);
 
   const rows = useMemo(

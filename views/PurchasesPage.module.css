@@ -55,29 +55,6 @@
   white-space: nowrap;
 }
 
-.dateInput {
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(241, 245, 249, 0.8);
-  border: 1px solid var(--border-light);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  outline: none;
-}
-
-.clearButton {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--accent-blue);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-}
-
 .presetButton {
   padding: 8px 14px;
   border-radius: 8px;
@@ -111,29 +88,6 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   overflow: hidden;
-}
-
-.loadMoreRow {
-  display: flex;
-  justify-content: center;
-  padding: 14px 0 4px;
-}
-
-.loadMoreButton {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--accent-blue);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-}
-
-.loadMoreButton:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .tableScroll {
@@ -449,4 +403,18 @@
   margin-right: 3px;
   color: var(--text-muted);
   font-size: 9px;
+}
+
+/* Matches ArSummaryTab's month picker — the two screens offer the same control,
+   so they should not look like two different controls. */
+.monthSelect {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
 }
