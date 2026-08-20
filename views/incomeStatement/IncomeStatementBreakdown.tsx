@@ -150,7 +150,7 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         </span>
       </div>
       <div className={styles.cashMemo}>
-        Starting from Operating Result above: cash movements only, not a running balance. Assumes swap fees and expenses are settled in cash.
+        Starting from Operating Result above: period movements, not a running balance. The two adjustments are the A/R movement — credit billed out, collections in. Assumes swap fees and expenses are settled in cash.
       </div>
 
       {/* A/R collected this period, checks included. The channel lines beneath
@@ -182,6 +182,16 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         </div>
       )}
 
+      {/* The other half of the A/R movement. This period's credit sales sit in
+          Operating Result as revenue, but no money arrived for them — so they
+          come out here, and what was actually collected went in above. */}
+      <div className={styles.row}>
+        <div className={styles.rowLabel}>Less: A/R (credit sales this period, not yet received)</div>
+        <span className={`${styles.rowValue} ${result.salesAr > 0 ? styles.valueRed : styles.valueDim}`}>
+          {result.salesAr > 0 ? `- ${fmt(result.salesAr)}` : fmt(0)}
+        </span>
+      </div>
+
       {/* The bottom line of the whole page — nothing renders after this
           total, so any exclusion the reader needs is attached directly below
           it rather than in a separate memo section further down. */}
@@ -189,7 +199,8 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
         <div>
           <span className={styles.finalTotalLabel}>Net Cash Movement This Period</span>
           <div className={styles.finalTotalSub}>
-            Operating Result plus everything collected on invoices this period, checks included.
+            Everything received minus everything paid — no credit sale counts as money until collected.
+            Received by the business, not the till: GCash and encashed checks both count.
             Net of stock purchases (paid COD) — differs from the Sales Report&apos;s Expected Cash Remit, which excludes purchases.
           </div>
         </div>

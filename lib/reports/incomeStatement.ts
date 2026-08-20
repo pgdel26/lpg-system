@@ -116,27 +116,46 @@ export interface IncomeStatementResult {
   arCollectedTotal: number;
 
   /**
-   * operatingResult + arCollectedTotal, per the owner's chosen definition
-   * (2026-08-20).
+   * operatingResult − salesAr + arCollectedTotal.
    *
-   * Read it as "what the period earned, plus what came back in on invoices" —
-   * NOT as cash in the till, and not as profit. It deliberately does not
-   * subtract credit sales billed this period, so a sale invoiced and collected
-   * in the same period contributes to both terms, and a collection against an
-   * older invoice is money arriving now against revenue already recognised in
-   * an earlier period. The owner was shown that this differs from an
-   * accrual-to-cash bridge (which would add the CHANGE in A/R, not gross
-   * collections) and chose this sum deliberately.
+   * The accrual-to-cash bridge: back out credit sales BILLED this period (no
+   * money arrived), then add everything COLLECTED on invoices (money did
+   * arrive, whenever the invoice was raised). Expanding it via totalBilled's
+   * identity gives what it is meant to be —
    *
-   * Consequence to preserve: this is not a channel-attributable figure — Cost
-   * of Purchases and Expenses have no payment channel — so the billing split
-   * shown beneath it foots to totalBilled and NOT to this number. Do not
-   * relabel that block as this figure's components.
+   *   salesCash + salesGcash + swapRevenue + arCollectedTotal
+   *     − totalRefunds − totalCostOfPurchases − totalExpenses
+   *
+   * — i.e. everything received minus everything paid, with no credit sale
+   * counted as money until collected.
+   *
+   * That expansion is CONDITIONAL on totalBilled's identity holding, which it
+   * does for everything recordSale writes but not for a handful of legacy docs
+   * (see totalBilled's own comment). Measured 2026-08-20: 5 docs across all
+   * history break it, four because `totalAmount` omits their deliveryCharge and
+   * one from a ₱9 entry inconsistency. Net effect on any period figure is under
+   * ₱25, and the on-screen walk still foots exactly either way because it IS
+   * this definition — the discrepancy is between this figure and a
+   * from-scratch cash tally, not between the rows and their total.
+   *
+   * "Received" here means received by the BUSINESS, not by the till: GCash
+   * (its own wallet account) and checks (encashed to the bank) both count. On
+   * real data that distinction is the whole ballgame — check was 99.5% of
+   * August 2026's A/R collections, so the previous physical-cash-only
+   * definition discarded PHP 1,476,891 of the PHP 1,484,291 collected.
+   *
+   * Purchases are paid COD (confirmed practice, not an assumption — if that
+   * changes, add a paymentMethod to Purchase and subtract only cash-tagged
+   * docs).
    *
    * Still DIFFERENT from the Sales Report's per-day Expected Cash Remit, which
-   * excludes purchases entirely (that figure reconciles against the physically
-   * counted drawer, a different workflow). Do not "fix" that divergence by
-   * touching salesReport.ts.
+   * excludes purchases entirely and reconciles against the physically counted
+   * drawer — a different workflow. Do not "fix" that divergence in
+   * salesReport.ts.
+   *
+   * Not channel-attributable: Cost of Purchases and Expenses have no payment
+   * channel, so the billing split shown beneath it foots to totalBilled and NOT
+   * to this figure. Do not relabel that block as this figure's components.
    */
   netCashMovement: number;
 }
@@ -357,14 +376,11 @@ export function computeIncomeStatement({
 
   const arCollectedTotal = arCollectedCash + arCollectedGcash + arCollectedCheck;
 
-  // Operating Result + everything collected on invoices, checks included. See
-  // the field comment on netCashMovement for what this figure does and does not
-  // mean — it is the owner's definition, not an accrual-to-cash bridge, and the
-  // difference is deliberate.
-  //
   // Operating Result already nets out Cost of Purchases (paid COD), Refunds and
-  // Expenses, so nothing here re-subtracts them.
-  const netCashMovement = operatingResult + arCollectedTotal;
+  // Expenses, so nothing here re-subtracts them. The two adjustments are the
+  // A/R movement: out with what was billed on credit, in with what was actually
+  // collected. See the field comment for the expanded form.
+  const netCashMovement = operatingResult - salesAr + arCollectedTotal;
 
   return {
     revenueLines,
@@ -574,7 +590,7 @@ export function buildIncomeStatementWorkbook({
   // statement above. These rows do NOT foot to Net Revenue or Gross Profit.
   // Starts from Operating Result, which already nets out Cost of Purchases
   // (paid COD), Refunds and Expenses, so nothing here re-subtracts them; the
-  // only addition is what was collected on invoices this period.
+  // two adjustments are the A/R movement — credit billed out, cash collected in.
   //
   // The billing split below the total is a MEMO. It foots to Total Billed, not
   // to Net Cash Movement — purchases and expenses have no payment channel, so
@@ -585,7 +601,7 @@ export function buildIncomeStatementWorkbook({
   sectionRows.push(r);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
-  data.push(["Period movements, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses. Assumes swap fees and expenses are settled in cash."]);
+  data.push(["Period movements, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses; the two adjustments below are the A/R movement — out with credit billed, in with cash collected. Assumes swap fees and expenses are settled in cash."]);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
   data.push(["", ...columnLabels]);
@@ -603,10 +619,14 @@ export function buildIncomeStatementWorkbook({
   if (allResults.some((res) => res.arCollectedGcash > 0)) {
     data.push(["  of which collected via GCash", ...amountsFor((res) => res.arCollectedGcash)]);
   }
+  // The other half of the A/R movement: this period's credit sales are in
+  // Operating Result as revenue, but no money arrived for them.
+  data.push(["Less: A/R (credit sales this period, not yet received)", ...amountsFor((res) => (res.salesAr > 0 ? -res.salesAr : 0))]);
   r = data.length;
   data.push(["NET CASH MOVEMENT THIS PERIOD", ...amountsFor((res) => res.netCashMovement)]);
   totalRows.push(r);
-  data.push(["  Operating Result plus everything collected on invoices this period. Not cash in the drawer, and not profit — a credit sale invoiced and collected in the same period counts in both terms"]);
+  data.push(["  Everything received minus everything paid: cash and GCash sales, swap fees and A/R collections, less refunds, purchases and expenses. No credit sale counts as money until collected"]);
+  data.push(["  Received by the business, not by the till — GCash and encashed checks both count"]);
   data.push(["  Net of stock purchases (paid COD) — differs from the Sales Report's Expected Cash Remit, which excludes purchases"]);
   if (branchResults.length > 0) {
     data.push(["  Per-outlet columns: purchases are paid from shared profit across outlets, not each outlet's own till — only the Combined column is a reliable cash figure"]);
