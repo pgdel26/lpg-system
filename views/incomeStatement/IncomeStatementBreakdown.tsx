@@ -86,6 +86,14 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           {result.totalCostOfPurchases > 0 ? `- ${fmt(result.totalCostOfPurchases)}` : fmt(0)}
         </span>
       </div>
+      {result.uncostedDeliveryCount > 0 && (
+        <div className={styles.cashMemo}>
+          {result.uncostedDeliveryCount} deliver{result.uncostedDeliveryCount === 1 ? "y" : "ies"} received
+          this period {result.uncostedDeliveryCount === 1 ? "has" : "have"} no cost entered yet, so the figure
+          above is a floor — Gross Profit below is overstated until {result.uncostedDeliveryCount === 1 ? "it is" : "they are"} costed
+          on the Purchases screen.
+        </div>
+      )}
       {result.hasTransferActivity && (
         <div className={styles.cashMemo}>
           Stock transferred in: {result.transferInQty} · out: {result.transferOutQty} (units, not valued).

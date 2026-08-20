@@ -170,16 +170,30 @@ export interface Purchase {
   createdAt: Timestamp;
 }
 
-// purchaseDelivery collection — one doc per delivery (auto id), holding the
-// amount payable for it. That total is all the operator knows at purchase time:
-// the supplier bills a delivery total and itemizes a month later, if at all.
-// Two deliveries on one date are two docs, so neither has to be a running total.
-// Purchase line docs point back via `deliveryId`.
+// purchaseDelivery collection — one doc per delivery, holding the amount payable
+// for it. That total is all the operator knows at purchase time: the supplier
+// bills a delivery total and itemizes a month later, if at all. Two deliveries on
+// one date are two docs, so neither has to be a running total. Purchase line docs
+// point back via `deliveryId`.
+//
+// IDs: deliveries recorded through the app get an auto id. The 90 docs written by
+// scripts/backfill-purchase-deliveries.mjs use a deterministic `<branch>_<date>`
+// id instead, which made that migration idempotent and enforces the one-per-date
+// assumption it had to make about pre-delivery history. Never derive meaning from
+// the id shape — read the fields.
 export interface PurchaseDelivery {
   id: string;
   date: string;
   branch: BranchId;
   totalCost: number;
+  /** True when nobody has entered this delivery's cost yet, so `totalCost: 0` is
+   *  a placeholder rather than a real figure. Set on the pre-July-2026 and
+   *  August deliveries created by the backfill, whose lines were recorded before
+   *  any cost was captured. A genuinely zero-billed delivery (a supplier
+   *  replacement, say) is a real thing and does NOT carry this flag — that
+   *  distinction is the whole reason the field exists. Reports must show these as
+   *  uncosted, never as ₱0.00, which would read as free stock. */
+  costPending?: boolean;
   createdAt: Timestamp;
 }
 

@@ -418,3 +418,12 @@
 .deliveryChildProduct {
   padding-left: 24px;
 }
+
+/* A delivery whose cost nobody has entered yet. Muted and non-mono so it reads
+   as a note rather than a figure — the placeholder 0 behind it is not money. */
+.deliveryHeaderCostPending {
+  font-family: inherit;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-muted);
+}

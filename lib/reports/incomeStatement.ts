@@ -63,6 +63,11 @@ export interface IncomeStatementResult {
   discountsByCustomer: IncomeStatementLine[];
   costLines: IncomeStatementLine[];
   totalCostOfPurchases: number;
+  /** Deliveries in this period whose cost nobody has entered yet. Above 0 means
+   *  totalCostOfPurchases is a floor, not the real spend, and Gross Profit is
+   *  overstated by whatever those deliveries actually cost — so every surface
+   *  showing the cost must say so rather than presenting the figure as complete. */
+  uncostedDeliveryCount: number;
   grossProfit: number;
   /** null when netRevenue is 0 — a margin isn't meaningful with no revenue. */
   grossMarginPct: number | null;
@@ -274,6 +279,7 @@ export function computeIncomeStatement({
   });
   const costBreakdown = purchaseCost(realPurchases, scopedDeliveries);
   const totalCostOfPurchases = costBreakdown.total;
+  const uncostedDeliveryCount = costBreakdown.pendingCount;
 
   // Per-category cost only exists for the per-line era. A delivery costed as one
   // total contributes a single undifferentiated line — the supplier does not
@@ -288,7 +294,9 @@ export function computeIncomeStatement({
       ? [{
           label: "Purchases",
           amount: costBreakdown.fromDeliveries,
-          count: costBreakdown.deliveryCount,
+          // Costed deliveries only: captioning ₱5.2M as "20 deliveries" when 5 of
+          // them contributed nothing understates the average delivery badly.
+          count: costBreakdown.deliveryCount - costBreakdown.pendingCount,
         }]
       : []),
   ];
@@ -371,6 +379,7 @@ export function computeIncomeStatement({
     discountsByCustomer,
     costLines,
     totalCostOfPurchases,
+    uncostedDeliveryCount,
     grossProfit,
     grossMarginPct,
     totalExpenses,
@@ -514,7 +523,13 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["Total Cost of Purchases", ...amountsFor((res) => res.totalCostOfPurchases)]);
   totalRows.push(r);
-  data.push(["  Stock bought this period, not adjusted for opening/closing inventory — a heavy-restocking month looks worse than it was, a sell-down month looks better"]);
+  data.push(["  Stock bought this period, not adjusted for opening/closing inventory — a heavy-restocking month looks worse than it was, a sell-down month looks better"])
+  // Load-bearing caveat, not decoration: without it a month of uncosted
+  // deliveries exports as a complete-looking cost figure that is simply too low.
+  if (allResults.some((res) => res.uncostedDeliveryCount > 0)) {
+    data.push(["  Deliveries received with no cost entered yet", ...amountsFor((res) => res.uncostedDeliveryCount)]);
+    data.push(["  Cost of Purchases above excludes those deliveries — it is a floor, and Gross Profit is overstated until they are costed"]);
+  };
   // Memo only — units, not pesos, and only meaningful per-outlet (nets to
   // zero company-wide, so Combined always reads 0/0 here by design).
   if (allResults.some((res) => res.hasTransferActivity)) {

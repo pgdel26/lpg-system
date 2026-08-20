@@ -44,7 +44,17 @@ interface DisplayRow {
  *  carrying its cost plus one row per product; a pre-delivery purchase
  *  contributes a single row carrying its own line cost. */
 type DisplayItem =
-  | { kind: "deliveryHeader"; key: string; date: string; totalCost?: number; lineCount: number; itemCount: number }
+  | {
+      kind: "deliveryHeader";
+      key: string;
+      date: string;
+      totalCost?: number;
+      /** No cost entered for this delivery yet — the header says so instead of
+       *  showing the placeholder 0. See PurchaseDelivery.costPending. */
+      costPending?: boolean;
+      lineCount: number;
+      itemCount: number;
+    }
   | { kind: "row"; row: DisplayRow };
 
 interface PendingDelete {
@@ -297,6 +307,7 @@ export default function PurchasesPage({
         // undefined (not 0) when the doc isn't loaded — "—" is honest, a zero
         // would read as a free delivery.
         totalCost: byId.get(deliveryId)?.totalCost,
+        costPending: byId.get(deliveryId)?.costPending,
         lineCount: lines.length,
         itemCount: lines.reduce((s, r) => s + (r.quantity || 0), 0),
       });
@@ -503,8 +514,14 @@ export default function PurchasesPage({
                         {item.itemCount} item{item.itemCount !== 1 ? "s" : ""} · {item.lineCount} product{item.lineCount !== 1 ? "s" : ""}
                       </span>
                     </td>
-                    <td className={styles.deliveryHeaderCost}>
-                      {item.totalCost == null ? "—" : fmt(item.totalCost)}
+                    {/* Three distinct states, and collapsing any two of them
+                        would misreport money: a real total, a delivery nobody
+                        has costed yet (placeholder 0 — must not render as
+                        ₱0.00), and a doc that simply isn't loaded. */}
+                    <td className={`${styles.deliveryHeaderCost} ${item.costPending ? styles.deliveryHeaderCostPending : ""}`}>
+                      {item.costPending
+                        ? "Not yet costed"
+                        : item.totalCost == null ? "—" : fmt(item.totalCost)}
                     </td>
                     <td />
                   </tr>
