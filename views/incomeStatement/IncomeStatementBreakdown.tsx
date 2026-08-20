@@ -73,11 +73,8 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
       </div>
 
       <div className={styles.row}>
-        <div>
-          <div className={styles.rowLabel}>Less: Cost of Purchases</div>
-          <div className={styles.rowSub}>Stock bought this period, not adjusted for opening/closing inventory</div>
-        </div>
-        <span className={`${styles.rowValue} ${result.totalCostOfPurchases > 0 ? styles.valueRed : styles.valueDim}`}>
+        <div className={styles.rowLabel}>Less: Cost of Purchases</div>
+        <span className={`${styles.totalValue} ${result.totalCostOfPurchases > 0 ? styles.valueRed : styles.valueDim}`}>
           {result.totalCostOfPurchases > 0 ? `- ${fmt(result.totalCostOfPurchases)}` : fmt(0)}
         </span>
       </div>
@@ -201,10 +198,7 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
           NOT to Net Cash Movement above — purchases and expenses have no payment
           channel, so that figure cannot be split this way. Labelled and totalled
           separately so the two are never read as one sum. */}
-      <div className={styles.cardTitle}>How This Period&apos;s Sales Were Billed</div>
-      <div className={styles.cashMemo}>
-        Describes this period&apos;s sales by payment channel. Foots to Total Billed — not a breakdown of Net Cash Movement.
-      </div>
+      <div className={styles.sectionTitle}>How This Period&apos;s Sales Were Billed</div>
       <div className={styles.row}>
         <div className={styles.rowLabel}>Cash</div>
         <span className={`${styles.rowValue} ${result.salesCash > 0 ? styles.valueNeutral : styles.valueDim}`}>{fmt(result.salesCash)}</span>

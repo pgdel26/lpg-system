@@ -146,7 +146,7 @@
 }
 
 .finalTotalValue {
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 800;
   font-family: var(--font-mono);
   line-height: 1.1;
@@ -161,3 +161,21 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
 }
 
+
+/* A section break inside the card, not another card — the statement above is one
+   continuous table and stays that way. The heavy rule plus the gap above it is
+   what says "different thing now": the billing figures below foot to Total
+   Billed, not to Net Cash Movement, so reading straight on from the total would
+   invite adding them together. */
+.sectionTitle {
+  margin-top: 28px;
+  padding: 14px 20px;
+  border-top: 3px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
