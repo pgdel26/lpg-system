@@ -6,7 +6,7 @@ import IncomeStatementPage from "../../../views/incomeStatement/IncomeStatementP
 import { today } from "../../../lib/utils";
 
 export default function IncomeStatementRoutePage() {
-  const { branches, arTransactions } = useAppData();
+  const { branches, arTransactions, staff } = useAppData();
   const { loading, error, data, fetchRange } = useIncomeStatementData();
 
   // Default period: current calendar month to date.
@@ -30,6 +30,7 @@ export default function IncomeStatementRoutePage() {
       purchases={data?.purchases || []}
       purchaseDeliveries={data?.purchaseDeliveries || []}
       expenses={data?.expenses || []}
+      staff={staff}
       branches={branches}
       arTransactions={arTransactions}
     />

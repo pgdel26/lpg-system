@@ -22,6 +22,9 @@ export interface ArCollectionEventLike {
   branch?: string;
   batchId?: string;
   voided?: boolean;
+  /** Free-text note the operator typed when recording the collection. Display
+   *  only — no calculation reads it. */
+  notes?: string;
 }
 
 export interface ArStatusLike extends PaymentSplitLike {
@@ -97,13 +100,30 @@ export function arStatusAsOf(t: ArStatusLike, date: string): ArStatus {
 // be paid down by more than one method over time (e.g. partly cash, later a
 // check) — "Mixed" says so honestly instead of picking whichever event a
 // naive "last one" comparison happens to favor.
+/**
+ * Display label for one AR collection method.
+ *
+ * The STORED value stays "gcash" — every filter keys on it and months of events
+ * already carry it, so renaming the value would orphan history. Only the label
+ * changed to "Online Payment". Kept in one place because the same ternary was
+ * written out in the modal, the Receivables event list, the void confirmation
+ * and collectionMethodLabel below.
+ *
+ * Distinct from a SALE's payment method (SalePayment.method) — a different field
+ * on a different document, still labelled "GCash".
+ */
+export function arMethodLabel(method: string | undefined): string {
+  if (method === "check") return "Check";
+  if (method === "gcash") return "Online Payment";
+  return "Cash";
+}
+
 export function collectionMethodLabel(t: ArStatusLike): string | null {
   const active = arCollectionEvents(t).filter((e) => !e.voided);
   if (active.length === 0) return null;
   const methods = new Set(active.map((e) => e.method));
   if (methods.size > 1) return "Mixed";
-  const method = active[0].method;
-  return method === "check" ? "Check" : method === "gcash" ? "GCash" : "Cash";
+  return arMethodLabel(active[0].method);
 }
 
 export interface FifoTarget {

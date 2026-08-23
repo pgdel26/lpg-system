@@ -24,6 +24,9 @@ export interface ArCollectionEvent {
   batchId: string;
   checkDate?: string;
   checkNumber?: string;
+  /** Free text the operator typed when recording it — why, or who handed it
+   *  over. Absent on every event recorded before the field existed. */
+  notes?: string;
   createdAt: Timestamp;
   // Set (never removed) when this event is reversed — kept in the array
   // rather than deleted so the collection history stays auditable. Excluded
@@ -237,10 +240,19 @@ export interface Swap {
 // Payload: { date, description, amount, createdAt }
 export interface Expense {
   id: string;
+  /** Optional for a salary, where the staff member identifies it — see
+   *  lib/expenses.ts's expenseDisplayLabel. Required for anything else. */
   description: string;
   amount: number;
   date: string;
   branch: BranchId;
+  /** "salary" | "operating" (see lib/expenses.ts). Absent on every expense
+   *  recorded before the field existed — those read as uncategorised rather
+   *  than being assumed into a bucket nobody chose. */
+  category?: string;
+  /** Staff doc id, only for a salary. Resolved to a name at read time so a
+   *  rename updates history instead of leaving a stale copy behind. */
+  staffId?: string;
   createdAt: Timestamp;
 }
 

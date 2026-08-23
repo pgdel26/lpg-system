@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx-js-style";
-import { titleCaseCategory } from "../utils";
+import { expenseDisplayLabel } from "../expenses";
+import { saleSectionLabel } from "../utils";
 import { paymentSplit } from "../payments";
 import { collectionsOnDate } from "../receivables";
 
@@ -48,6 +49,9 @@ interface ReportExpense {
   id?: string;
   description?: string;
   amount?: number;
+  /** Both needed to label a salary, whose own description is optional. */
+  category?: string;
+  staffId?: string;
 }
 
 interface ReportStaff {
@@ -91,15 +95,15 @@ export interface SalesReportInput {
   branch?: string;
 }
 
-const saleTypeLabel = (section: string): string => {
-  if (section === "cylinderWithRefill") return "Full Cylinder";
-  if (section === "refill") return "Refill";
-  // Single-price categories (accessories + any future one) use the category key
-  // as their section; title-case it for display.
-  return titleCaseCategory(section);
-};
-
-export function buildSalesReportWorkbook({
+/**
+ * The Sales Report as a WORKSHEET, so callers can either wrap it in a workbook
+ * of its own (buildSalesReportWorkbook, below — the cron route uses that) or
+ * append it alongside other sheets in a combined export. Splitting sheet from
+ * workbook is the whole reason this is separate: the figures below are what the
+ * operator remits against, so they're built in exactly one place regardless of
+ * which file they end up in.
+ */
+export function buildSalesReportSheet({
   date,
   saleTransactions = [],
   swaps = [],
@@ -109,7 +113,7 @@ export function buildSalesReportWorkbook({
   dailyReport = { cashier: null, staff: [] },
   arTransactions = [],
   branch,
-}: SalesReportInput): XLSX.WorkBook {
+}: SalesReportInput): XLSX.WorkSheet {
   const sorted = [...saleTransactions].sort((a, b) => {
     const invA = (a.invoice || "").toLowerCase();
     const invB = (b.invoice || "").toLowerCase();
@@ -222,7 +226,11 @@ export function buildSalesReportWorkbook({
     data.push(["Description", "Amount"]);
     tableHeaderRows.push(r);
     expenses.forEach((e) => {
-      data.push([e.description || "", e.amount || 0]);
+      // NOT e.description: a salary's description is optional, because the
+      // staff member identifies it. This sheet is emailed nightly by the cron
+      // route, so a blank cell here is an unexplained deduction in the copy
+      // that leaves the building.
+      data.push([expenseDisplayLabel(e, staff), e.amount || 0]);
     });
     r = data.length;
     data.push(["Total Expenses", totalExpenses]);
@@ -247,7 +255,7 @@ export function buildSalesReportWorkbook({
       const split = paymentSplit(t);
       data.push([
         t.invoice || "", t.customerName || "", t.product || "",
-        saleTypeLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
+        saleSectionLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
         t.discount || 0, t.deliveryCharge || 0,
         split.cash > 0 ? split.cash : "",
         split.gcash > 0 ? split.gcash : "",
@@ -311,7 +319,12 @@ export function buildSalesReportWorkbook({
     }
   }
 
+  return ws;
+}
+
+/** The sheet above as a standalone one-sheet workbook. */
+export function buildSalesReportWorkbook(input: SalesReportInput): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+  XLSX.utils.book_append_sheet(wb, buildSalesReportSheet(input), "Sales Report");
   return wb;
 }

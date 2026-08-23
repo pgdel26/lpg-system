@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { fmt, today, formatDateShort } from "../lib/utils";
+import { arStatus, allocateFifo, arMethodLabel, type FifoTarget } from "../lib/receivables";
 import { customerKey } from "../lib/customers";
-import { arStatus, allocateFifo, type FifoTarget } from "../lib/receivables";
 import { XIcon } from "./Icons";
 import type { SaleTransaction, Branch } from "../lib/types";
 import type { RecordArCollectionInput } from "../lib/hooks/useReceivablesData";
@@ -29,10 +29,13 @@ interface RecordCollectionModalProps {
   defaultBranch?: string;
 }
 
-const METHODS: Array<{ value: "cash" | "check" | "gcash"; label: string; color: string }> = [
-  { value: "cash", label: "Cash", color: "#22c55e" },
-  { value: "check", label: "Check", color: "#3b82f6" },
-  { value: "gcash", label: "GCash", color: "#0ea5e9" },
+// Labels come from arMethodLabel so this button, the Receivables event list and
+// the void confirmation can't disagree. The VALUES are the stored ones and must
+// not change — "gcash" is what every filter and every existing event uses.
+const METHODS: Array<{ value: "cash" | "check" | "gcash"; color: string }> = [
+  { value: "cash", color: "#22c55e" },
+  { value: "check", color: "#3b82f6" },
+  { value: "gcash", color: "#0ea5e9" },
 ];
 
 export default function RecordCollectionModal({
@@ -43,7 +46,8 @@ export default function RecordCollectionModal({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "check" | "gcash">("cash");
-  const [date, setDate] = useState(defaultDate || today());
+  // Not state: nothing can change it, and the modal unmounts on close.
+  const date = defaultDate || today();
   // Defaults to nothing when the caller doesn't supply one: Receivables is a
   // company-wide page, so pre-selecting an outlet (e.g. always the first one)
   // would let a clerk submit without noticing, misattributing cash between
@@ -52,6 +56,7 @@ export default function RecordCollectionModal({
   // more likely source of a wrong answer.
   const [branch, setBranch] = useState(defaultBranch || "");
   const [checkDate, setCheckDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [checkNumber, setCheckNumber] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -120,6 +125,7 @@ export default function RecordCollectionModal({
       method,
       date,
       branch,
+      ...(notes.trim() ? { notes: notes.trim() } : {}),
       ...(method === "check" && checkDate ? { checkDate } : {}),
       ...(method === "check" && checkNumber ? { checkNumber } : {}),
     });
@@ -191,11 +197,19 @@ export default function RecordCollectionModal({
             </div>
 
             <div className={styles.fieldRow}>
+              {/* Read-only, not a picker. The date isn't the operator's to
+                  choose: it comes from today, or from the day being worked on
+                  when this is opened from an outlet's Sales screen. Still shown,
+                  because a collection filed under a day nobody saw is worse than
+                  one nobody can change. */}
               <div className={styles.field}>
                 <label className={styles.label}>Collection Date</label>
-                <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setError(""); }} className={styles.input} />
+                <div className={styles.readOnlyValue}>{formatDateShort(date)}</div>
                 {date !== today() && (
-                  <div className={styles.warningText}>This will change the Sales Report for {formatDateShort(date)}.</div>
+                  <div className={styles.warningText}>
+                    Dated to the day being viewed, not today — this changes that
+                    day&apos;s Sales Report and expected cash remit.
+                  </div>
                 )}
               </div>
               <div className={styles.field}>
@@ -221,7 +235,7 @@ export default function RecordCollectionModal({
                       color: method === opt.value ? opt.color : "var(--text-muted)",
                     }}
                   >
-                    {opt.label}
+                    {arMethodLabel(opt.value)}
                   </button>
                 ))}
               </div>
@@ -239,6 +253,21 @@ export default function RecordCollectionModal({
                 </div>
               </div>
             )}
+
+            {/* Last field, after the check details: it's optional and applies to
+                any method, so it reads as a footnote to the form rather than
+                something to fill in on the way past. No placeholder — the label
+                already says what it is, and example text in the box was being
+                read as a required format. */}
+            <div className={styles.field}>
+              <label className={styles.label}>Notes <span className={styles.optional}>(optional)</span></label>
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className={styles.input}
+                maxLength={200}
+              />
+            </div>
 
             {amountNum > 0 && fifoPreview.length > 0 && (
               <div className={styles.previewCard}>

@@ -99,34 +99,6 @@
   transform: rotate(-90deg);
 }
 
-/* Sub-group button (outlet name, e.g. PILI / CADLAN, nested under Operations) */
-.subGroupButton {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px 8px 28px;
-  justify-content: flex-start;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  transition: all 0.15s;
-  margin-bottom: 2px;
-}
-.subGroupButton.active {
-  color: rgba(255, 255, 255, 0.95);
-}
-.subGroupLabel {
-  flex: 1;
-  text-align: left;
-}
-
 /* Nav link */
 .navLink {
   width: 100%;
@@ -148,9 +120,6 @@
 }
 .navLink.indented {
   padding-left: 36px;
-}
-.navLink.doubleIndented {
-  padding-left: 52px;
 }
 .aside.collapsed .navLink {
   padding: 10px 0;

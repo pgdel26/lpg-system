@@ -55,18 +55,6 @@
   white-space: nowrap;
 }
 
-.presetButton {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--accent-blue);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-}
-
 .addButton {
   margin-left: auto;
   padding: 8px 18px;
@@ -250,13 +238,6 @@
   color: var(--text-secondary);
 }
 
-.unitCostCell {
-  text-align: right;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
 .totalCostCell {
   text-align: right;
   font-size: 13px;
@@ -324,13 +305,30 @@
   color: var(--accent-orange-dark);
 }
 
+/* ---- List beside detail ---- */
+/* Collapses to one column on a narrow window, where the panel then sits under
+   the list rather than squeezing both. */
+.listWithPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .listWithPanel {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---- Delivery header row ---- */
 /* Reads as a band above its product lines rather than as another data row, so
-   the one cost figure is visibly the delivery's and not a product's. */
-/* The delivery header sits on the card's own white — the tint belongs to its
-   product lines, so the group reads as "heading, then its contents" rather than
-   two competing bands of colour. The top border still marks where one delivery
-   ends and the next begins. */
+   the one cost figure is visibly the delivery's and not a product's. It sits on
+   the card's own white — the tint belongs to its product lines, so the group
+   reads as "heading, then its contents" rather than two competing bands of
+   colour. The top border still marks where one delivery ends and the next
+   begins. */
+
 .deliveryHeaderRow {
   border-top: 1px solid rgba(37, 99, 235, 0.18);
   /* The whole row toggles its products, so it has to look like it does. */
@@ -397,14 +395,6 @@
   color: var(--text-muted);
 }
 
-.deliveryCaret {
-  display: inline-block;
-  width: 12px;
-  margin-right: 3px;
-  color: var(--text-muted);
-  font-size: 9px;
-}
-
 /* Matches ArSummaryTab's month picker — the two screens offer the same control,
    so they should not look like two different controls. */
 .monthSelect {
@@ -417,4 +407,11 @@
   font-family: inherit;
   outline: none;
   cursor: pointer;
+}
+
+/* The selected day, held until you pick another. A left edge rather than a fill
+   so the row's own figures stay legible. */
+.deliveryHeaderRowSelected {
+  background: rgba(37, 99, 235, 0.07);
+  box-shadow: inset 3px 0 0 var(--accent-blue);
 }

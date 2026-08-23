@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { fmt, today } from "../../lib/utils";
+import { fmt } from "../../lib/utils";
 import { paymentSplit } from "../../lib/payments";
 import { collectionEventsOnDate, arStatusAsOf } from "../../lib/receivables";
 import { groupDiscountsByCustomer, groupARByCustomer, groupGCashByCustomer } from "../../lib/reports/incomeStatement";
-import { DownloadIcon, EditIcon, TrashIcon, XIcon, ChevronDownIcon } from "../../components/Icons";
-import ExpenseModal from "../../components/ExpenseModal";
+import { EditIcon, TrashIcon, XIcon, ChevronDownIcon } from "../../components/Icons";
+import ExpenseModal, { type ExpenseSubmission } from "../../components/ExpenseModal";
+import { expenseRowLabels } from "../../lib/expenses";
 import type { SaleTransaction, Swap, Refund, Expense, Staff } from "../../lib/types";
 import type { EditData, PendingDelete, DailyReportWithCash, UpdateExpenseFn } from "./transactionsTypes";
 import styles from "./SalesReportTab.module.css";
 
 interface SalesReportTabProps {
   inventoryDate: string;
-  setInventoryDate: (v: string) => void;
   saleTransactions: SaleTransaction[];
   swaps: Swap[];
   refunds: Refund[];
@@ -21,9 +21,8 @@ interface SalesReportTabProps {
   arTransactions: SaleTransaction[];
   branch: string;
   onUpdateDailyStaff: (data: DailyReportWithCash) => Promise<void>;
-  onAddExpense: (description: string, amount: string | number) => Promise<void>;
+  onAddExpense: (input: ExpenseSubmission) => Promise<void>;
   onUpdateExpense: UpdateExpenseFn;
-  onExportFullReport: () => void;
   // Shared inline-edit state (owned by parent; reused by sales tab too)
   editingId: string | null;
   editData: EditData | null;
@@ -34,11 +33,10 @@ interface SalesReportTabProps {
 }
 
 export default function SalesReportTab({
-  inventoryDate, setInventoryDate,
+  inventoryDate,
   saleTransactions, swaps, refunds, expenses, staff,
   dailyReport, arTransactions, branch,
   onUpdateDailyStaff, onAddExpense, onUpdateExpense,
-  onExportFullReport,
   editingId, editData, setEditData, setEditingId, cancelEdit, setPendingDelete,
 }: SalesReportTabProps) {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -80,23 +78,8 @@ export default function SalesReportTab({
 
   return (
     <div>
-      {/* Date selector */}
-      <div className={styles.dateBar}>
-        <input
-          type="date"
-          value={inventoryDate}
-          onChange={(e) => setInventoryDate(e.target.value)}
-          className={styles.dateInput}
-        />
-        {inventoryDate !== today() && (
-          <button onClick={() => setInventoryDate(today())} className={styles.todayButton}>
-            Go to Today
-          </button>
-        )}
-        <button onClick={onExportFullReport} className={styles.exportButton}>
-          <DownloadIcon /> Export
-        </button>
-      </div>
+      {/* Date filter and Export live in the outlet page's shared header — both
+          applied to every tab, not just this one. */}
 
       <div className={styles.layout}>
         {/* Left: Report summary */}
@@ -463,10 +446,17 @@ export default function SalesReportTab({
                   );
                 }
 
+                // Resolved from the roster on every render on purpose: renaming
+                // a staff member re-labels their historical salary rows.
+                const labels = expenseRowLabels(e, staff);
+
                 return (
                   <div key={e.id} className={styles.expenseRow}>
                     <div className={styles.expenseRowInner}>
-                      <span className={styles.expenseDesc}>{e.description}</span>
+                      <div className={styles.expenseDescWrap}>
+                        <span className={styles.expenseDesc}>{labels.primary}</span>
+                        <span className={styles.expenseCategory}>{labels.category}</span>
+                      </div>
                       <div className={styles.expenseRowRight}>
                         <span className={styles.expenseAmount}>{fmt(e.amount)}</span>
                         <button
@@ -499,6 +489,7 @@ export default function SalesReportTab({
 
       {expenseModalOpen && (
         <ExpenseModal
+          staff={staff}
           onSubmit={onAddExpense}
           onClose={() => setExpenseModalOpen(false)}
         />

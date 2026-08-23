@@ -62,9 +62,6 @@
   font-family: inherit;
   box-sizing: border-box;
 }
-.inputMono {
-  font-family: var(--font-mono);
-}
 .error {
   font-size: 11px;
   color: var(--accent-red);
@@ -98,4 +95,21 @@
   font-family: inherit;
   background: var(--accent-blue);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+/* "(optional)" beside the Description label when the category is Salary — the
+   staff member already names that row, so the field is a note, not a
+   requirement. Lowercase to sit apart from the uppercase label. */
+.optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+/* Shown only when Salary is picked and no staff exist yet — otherwise the empty
+   select looks broken with no explanation. */
+.hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--accent-orange-dark);
+  line-height: 1.4;
 }

@@ -1,0 +1,158 @@
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.headActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Soft-blue tint, not the solid/gradient primary treatment: these are secondary
+   navigation off a card header, not the screen's main action. */
+.branchButton {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.branchButton:hover {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+/* Its own scroll container so six columns can't push the page sideways. */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 9px 12px 8px 0;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.tr {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.td {
+  padding: 9px 12px 9px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.right {
+  text-align: right;
+  padding-right: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* The one unbounded-length column, so it's the one allowed to wrap. */
+.detail {
+  white-space: normal;
+  max-width: 200px;
+  color: var(--text-muted);
+}
+
+.negative {
+  color: var(--accent-red);
+}
+
+.kind {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sale {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--accent-green);
+}
+
+.swap {
+  background: rgba(245, 158, 66, 0.12);
+  color: var(--accent-orange-dark);
+}
+
+.refund {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-red);
+}
+
+/* Blue, not green: a collection is cash in, but against revenue already booked
+   on an earlier day — it must not read as another sale. */
+.collection {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+}
+
+.empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.footnote {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { DEFAULT_BRANCH_ID } from "../lib/constants";
 
+// The app's landing page. The dashboard spans every outlet, so it's the right
+// first screen; the per-outlet pages are one click away in the sidebar.
 export default function Home() {
-  redirect(`/${DEFAULT_BRANCH_ID}/sales`);
+  redirect("/dashboard");
 }

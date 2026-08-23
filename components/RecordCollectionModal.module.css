@@ -334,3 +334,23 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* The collection date, shown but not editable. Styled to match .input's box so
+   the row doesn't look broken next to the outlet select beside it, but flat and
+   without a border-focus state so it doesn't invite a click. */
+.readOnlyValue {
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.7);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+}

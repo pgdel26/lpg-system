@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "../firebase";
+import { fetchRangeCollection } from "../firestoreRange";
 import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDelivery } from "../types";
 
 export interface IncomeStatementRangeData {
@@ -17,17 +16,6 @@ export interface UseIncomeStatementData {
   error: string | null;
   data: IncomeStatementRangeData | null;
   fetchRange: (startDate: string, endDate: string) => Promise<void>;
-}
-
-// One-shot fetch (not onSnapshot) — a report range doesn't need live updates,
-// and subscribing to a year-long window would be a needless memory/cost load.
-async function fetchRangeCollection<T>(name: string, startDate: string, endDate: string): Promise<T[]> {
-  const snapshot = await getDocs(
-    query(collection(db, name), where("date", ">=", startDate), where("date", "<=", endDate)),
-  );
-  const list: T[] = [];
-  snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as T));
-  return list;
 }
 
 export function useIncomeStatementData(): UseIncomeStatementData {

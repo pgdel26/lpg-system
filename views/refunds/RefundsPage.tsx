@@ -2,8 +2,8 @@ import { useState, useMemo } from "react";
 import { fmt } from "../../lib/utils";
 import { EditIcon, TrashIcon } from "../../components/Icons";
 import ConfirmModal from "../../components/ConfirmModal";
-import type { Refund } from "../../lib/types";
-import type { UpdateRefundFn, RefundItemInput } from "./transactionsTypes";
+import type { Branch, Refund } from "../../lib/types";
+import type { UpdateRefundFn, RefundItemInput } from "../transactions/transactionsTypes";
 import styles from "./RefundsPage.module.css";
 
 // Mutable item shape during inline edit (qty/value may be strings while typing).
@@ -18,11 +18,22 @@ interface RefundEditData {
 
 interface RefundsPageProps {
   allRefunds: Refund[];
+  /** Used only to render outlet names; the list itself is already company-wide. */
+  branches: Branch[];
   onUpdateRefund: UpdateRefundFn;
   onDeleteRefund: (id: string) => Promise<void>;
 }
 
-export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund }: RefundsPageProps) {
+export default function RefundsPage({
+  allRefunds,
+  branches,
+  onUpdateRefund,
+  onDeleteRefund,
+}: RefundsPageProps) {
+  // Falls back to the raw id so an outlet whose branch doc was removed still
+  // shows something rather than a blank cell.
+  const branchName = (id: string) => branches.find((b) => b.id === id)?.name || id || "—";
+
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [defectiveOnly, setDefectiveOnly] = useState(false);
@@ -139,12 +150,16 @@ export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund
             {/* Date header */}
             <div className={styles.groupHeader}>
               <span className={styles.groupDate}>{dateLabel}</span>
-              <span className={styles.groupTotal}>-{fmt(groupTotal)}</span>
+              {/* This screen lists EVERY outlet (the listener is company-wide),
+                  and there's no outlet filter — so the total has to say so, or
+                  it reads as one outlet's returns. */}
+              <span className={styles.groupTotal}>-{fmt(groupTotal)} · all outlets</span>
             </div>
 
             <div className={styles.card}>
               {/* Table header */}
               <div className={styles.tableHeader}>
+                <span>Outlet</span>
                 <span>Invoice</span>
                 <span>Customer</span>
                 <span>Items</span>
@@ -272,6 +287,9 @@ export default function RefundsPage({ allRefunds, onUpdateRefund, onDeleteRefund
 
                 return (
                   <div key={r.id} className={styles.row}>
+                    <span className={styles.cellOutlet}>
+                      {branchName(r.branch)}
+                    </span>
                     <span className={styles.cellStrong}>
                       {r.invoice || "—"}
                     </span>

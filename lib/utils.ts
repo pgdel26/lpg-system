@@ -9,6 +9,24 @@ export const today = (): string => new Date().toISOString().split("T")[0];
 export const titleCaseCategory = (category: string): string =>
   category.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+/**
+ * Display label for a sale/purchase SECTION key.
+ *
+ * "cylinderWithRefill" and "refill" are structural section keys with
+ * established names — the distinction between buying a cylinder outright and
+ * paying for gas only. Everything else is a single-price category key (see
+ * safe-category-change), so it title-cases.
+ *
+ * This existed verbatim in four places (salesReport, incomeStatement,
+ * outletExport, OutletPage) before the Customer Orders report needed a fifth.
+ * One copy, so the two names can't drift between the screens and the exports.
+ */
+export const saleSectionLabel = (section: string): string => {
+  if (section === "cylinderWithRefill") return "Full Cylinder";
+  if (section === "refill") return "Refill";
+  return titleCaseCategory(section);
+};
+
 // Canonical per-category color, shared by the Inventory sections and the
 // Products/Pricing tabs so a category renders the same color everywhere.
 // cylinder/accessories keep their historical colors; any other category gets a

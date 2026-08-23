@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, where,
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { fmt } from "../utils";
@@ -69,22 +69,35 @@ export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
 
   const [allRefunds, setAllRefunds] = useState<Refund[]>([]);
 
-  // ---- Branch-switch safety ----
-  // Without this, switching outlets leaves the previous branch's data on
-  // screen under the new branch's label until the new listener's first
-  // snapshot arrives. React's documented "adjust state during render"
-  // pattern (tracked via useState, not a ref) clears it immediately.
-  const [prevBranch, setPrevBranch] = useState(branch);
-  if (prevBranch !== branch) {
-    setPrevBranch(branch);
-    setAllRefunds([]);
-  }
+  // NO branch-switch reset here, deliberately — the sibling hooks have one and
+  // this hook must not.
+  //
+  // That pattern only works when the clear is paired with an effect that
+  // re-subscribes on the same change: useSalesData and friends key their
+  // listener on [inventoryDate, branch], so clearing is immediately followed by
+  // a fresh snapshot. This listener is company-wide and keyed on [], so it
+  // subscribes once and only re-emits when a refund document actually changes.
+  // Clearing here would therefore blank the list until the next write —
+  // and `branch` changes on every navigation away from an outlet page, since
+  // AppDataProvider falls back to DEFAULT_BRANCH_ID when the route has no
+  // branch segment. There is also nothing to clear: the list is not
+  // outlet-scoped, so it never shows one outlet's data under another's label.
 
-  // ---- FIREBASE: All refunds listener, scoped to branch (for Refunds tab) ----
+  // ---- FIREBASE: All refunds listener, EVERY outlet ----
+  // Company-wide because the Returns & Refunds screen lists all outlets in one
+  // place. It stays a live subscription rather than a one-shot range fetch
+  // because that screen edits and deletes rows and must reflect the result.
+  //
+  // IMPORTANT: this list is no longer outlet-scoped, so anything needing one
+  // outlet's refunds must filter by branch itself. AppDataProvider's dateRefunds
+  // does exactly that — it used to rely on this query's `where` clause, which
+  // made the inventory engine's outlet-correctness an invisible side effect of a
+  // line up here. It's explicit there now.
+  //
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
-      query(collection(db, "refunds"), where("branch", "==", branch)),
+      collection(db, "refunds"),
       (snapshot) => {
         const list: Refund[] = [];
         snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as Refund));
@@ -93,7 +106,7 @@ export function useRefundsData(deps: UseRefundsDataDeps): UseRefundsData {
       },
     );
     return () => unsub();
-  }, [branch]);
+  }, []);
 
   // ---- recordRefund ----
   const recordRefund = useCallback(async (input: RecordRefundInput): Promise<string | null> => {

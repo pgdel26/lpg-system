@@ -81,6 +81,88 @@
   gap: 8px;
 }
 
+.accountWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.avatarButton {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+/* Generic stand-in when the provider gives us no photo. Sized to match .avatar
+   exactly so the header doesn't shift depending on who is signed in. */
+.avatarFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+.avatarButton:hover .avatarFallback {
+  background: var(--border-light);
+  color: var(--accent-blue);
+}
+
+/* Full-viewport catcher so a click anywhere closes the panel. z-index sits just
+   under the panel, which is why the panel is declared after it. */
+.accountBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+/* Its own opaque surface — that's the point. The address was unreadable as grey
+   text directly on the header. */
+.accountPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.accountLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Full strength, and allowed to wrap: a long address should be readable rather
+   than truncated, since the panel exists only to show it. */
+.accountEmail {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.accountName {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .avatar {
   width: 28px;
   height: 28px;

@@ -12,6 +12,15 @@ type ToastFn = (t: { type: string; message: string }) => void;
 
 export interface UseInventoryData {
   inventory: InventoryState;
+  /**
+   * False until EVERY section's dailyInventory listener has delivered a first
+   * snapshot for the current {date, branch}. The auto-save in AppDataProvider
+   * gates on this: END is computed from BEG + movements, and movements arrive on
+   * a different listener, so saving before the inventory docs land would persist
+   * an END derived from a missing BEG — and scripts/daily-init-beg.mjs carries
+   * END into tomorrow's BEG. Mirrors purchases.datePurchasesLoaded.
+   */
+  inventoryLoaded: boolean;
   inventoryDate: string;
   setInventoryDate: (date: string) => void;
   /** Expose so consumers (e.g. AppDataProvider) can keep resolvedInventoryRef current.
@@ -82,9 +91,9 @@ export function useInventoryData(
   // Clearing pending per-section save timers is a real side effect (calling
   // clearTimeout, an external API), so it belongs in an effect rather than
   // render — unlike the state reset above, there's no setState call here for
-  // set-state-in-effect to flag. saveSection's own empty-rawItems guard means
-  // even a timer that slips through writes nothing once state is cleared, but
-  // clearing timers outright is the harder guarantee.
+  // set-state-in-effect to flag. saveSection no longer bails on empty rawItems
+  // alone (it has to write when movements exist but nothing was typed), so
+  // clearing the timers outright is now the only guarantee, not a backstop.
   useEffect(() => {
     Object.values(saveTimerRef.current).forEach(clearTimeout);
     saveTimerRef.current = {};
@@ -100,6 +109,26 @@ export function useInventoryData(
   // products snapshot even when the category structure is unchanged.
   const sectionKeysString = inventorySections.map((s) => s.key).join(",");
 
+  // ---- First-snapshot tracking ----
+  // Which sections' dailyInventory listeners have reported in for the CURRENT
+  // {date, branch, section set}. Reset via the same "adjust state during
+  // render" pattern as the branch reset above, so the flag drops before the new
+  // scope's UI paints rather than one render late. Keyed on the date too:
+  // switching days re-subscribes, and yesterday's snapshots say nothing about
+  // whether today's docs have arrived.
+  const loadScopeKey = `${inventoryDate}|${branch}|${sectionKeysString}`;
+  const [prevLoadScope, setPrevLoadScope] = useState(loadScopeKey);
+  const [loadedSections, setLoadedSections] = useState<string[]>([]);
+  if (prevLoadScope !== loadScopeKey) {
+    setPrevLoadScope(loadScopeKey);
+    setLoadedSections([]);
+  }
+  // Empty section list means the products snapshot hasn't landed either, which
+  // is equally a reason not to save.
+  const allSectionKeys = sectionKeysString ? sectionKeysString.split(",") : [];
+  const inventoryLoaded = allSectionKeys.length > 0
+    && allSectionKeys.every((k) => loadedSections.includes(k));
+
   // ---- FIREBASE: Daily inventory listener ----
   // Section keys come from the live section list ("full", "empty", + one per
   // single-price category), so a new category gets its own daily-inventory doc.
@@ -109,17 +138,13 @@ export function useInventoryData(
     const unsubscribers = sectionKeys.map((sectionKey) => {
       const docId = `${inventoryDate}_${branch}_${sectionKey}`;
       return onSnapshot(doc(db, "dailyInventory", docId), (snapshot) => {
-        if (snapshot.exists()) {
-          setInventory((prev) => ({
-            ...prev,
-            [sectionKey]: snapshot.data().items || {},
-          }));
-        } else {
-          setInventory((prev) => ({
-            ...prev,
-            [sectionKey]: {},
-          }));
-        }
+        setInventory((prev) => ({
+          ...prev,
+          [sectionKey]: snapshot.exists() ? (snapshot.data().items || {}) : {},
+        }));
+        // A missing doc is a real answer, not a pending one — mark the section
+        // reported either way, or a brand-new day would never unblock saving.
+        setLoadedSections((prev) => (prev.includes(sectionKey) ? prev : [...prev, sectionKey]));
       });
     });
     return () => unsubscribers.forEach((unsub) => unsub());
@@ -208,9 +233,40 @@ export function useInventoryData(
       const docId = `${inventoryDate}_${branch}_${sectionKey}`;
       const rawItems = inventoryRef.current[sectionKey] || {};
       const resolvedItems = resolvedInventoryRef.current[sectionKey] || {};
-      // Skip saving if raw inventory is empty and no BEG exists (avoids writing stale data to a new day)
-      if (Object.keys(rawItems).length === 0) return;
       const section = inventorySectionsRef.current.find((s) => s.key === sectionKey);
+
+      // Persist when EITHER someone has typed into this section, OR the day has
+      // real movement in it.
+      //
+      // This used to be `rawItems.length === 0` alone, which silently excluded
+      // any outlet stocked purely by transfer. CADLAN's inventory is entirely
+      // inbound transfers plus sales with nothing typed, so this returned every
+      // single time: its END rendered on screen (resolvedInventory merges the
+      // stored doc with live movements) but no dailyInventory document was ever
+      // written, leaving the nightly BEG batch nothing to carry forward. The
+      // outlet could never accumulate a beginning balance.
+      //
+      // Movement is tested rather than mere presence because resolvedInventory
+      // holds a row for EVERY product in the section whether or not anything
+      // happened — a bare length check would write a document every day for
+      // every section at every outlet.
+      //
+      // The movement columns are derived from the section's own definition
+      // (anything sourced from sales / purchases / swaps / refunds / another
+      // section) rather than a hardcoded field list, so a new product category
+      // brings its columns along with no change here — see
+      // .claude/skills/safe-category-change.md.
+      const movementFields = (section?.columns || [])
+        .filter((c) => c.salesSource || c.purchaseSource || c.swapSource || c.refundSource || c.source)
+        .map((c) => c.field);
+      const hasMovement = Object.values(resolvedItems).some((row) => {
+        const cells = row as Record<string, unknown>;
+        return movementFields.some((f) => {
+          const v = cells[f];
+          return v != null && v !== "" && (parseFloat(String(v)) || 0) !== 0;
+        });
+      });
+      if (Object.keys(rawItems).length === 0 && !hasMovement) return;
       // Merge raw inventory with resolved values and compute END
       const items: Record<string, InventoryCell | Record<string, unknown>> = {};
       for (const product of Object.keys({ ...rawItems, ...resolvedItems })) {
@@ -293,6 +349,7 @@ export function useInventoryData(
 
   return {
     inventory,
+    inventoryLoaded,
     inventoryDate,
     setInventoryDate,
     resolvedInventoryRef,

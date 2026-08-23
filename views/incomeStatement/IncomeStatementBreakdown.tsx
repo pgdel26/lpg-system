@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { fmt } from "../../lib/utils";
 import { ChevronDownIcon } from "../../components/Icons";
+import { expenseDisplayLabel } from "../../lib/expenses";
+import { arMethodLabel } from "../../lib/receivables";
 import type { IncomeStatementResult } from "../../lib/reports/incomeStatement";
+import type { Staff } from "../../lib/types";
 import styles from "./IncomeStatementBreakdown.module.css";
 
 interface IncomeStatementBreakdownProps {
   result: IncomeStatementResult;
+  /** Names salary expenses, whose own description is optional. */
+  staff: Staff[];
   /**
    * True when viewing a single outlet's tab rather than "All Outlets".
    * Purchases are paid from shared/pooled profit across outlets (confirmed
@@ -17,7 +22,7 @@ interface IncomeStatementBreakdownProps {
   isPerBranchView: boolean;
 }
 
-export default function IncomeStatementBreakdown({ result, isPerBranchView }: IncomeStatementBreakdownProps) {
+export default function IncomeStatementBreakdown({ result, staff, isPerBranchView }: IncomeStatementBreakdownProps) {
   const [expensesOpen, setExpensesOpen] = useState(false);
 
   return (
@@ -113,7 +118,7 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
 
       {expensesOpen && result.expenseItems.map((e) => (
         <div key={e.id} className={styles.row}>
-          <div className={styles.rowLabel}>{e.description}</div>
+          <div className={styles.rowLabel}>{expenseDisplayLabel(e, staff)}</div>
           <span className={`${styles.rowValue} ${styles.valueRed}`}>{fmt(e.amount)}</span>
         </div>
       ))}
@@ -163,7 +168,7 @@ export default function IncomeStatementBreakdown({ result, isPerBranchView }: In
       )}
       {result.arCollectedGcash > 0 && (
         <div className={`${styles.row} ${styles.channelRow}`}>
-          <div className={styles.channelLabel}>of which collected via GCash</div>
+          <div className={styles.channelLabel}>of which collected via {arMethodLabel("gcash")}</div>
           <span className={`${styles.rowValue} ${styles.valueDim}`}>{fmt(result.arCollectedGcash)}</span>
         </div>
       )}

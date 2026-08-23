@@ -1,0 +1,7 @@
+/* The reports screen's content wrapper. Sized to match the sibling screens'
+   card rather than inventing a third convention. */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 24px;
+}

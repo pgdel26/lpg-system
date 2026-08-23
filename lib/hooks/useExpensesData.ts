@@ -13,9 +13,18 @@ export interface UseExpensesDataDeps {
   onToast: ToastFn;
 }
 
+export interface AddExpenseInput {
+  /** Optional only when category is "salary" — the staff member names it then. */
+  description: string;
+  amount: string | number;
+  category: string;
+  /** Required for "salary", omitted otherwise. */
+  staffId?: string;
+}
+
 export interface UseExpensesData {
   expenses: Expense[];
-  addExpense: (description: string, amount: string | number) => Promise<void>;
+  addExpense: (input: AddExpenseInput) => Promise<void>;
   updateExpense: (
     expenseId: string,
     data: { description: string; amount: string | number },
@@ -59,16 +68,18 @@ export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
   }, [inventoryDate, branch]);
 
   // ---- addExpense ----
-  const addExpense = useCallback(async (
-    description: string,
-    amount: string | number,
-  ): Promise<void> => {
+  const addExpense = useCallback(async (input: AddExpenseInput): Promise<void> => {
     try {
       await addDoc(collection(db, "expenses"), {
         date: inventoryDate,
-        description: description.trim(),
-        amount: parseFloat(String(amount)) || 0,
+        description: (input.description || "").trim(),
+        amount: parseFloat(String(input.amount)) || 0,
         branch,
+        category: input.category,
+        // Written only for a salary. An omitted key beats an empty string: a
+        // blank staffId would read as "a staff member was chosen" to anything
+        // testing for one.
+        ...(input.staffId ? { staffId: input.staffId } : {}),
         createdAt: Timestamp.now(),
       });
       onToast({ type: "success", message: "Expense added." });
@@ -83,10 +94,19 @@ export function useExpensesData(deps: UseExpensesDataDeps): UseExpensesData {
     expenseId: string,
     data: { description: string; amount: string | number },
   ): Promise<void> => {
+    // Guard lives on the WRITE, not just in ExpenseModal: the inline edit row
+    // in SalesReportTab calls straight into here. Every consumer subtracts
+    // expenses, so a negative one raises Net Sales AND Expected Cash Remit by
+    // twice the amount — the operator gets told to remit money that isn't there.
+    const amount = parseFloat(String(data.amount)) || 0;
+    if (amount <= 0) {
+      onToast({ type: "error", message: "Please enter a valid amount." });
+      return;
+    }
     try {
       await updateDoc(doc(db, "expenses", expenseId), {
         description: data.description,
-        amount: parseFloat(String(data.amount)) || 0,
+        amount,
       });
       onToast({ type: "success", message: "Expense updated." });
     } catch (error) {

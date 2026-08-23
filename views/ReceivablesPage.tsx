@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { fmt, formatDateShort } from "../lib/utils";
 import { paymentSplit } from "../lib/payments";
-import { arStatus, arCollectionEvents, collectionMethodLabel, batchSummary } from "../lib/receivables";
+import { arStatus, arCollectionEvents, collectionMethodLabel, batchSummary, arMethodLabel } from "../lib/receivables";
 import { EditIcon, TrashIcon, PlusIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import RecordCollectionModal from "../components/RecordCollectionModal";
@@ -357,7 +357,8 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
                       {events.map((e, i) => (
                         <div key={`${e.batchId}-${i}`} className={e.voided ? `${styles.historyRow} ${styles.historyRowVoided}` : styles.historyRow}>
                           <span className={styles.historyText}>
-                            {e.date ? formatDateShort(e.date) : "—"} &middot; {e.method === "check" ? "Check" : e.method === "gcash" ? "GCash" : "Cash"} &middot; {fmt(e.amount)} &middot; {branchName(e.branch)}
+                            {e.date ? formatDateShort(e.date) : "—"} &middot; {arMethodLabel(e.method)} &middot; {fmt(e.amount)} &middot; {branchName(e.branch)}
+                            {e.notes && <span className={styles.eventNote}> &middot; {e.notes}</span>}
                           </span>
                           {e.voided ? (
                             <span className={styles.voidedLabel}>Voided</span>
@@ -422,7 +423,7 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
               ? ` and reduces ${formatDateShort(pendingVoid.date)}'s Expected Cash Remit by that amount.`
               : pendingVoid.method === "cash"
               ? ". It has no recorded collection date, so it never counted toward any day's cash remit."
-              : `. It was collected by ${pendingVoid.method === "check" ? "check" : "GCash"}, so it never counted toward any day's cash remit.`) +
+              : `. It was collected by ${arMethodLabel(pendingVoid.method).toLowerCase()}, so it never counted toward any day's cash remit.`) +
             " This cannot be undone."
           }
           confirmLabel="Void"

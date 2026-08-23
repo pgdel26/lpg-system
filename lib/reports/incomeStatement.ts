@@ -1,8 +1,8 @@
 import * as XLSX from "xlsx-js-style";
-import { titleCaseCategory } from "../utils";
+import { saleSectionLabel } from "../utils";
 import { customerKey } from "../customers";
 import { paymentSplit } from "../payments";
-import { collectionEventsInRange } from "../receivables";
+import { collectionEventsInRange, arMethodLabel } from "../receivables";
 import type { SaleTransaction, Swap, Refund, Purchase, Expense, PurchaseDelivery } from "../types";
 import { purchaseCost } from "./purchaseCost";
 
@@ -178,14 +178,6 @@ export interface IncomeStatementResult {
   netCashMovement: number;
 }
 
-// "cylinderWithRefill"/"refill" get their established Sales Report labels;
-// any other saleSection/purchaseSection is a category key (see safe-category-change).
-const sectionLabel = (section: string): string => {
-  if (section === "cylinderWithRefill") return "Full Cylinder";
-  if (section === "refill") return "Refill";
-  return titleCaseCategory(section);
-};
-
 // Shared per-customer roll-up behind every itemized breakdown row in the Sales
 // Report's Daily Breakdown. `amountOf` picks which peso figure is being
 // itemized; sales contributing 0 are skipped, so a pure-cash sale never appears
@@ -233,10 +225,10 @@ export function groupGCashByCustomer(saleTransactions: SaleTransaction[]): Incom
 // cylinder brands) sorts after these three, alphabetically among themselves.
 // Used by the Excel export's per-category revenue rows (the on-screen
 // breakdown shows Gross Sales as a single total, not a per-category
-// breakdown). Derived from sectionLabel() (not hardcoded display strings) so
+// breakdown). Derived from saleSectionLabel() (not hardcoded display strings) so
 // a section-key rename can't silently degrade this to alphabetical order
 // without also changing this line.
-const REVENUE_LABEL_PRIORITY = ["refill", "cylinderWithRefill", "accessories"].map(sectionLabel);
+const REVENUE_LABEL_PRIORITY = ["refill", "cylinderWithRefill", "accessories"].map(saleSectionLabel);
 function compareRevenueLabels(a: string, b: string): number {
   const ai = REVENUE_LABEL_PRIORITY.indexOf(a);
   const bi = REVENUE_LABEL_PRIORITY.indexOf(b);
@@ -261,7 +253,7 @@ function groupByLine<T>(
     bySection.set(key, entry);
   }
   return Array.from(bySection.entries())
-    .map(([section, v]) => ({ label: sectionLabel(section), amount: v.amount, count: v.count }))
+    .map(([section, v]) => ({ label: saleSectionLabel(section), amount: v.amount, count: v.count }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
@@ -642,7 +634,7 @@ export function buildIncomeStatementWorkbook({
     data.push(["  of which collected by check (encashed to bank)", ...amountsFor((res) => res.arCollectedCheck)]);
   }
   if (allResults.some((res) => res.arCollectedGcash > 0)) {
-    data.push(["  of which collected via GCash", ...amountsFor((res) => res.arCollectedGcash)]);
+    data.push([`  of which collected via ${arMethodLabel("gcash")}`, ...amountsFor((res) => res.arCollectedGcash)]);
   }
   // The other half of the A/R movement: this period's credit sales are in
   // Operating Result as revenue, but no money arrived for them.

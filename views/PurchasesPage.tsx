@@ -5,6 +5,7 @@ import { PlusIcon, EditIcon, TrashIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import { purchaseCost } from "../lib/reports/purchaseCost";
 import type { Purchase, Branch, PurchaseDelivery } from "../lib/types";
+import DeliveryDetailPanel from "./purchases/DeliveryDetailPanel";
 import styles from "./PurchasesPage.module.css";
 
 interface EditData {
@@ -108,11 +109,20 @@ export default function PurchasesPage({
   /** Whether the line being edited belongs to a delivery — if so, Save must send
    *  quantity only and leave the historical cost figures untouched. */
   const [editingLinked, setEditingLinked] = useState(false);
-  /** Which deliveries are showing their product lines. Collapsed is the default:
-   *  a delivery's header already carries the figures that matter (date, item and
-   *  product counts, cost), and 90 deliveries expanded at once is 570 rows of
-   *  quantities nobody scrolled here to read. */
-  const [expandedDeliveries, setExpandedDeliveries] = useState<Set<string>>(new Set());
+  /**
+   * Which day the side panel is showing, as an intent rather than an id.
+   *
+   *   auto  — nobody has chosen; fall back to the most recent delivery
+   *   id    — this specific day
+   *   none  — explicitly cleared by clicking the selected row again
+   *
+   * The three-way shape exists because "default to the newest" and "clicking the
+   * selected row clears it" contradict each other if the state is just an id:
+   * clearing would set it to null, which the default would immediately refill.
+   */
+  const [selection, setSelection] = useState<
+    { kind: "auto" } | { kind: "id"; id: string } | { kind: "none" }
+  >({ kind: "auto" });
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const { start: monthStart, end: monthEnd } = monthBounds(month);
@@ -144,6 +154,9 @@ export default function PurchasesPage({
     setRangeTruncated(false);
     setRangeError(false);
     setRangeLoading(true);
+    // A new month should open on ITS most recent delivery, not keep showing a
+    // cleared panel or an id belonging to the month you just left.
+    setSelection({ kind: "auto" });
   }
 
   useEffect(() => {
@@ -340,39 +353,59 @@ export default function PurchasesPage({
     return [...items].sort((a, b) => dir * itemDate(a).localeCompare(itemDate(b)));
   }, [subTab, purchaseRows, transferRows, sortDir, visibleDeliveries]);
 
-  // Delivery ids currently on screen — what Expand/Collapse all acts on, so the
-  // control never claims to affect deliveries outside the active filter.
-  const deliveryIdsInView = useMemo(
-    () => activeRows.flatMap((i) => (i.kind === "deliveryHeader" ? [i.deliveryId] : [])),
+  // A delivery's product lines never appear in the list any more — they belong
+  // to the panel. Headers and legacy pre-delivery rows (which belong to no
+  // delivery, so nothing else can reach them) are all that render here.
+  const visibleItems = useMemo(
+    () => activeRows.filter((i) => i.kind === "deliveryHeader" || !i.row.deliveryId),
     [activeRows],
   );
-  const allExpanded = deliveryIdsInView.length > 0
-    && deliveryIdsInView.every((id) => expandedDeliveries.has(id));
 
-  const toggleAllDeliveries = () => {
-    setExpandedDeliveries(allExpanded ? new Set() : new Set(deliveryIdsInView));
-  };
-
-  // A collapsed delivery's product lines are dropped from the rendered list
-  // rather than hidden with CSS, so a 90-delivery view mounts 90 rows and not
-  // 660. Headers always survive: collapsing must never hide that money exists.
-  const visibleItems = useMemo(
-    () => activeRows.filter((i) =>
-      i.kind === "deliveryHeader"
-      || !i.row.deliveryId
-      || expandedDeliveries.has(i.row.deliveryId)),
-    [activeRows, expandedDeliveries],
+  // Delivery headers in view, and the newest of them by DATE — not by list
+  // position, so flipping the date sort doesn't change which day "most recent"
+  // means.
+  const deliveryHeaders = useMemo(
+    () => activeRows.flatMap((i) => (i.kind === "deliveryHeader" ? [i] : [])),
+    [activeRows],
   );
+  const newestDelivery = useMemo(
+    () => deliveryHeaders.reduce<typeof deliveryHeaders[number] | null>(
+      (best, h) => (!best || h.date > best.date ? h : best), null),
+    [deliveryHeaders],
+  );
+
+  // Resolved from activeRows rather than held in state, so changing month or
+  // sub-tab can't leave the panel showing a delivery that is no longer listed —
+  // an id that has scrolled out of scope simply falls back to the newest.
+  const selectedDelivery = useMemo(() => {
+    if (subTab !== "purchases") return null;
+    if (selection.kind === "none") return null;
+    if (selection.kind === "id") {
+      const found = deliveryHeaders.find((h) => h.deliveryId === selection.id);
+      if (found) return found;
+    }
+    return newestDelivery;
+  }, [subTab, selection, deliveryHeaders, newestDelivery]);
+
+  const selectedDeliveryId = selectedDelivery?.deliveryId ?? null;
+
+  const selectedLines = useMemo(() => {
+    if (!selectedDelivery) return [];
+    return activeRows.flatMap((i) =>
+      i.kind === "row" && i.row.deliveryId === selectedDelivery.deliveryId
+        ? [{ key: i.row.key, product: i.row.product, quantity: i.row.quantity }]
+        : []);
+  }, [activeRows, selectedDelivery]);
 
   const totalTransferItems = transferRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
-  const toggleDelivery = (deliveryId: string) => {
-    setExpandedDeliveries((prev) => {
-      const next = new Set(prev);
-      if (next.has(deliveryId)) next.delete(deliveryId);
-      else next.add(deliveryId);
-      return next;
-    });
+  // Clicking the selected day again clears the panel, so the row behaves like a
+  // toggle rather than a one-way door.
+  const selectDelivery = (deliveryId: string) => {
+    setSelection((prev) =>
+      prev.kind !== "none" && selectedDeliveryId === deliveryId
+        ? { kind: "none" }
+        : { kind: "id", id: deliveryId });
   };
 
   const startEdit = (row: DisplayRow) => {
@@ -457,11 +490,6 @@ export default function PurchasesPage({
               {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
           </div>
-          {subTab === "purchases" && deliveryIdsInView.length > 0 && (
-            <button onClick={toggleAllDeliveries} className={styles.presetButton}>
-              {allExpanded ? "Collapse all" : "Expand all"}
-            </button>
-          )}
           {subTab === "purchases" && (
             <button
               onClick={onOpenPurchaseModal}
@@ -472,7 +500,9 @@ export default function PurchasesPage({
           )}
         </div>
 
-        {/* Purchases / Transfers list */}
+        {/* List on the left, the selected day's products on the right. The
+            panel only exists for purchases — a transfer has no delivery. */}
+        <div className={subTab === "purchases" ? styles.listWithPanel : undefined}>
         <div className={styles.tableCard}>
         <div className={styles.tableScroll}>
         <table className={styles.table}>
@@ -535,15 +565,12 @@ export default function PurchasesPage({
                 item.kind === "deliveryHeader" ? (
                   <tr
                     key={item.key}
-                    className={styles.deliveryHeaderRow}
-                    onClick={() => toggleDelivery(item.deliveryId)}
-                    aria-expanded={expandedDeliveries.has(item.deliveryId)}
-                    title={expandedDeliveries.has(item.deliveryId) ? "Hide products" : "Show products"}
+                    className={`${styles.deliveryHeaderRow} ${selectedDeliveryId === item.deliveryId ? styles.deliveryHeaderRowSelected : ""}`}
+                    onClick={() => selectDelivery(item.deliveryId)}
+                    aria-selected={selectedDeliveryId === item.deliveryId}
+                    title="Show this day's products"
                   >
                     <td className={styles.deliveryHeaderDate}>
-                      <span className={styles.deliveryCaret} aria-hidden="true">
-                        {expandedDeliveries.has(item.deliveryId) ? "▾" : "▸"}
-                      </span>
                       {formatDateShort(item.date)}
                     </td>
                     <td colSpan={2} className={styles.deliveryHeaderLabel}>
@@ -566,8 +593,8 @@ export default function PurchasesPage({
                         fmt(item.totalCost)
                       )}
                     </td>
-                    {/* Stops the row's accordion toggle: the pencil opens the
-                        editor, it does not also collapse what you are editing. */}
+                    {/* Stops the row's selection handler: the pencil opens the
+                        editor, it does not also change what the panel shows. */}
                     <td onClick={(e) => e.stopPropagation()}>
                       {item.totalCost != null && (
                         <div className={styles.actionsCell}>
@@ -734,6 +761,14 @@ export default function PurchasesPage({
           )}
         </table>
         </div>
+        </div>
+
+        {subTab === "purchases" && (
+          <DeliveryDetailPanel
+            delivery={selectedDelivery}
+            lines={selectedLines}
+          />
+        )}
         </div>
 
         {/* No "load older" button: a month query is complete by construction, and

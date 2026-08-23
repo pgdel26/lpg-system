@@ -9,21 +9,15 @@ interface InventoryTableProps {
   allInventory: InventoryState;
   onChange: (sectionKey: string, product: string, field: string, value: number | string) => void;
   onSaveSection: (sectionKey: string) => void;
-  showAudit?: boolean;
-  /** Per-product END that overrides calcEnd(). Range mode needs this: its
-   *  consolidated row sums activity across days, and calcEnd would re-derive
-   *  END from day one's BEG — which only holds if END(day N) === BEG(day N+1).
-   *  An audit breaks that chain by design, so range mode passes the final
-   *  day's actual END here rather than letting the arithmetic drift. */
-  endOverride?: Record<string, number>;
 }
 
-export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection, showAudit = true, endOverride }: InventoryTableProps) {
+export default function InventoryTable({ section, data, allInventory, onChange, onSaveSection }: InventoryTableProps) {
   const { columns, products, calcEnd, subgroups } = section;
 
-  const visibleColumns = showAudit
-    ? columns
-    : columns.filter((col) => !col.auditSource && !col.auditReason && col.field !== "var");
+  // NOTE: every column renders, always. The AUDIT / REASON / DIFF trio used to
+  // be hidden behind a "Show Audit" toggle; with the Audited Records tab gone
+  // this grid is the only place an audit can be recorded, so hiding them would
+  // make audits unreachable — and an audit sets the next day's BEG.
 
   const getMergedRow = (product: string): InventoryCell => {
     const row: Record<string, unknown> = { ...(data[product] || {}) };
@@ -49,8 +43,10 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
     return row as InventoryCell;
   };
 
-  const getEndValue = (product: string) =>
-    endOverride?.[product] ?? calcEnd(getMergedRow(product));
+  // Always the arithmetic END. The override existed for the removed range view,
+  // whose consolidated rows spanned days and so couldn't be re-derived from a
+  // single BEG; a single date has no such problem.
+  const getEndValue = (product: string) => calcEnd(getMergedRow(product));
   const getVarValue = (product: string): number | null => {
     const row = getMergedRow(product);
     if (row.aud == null || (row.aud as unknown) === "") return null;
@@ -87,7 +83,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
       return (
         <tr key={product} className={styles.dataRow}>
           <td className={styles.stickyTd}>{product}</td>
-          {visibleColumns.map((col) => {
+          {columns.map((col) => {
             if (col.field === "end") {
               return (
                 <td key={col.field} className={styles.calcCell} style={{ color: "var(--text-secondary)" }}>
@@ -207,12 +203,12 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
     <div className={styles.wrapper}>
       <table
         className={styles.table}
-        style={{ minWidth: `${120 + visibleColumns.length * 80}px` }}
+        style={{ minWidth: `${120 + columns.length * 80}px` }}
       >
         <thead>
           <tr className={styles.headerRow}>
             <th className={styles.stickyTh}>Product</th>
-            {visibleColumns.map((col) => (
+            {columns.map((col) => (
               <th
                 key={col.field}
                 className={styles.colTh}
@@ -231,7 +227,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
             subgroups.map((sg) => (
               <React.Fragment key={sg.label}>
                 <tr className={styles.subgroupRow}>
-                  <td colSpan={visibleColumns.length + 1}>{sg.label}</td>
+                  <td colSpan={columns.length + 1}>{sg.label}</td>
                 </tr>
                 {renderProducts(sg.products)}
               </React.Fragment>

@@ -7,7 +7,7 @@ import { collectionEventsInRange } from "../../lib/receivables";
 import IncomeStatementBreakdown from "./IncomeStatementBreakdown";
 import DiscountsByCustomerCard from "./DiscountsByCustomerCard";
 import { LoadingIcon, DownloadIcon } from "../../components/Icons";
-import type { SaleTransaction, Swap, Refund, Purchase, Expense, Branch, PurchaseDelivery } from "../../lib/types";
+import type { SaleTransaction, Swap, Refund, Purchase, Expense, Staff, Branch, PurchaseDelivery } from "../../lib/types";
 import styles from "./IncomeStatementPage.module.css";
 
 interface IncomeStatementPageProps {
@@ -22,6 +22,8 @@ interface IncomeStatementPageProps {
   purchases: Purchase[];
   purchaseDeliveries: PurchaseDelivery[];
   expenses: Expense[];
+  /** Roster, only used to name salary expenses in the breakdown. */
+  staff: Staff[];
   branches: Branch[];
   /** Unbounded, live AR doc list — NOT date-ranged. See IncomeStatementInput. */
   arTransactions: SaleTransaction[];
@@ -44,6 +46,7 @@ export default function IncomeStatementPage({
   purchases,
   purchaseDeliveries,
   expenses,
+  staff,
   branches,
   arTransactions,
 }: IncomeStatementPageProps) {
@@ -204,7 +207,7 @@ export default function IncomeStatementPage({
       ) : (
         <div className={styles.pageLayout}>
           <div className={styles.mainColumn}>
-            <IncomeStatementBreakdown result={activeResult} isPerBranchView={activeTab !== "all"} />
+            <IncomeStatementBreakdown result={activeResult} staff={staff} isPerBranchView={activeTab !== "all"} />
           </div>
           {activeResult.discountsByCustomer.length > 0 && (
             <div className={styles.rightCol}>

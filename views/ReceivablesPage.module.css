@@ -446,3 +446,8 @@
   font-family: inherit;
 }
 
+/* The operator's own note on a collection. Dimmed: it's context, not a figure. */
+.eventNote {
+  color: var(--text-dim);
+  font-style: italic;
+}

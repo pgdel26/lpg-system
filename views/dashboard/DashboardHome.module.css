@@ -1,0 +1,62 @@
+.header {
+  margin-bottom: 20px;
+}
+
+.heading {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.quickEntryRow {
+  margin-bottom: 16px;
+}
+
+/* The feed and the low-stock alerts now share one row. align-items:start keeps
+   each card at its natural height rather than stretching the shorter one, and
+   min-width:0 on the grid children lets the feed's own horizontal scroll work
+   instead of the table forcing the column wider. */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.mainGrid > * {
+  min-width: 0;
+}
+
+.error {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid var(--accent-red);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}

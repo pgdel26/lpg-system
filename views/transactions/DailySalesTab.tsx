@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { fmt, today } from "../../lib/utils";
-import { PlusIcon, EditIcon, TrashIcon, DownloadIcon, ChevronLeftIcon } from "../../components/Icons";
+import { fmt, saleSectionLabel } from "../../lib/utils";
+import { EditIcon, TrashIcon, ChevronLeftIcon } from "../../components/Icons";
 import { paymentSplit } from "../../lib/payments";
 import { arStatus } from "../../lib/receivables";
 import type { SaleTransaction, Swap, Refund } from "../../lib/types";
@@ -8,23 +8,14 @@ import type { EditData, PendingDelete } from "./transactionsTypes";
 import styles from "./DailySalesTab.module.css";
 
 interface DailySalesTabProps {
-  inventoryDate: string;
-  setInventoryDate: (v: string) => void;
   sorted: SaleTransaction[];
   swaps: Swap[];
   refunds: Refund[];
   swapTotal: number;
   refundTotal: number;
-  grandTotal: number;
-  saleTypeLabel: (section: string) => string;
-  onOpenSaleModal: () => void;
   onOpenSwapModal: () => void;
-  onOpenRefundModal: () => void;
   /** Opens the same RecordCollectionModal the Receivables page uses — collecting
    *  on an invoice is the same event wherever it is entered from. */
-  onOpenCollectionModal: () => void;
-  onViewInventory: () => void;
-  onExportFullReport: () => void;
   // Shared inline-edit state (owned by parent)
   editingId: string | null;
   editData: EditData | null;
@@ -39,12 +30,9 @@ interface DailySalesTabProps {
 const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
 
 export default function DailySalesTab({
-  inventoryDate, setInventoryDate,
   sorted, swaps, refunds,
-  swapTotal, refundTotal, grandTotal,
-  saleTypeLabel,
-  onOpenSaleModal, onOpenSwapModal, onOpenRefundModal, onOpenCollectionModal,
-  onViewInventory, onExportFullReport,
+  swapTotal, refundTotal,
+  onOpenSwapModal,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -60,47 +48,11 @@ export default function DailySalesTab({
 
   return (
     <div>
-      {/* Date selector + Record Sale button */}
-      <div className={styles.toolbar}>
-        <input
-          type="date"
-          value={inventoryDate}
-          onChange={(e) => setInventoryDate(e.target.value)}
-          className={styles.dateInput}
-        />
-        {inventoryDate !== today() && (
-          <button onClick={() => setInventoryDate(today())} className={styles.todayButton}>
-            Go to Today
-          </button>
-        )}
-        <div className={styles.toolbarActions}>
-          <button onClick={() => onOpenSaleModal()} className={styles.primaryButton}>
-            <PlusIcon /> Add Sale
-          </button>
-          {/* Sits beside Add Sale: money coming in on an old invoice is part of
-              the same day's takings, so it belongs on the day's own screen
-              rather than only on Receivables. */}
-          <button onClick={onOpenCollectionModal} className={styles.primaryButton}>
-            <PlusIcon /> Add AR Collection
-          </button>
-          <button onClick={onViewInventory} className={styles.primaryButton}>
-            View Inventory
-          </button>
-          <button
-            onClick={onExportFullReport}
-            disabled={sorted.length === 0}
-            className={`${styles.exportButton} ${sorted.length === 0 ? styles.exportButtonDisabled : ""}`}
-          >
-            <DownloadIcon /> Export
-          </button>
-        </div>
-      </div>
-
-      {/* Grand total card */}
-      <div className={styles.grandTotalCard}>
-        <span className={styles.grandTotalLabel}>Total Sales</span>
-        <span className={styles.grandTotalValue}>{fmt(grandTotal)}</span>
-      </div>
+      {/* This tab has no toolbar of its own any more. The date filter, Export,
+          Add Sale and Add AR Collection all live in the outlet page's shared
+          header — every one of them applied to more than just this tab. The
+          New buttons on the swap and refund panels below stay local: they add
+          to those panels specifically. */}
 
       {/* Main layout: Sales table + side panels */}
       <div className={styles.mainLayout}>
@@ -193,7 +145,7 @@ export default function DailySalesTab({
                   <span className={styles.invoiceCell}>{t.invoice || "—"}</span>
                   <span className={styles.secondaryCell}>{t.customerName || "—"}</span>
                   <span className={styles.productCell}>{t.product}</span>
-                  <span className={styles.typeCell}>{saleTypeLabel(t.saleSection)}</span>
+                  <span className={styles.typeCell}>{saleSectionLabel(t.saleSection)}</span>
                   <span className={styles.qtyCell}>{t.quantity || 1}</span>
                   <span className={styles.srpCell}>{fmt(t.srp || 0)}</span>
                   <span className={`${styles.discCell} ${t.discount > 0 ? styles.discActive : styles.discDim}`}>
@@ -361,9 +313,6 @@ export default function DailySalesTab({
                   <div className={styles.panelHeadingInner}>
                     <div className={`${styles.dot} ${styles.dotRed}`} />
                     <h3 className={styles.panelTitle}>Refund / Return</h3>
-                  </div>
-                  <div className={styles.panelHeadingActions}>
-                    <button onClick={onOpenRefundModal} className={styles.refundNewButton}>New</button>
                   </div>
                 </div>
 

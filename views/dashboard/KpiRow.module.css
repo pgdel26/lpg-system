@@ -1,0 +1,240 @@
+/* Three KPI cards. Card treatment matches the app's existing cards
+   (--bg-card, --border, 12px radius) rather than the mockup's flat white +
+   #E2E8F0, so the dashboard sits inside TankTracker's own look. */
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.cardHead {
+  margin-bottom: 14px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cardSub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Value and chip share a baseline so the chip reads as an annotation on the
+   number rather than a separate line of its own. */
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bigValue {
+  font-size: 26px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.valueRed {
+  color: var(--accent-red);
+}
+
+.valueOrange {
+  color: var(--accent-orange-dark);
+}
+
+/* 10% tint behind full-opacity text — the app's existing chip treatment. */
+.invoiceChip,
+.countChip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.invoiceChip {
+  background: rgba(245, 158, 66, 0.14);
+  color: var(--accent-orange-dark);
+}
+
+.countChip {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+/* ─── Outlet split, nested in the Net Sales card ─── */
+
+.splitList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Each outlet row links to that outlet's Sales screen. Border-and-tint shift on
+   hover rather than a lift, matching the app's flat card idiom. Negative margin
+   with matching padding keeps the bars aligned with the card's other content
+   while still giving the hover state room to read as a target. */
+.splitItem {
+  display: block;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  transition: background 0.15s ease;
+}
+
+.splitItem:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.splitItem:hover .splitName,
+.splitItem:hover .splitArrow {
+  color: var(--accent-blue);
+}
+
+.splitLabelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.splitName {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.splitValue {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* Always present, not hover-only: an affordance that appears only on hover is
+   invisible on touch, and this row is the only drill-in on the card. */
+.splitArrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.splitTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.splitFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+/* ─── Compact ranked list, shared by the Pending A/R and Expenses cards ─── */
+
+.miniList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.miniRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.miniMore {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.miniDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-orange);
+  flex-shrink: 0;
+}
+
+.miniName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miniAmount {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Pushed to the bottom of the card so it sits below the account list
+   regardless of how many rows that list has. */
+.cardAction {
+  display: inline-block;
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.cardAction:hover {
+  text-decoration: underline;
+}
+
+.emptyInline {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+@media (max-width: 1100px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

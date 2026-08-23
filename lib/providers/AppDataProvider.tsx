@@ -18,6 +18,8 @@ import { useStaffData, type UseStaffData } from "../hooks/useStaffData";
 import { useNotificationsData, type UseNotificationsData } from "../hooks/useNotificationsData";
 import { useReceivablesData, type UseReceivablesData } from "../hooks/useReceivablesData";
 import { useBranchesData, type UseBranchesData } from "../hooks/useBranchesData";
+import { usePermissionsData, type UsePermissionsData } from "../hooks/usePermissionsData";
+import { isAdminEmail } from "../allowedEmails";
 import type { InventoryState, Refund } from "../types";
 
 // The composed context value: the union of every domain hook's return shape.
@@ -28,12 +30,21 @@ export interface AppData extends
   UseProductsData, UsePricebooksData, UseInventoryData, UseCustomersData,
   UseSalesData, UseSwapsData, UsePurchasesData, UseRefundsData,
   UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData,
-  UseBranchesData {
+  UseBranchesData, UsePermissionsData {
   // Cross-domain derived values computed in the provider (not owned by any
   // single hook). resolvedInventory merges raw inventory + movements; refunds
   // is allRefunds filtered to the viewed date (page.js passed this as `refunds`).
   resolvedInventory: InventoryState;
   refunds: Refund[];
+
+  // ---- Access control (UX only — see CLAUDE.md; the real boundary is
+  // Firestore rules, which this app does not yet have) ----
+  /** True when the signed-in address has role "admin" in lib/allowedEmails.ts. */
+  isAdmin: boolean;
+  /** Permission keys hidden from the signed-in user. Always empty for an admin. */
+  deniedNavKeys: string[];
+  /** Whether `key` is visible to the signed-in user. */
+  canAccess: (key: string) => boolean;
 }
 
 const AppDataContext = createContext<AppData | null>(null);
@@ -63,7 +74,7 @@ export function AppDataProvider({
   }, [toast]);
 
   // ---- Active outlet ----
-  // Comes from the URL (/[branch]/sales, /[branch]/inventory, /[branch]/purchases).
+  // Comes from the URL's first segment (/[branch], e.g. /pili).
   // Routes outside a [branch] segment (e.g. /customers, /income-statement) get no
   // branch param — DEFAULT_BRANCH_ID is a harmless fallback there since none of
   // those screens read branch-scoped data.
@@ -109,15 +120,24 @@ export function AppDataProvider({
   const notifications = useNotificationsData(currentUserEmail, onToast);
   const receivables = useReceivablesData(onToast);
   const branches = useBranchesData();
+  const permissions = usePermissionsData(onToast);
 
   // ---- Cross-domain effect 1: resolved inventory ----
   // Relocated verbatim from app/page.js. This computation merges raw inventory
   // with sales / purchase / swap / refund movements, so it spans every domain
   // and can't live in the inventory hook alone. page.js filtered allRefunds to
   // the viewed date before feeding this memo, so we reproduce that filter here.
+  //
+  // The branch filter is load-bearing and explicit: allRefunds is company-wide
+  // (the Returns & Refunds screen lists every outlet), so without it this memo
+  // would feed another outlet's returns into THIS outlet's inventory. It used
+  // to come for free from the listener's own `where` clause, which meant the
+  // invariant lived in a different file from the code depending on it.
   const dateRefunds = useMemo(
-    () => refunds.allRefunds.filter((r) => r.date === inventory.inventoryDate),
-    [refunds.allRefunds, inventory.inventoryDate],
+    () => refunds.allRefunds.filter(
+      (r) => r.date === inventory.inventoryDate && r.branch === branch,
+    ),
+    [refunds.allRefunds, inventory.inventoryDate, branch],
   );
 
   const resolvedInventory = useMemo(() => {
@@ -243,6 +263,13 @@ export function AppDataProvider({
     // slow/cold-start snapshot could otherwise lose the race against this
     // 2s debounce and get saveSection to persist purchases=0 for the new scope.
     if (!purchases.datePurchasesLoaded) return;
+    // Same race on the other side. saveSection now writes whenever MOVEMENTS
+    // exist, even with nothing typed, so it no longer implicitly waits for the
+    // dailyInventory docs the way its old empty-rawItems bail did. Without this
+    // gate, cold-starting an outlet where sales land before the inventory
+    // snapshots persists an END computed from an absent BEG — and
+    // scripts/daily-init-beg.mjs carries END into tomorrow's BEG.
+    if (!inventory.inventoryLoaded) return;
     const sectionKeys = inventorySectionKeysString.split(",").filter(Boolean);
     const timer = setTimeout(() => {
       sectionKeys.forEach((key) => saveSection(key));
@@ -252,11 +279,31 @@ export function AppDataProvider({
     sales.sales,
     purchases.datePurchaseTransactions,
     purchases.datePurchasesLoaded,
+    inventory.inventoryLoaded,
     swaps.swaps,
     dateRefunds,
     saveSection,
     inventorySectionKeysString,
   ]);
+
+  // ---- Access control ----
+  // An admin bypasses restrictions entirely: they're the only account that can
+  // edit them, so a self-inflicted lockout has to be impossible.
+  const isAdmin = isAdminEmail(currentUserEmail);
+  const deniedNavKeys = useMemo(() => {
+    if (isAdmin) return [];
+    const email = (currentUserEmail || "").trim().toLowerCase();
+    return permissions.deniedByEmail[email] || [];
+  }, [isAdmin, currentUserEmail, permissions.deniedByEmail]);
+
+  const canAccess = useCallback((key: string) => {
+    if (isAdmin) return true;
+    // Until the first snapshot lands, treat nothing as denied — a brief
+    // over-permissive moment is better than tabs visibly popping out of the
+    // sidebar a beat after login.
+    if (!permissions.permissionsLoaded) return true;
+    return !deniedNavKeys.includes(key);
+  }, [isAdmin, permissions.permissionsLoaded, deniedNavKeys]);
 
   // Compose the single context value. `...inventory` carries resolvedInventoryRef
   // through to consumers by design (the inventory hook exposes it for this exact
@@ -276,8 +323,12 @@ export function AppDataProvider({
     ...notifications,
     ...receivables,
     ...branches,
+    ...permissions,
     resolvedInventory,
     refunds: dateRefunds,
+    isAdmin,
+    deniedNavKeys,
+    canAccess,
   };
 
   return (

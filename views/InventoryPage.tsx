@@ -17,8 +17,6 @@ interface InventoryPageProps {
   inventorySections: InventorySection[];
   onInventoryChange: (sectionKey: string, product: string, field: string, value: number | string) => void;
   onSaveSection: (sectionKey: string) => void;
-  inventory?: unknown;
-  showAudit?: boolean;
 }
 
 export default function InventoryPage({
@@ -27,7 +25,6 @@ export default function InventoryPage({
   inventorySections,
   onInventoryChange,
   onSaveSection,
-  showAudit = false,
 }: InventoryPageProps) {
   return (
     <div className="animate-fade">
@@ -45,7 +42,6 @@ export default function InventoryPage({
             allInventory={resolvedInventory}
             onChange={onInventoryChange}
             onSaveSection={onSaveSection}
-            showAudit={showAudit}
           />
         </div>
       ))}

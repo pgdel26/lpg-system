@@ -1,0 +1,107 @@
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  align-self: start;
+  /* Sticks while the list scrolls, so the detail stays put for a long month. */
+  position: sticky;
+  top: 16px;
+}
+
+.header {
+  padding: 14px 16px;
+  background: rgba(241, 245, 249, 0.6);
+  border-bottom: 1px solid var(--border);
+}
+
+.headerDate {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.headerMeta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.headerCost {
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* Both non-figures are worded, never rendered as a number — a zero here would
+   read as a free delivery. */
+.costPending {
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--accent-orange-dark);
+}
+
+.costUnknown {
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+}
+
+.lines {
+  padding: 6px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.line:last-of-type {
+  border-bottom: none;
+}
+
+.lineProduct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.lineQty {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.lineTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.placeholder {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}

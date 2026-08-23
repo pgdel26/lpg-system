@@ -23,6 +23,9 @@ export interface RecordArCollectionInput {
   branch: string;
   checkDate?: string;
   checkNumber?: string;
+  /** Optional free-text note. Trimmed and omitted entirely when blank, so a
+   *  doc never carries an empty string that reads as "a note exists". */
+  notes?: string;
 }
 
 export interface UseReceivablesData {
@@ -137,6 +140,7 @@ export function useReceivablesData(onToast: ToastFn): UseReceivablesData {
             createdAt: now,
             ...(input.method === "check" && input.checkDate ? { checkDate: input.checkDate } : {}),
             ...(input.method === "check" && input.checkNumber ? { checkNumber: input.checkNumber } : {}),
+            ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
           };
           const events = [...arCollectionEvents(target.data), event] as ArCollectionEvent[];
           // arCollections is now the sole source of truth for this doc — clear
