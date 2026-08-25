@@ -1,0 +1,116 @@
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.main {
+  min-width: 0;
+  flex: 1;
+}
+
+.topLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.customer {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.chipCash {
+  color: var(--accent-green);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.chipCheck {
+  color: var(--accent-blue);
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.chipUnknown {
+  color: var(--accent-orange);
+  background: rgba(245, 158, 66, 0.14);
+}
+
+.chipGcash {
+  color: #0284c7;
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.subLine {
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 500;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sep {
+  opacity: 0.5;
+}
+
+.notes {
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.amount {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-green);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: flex;
+  padding: 2px;
+}
+
+.iconButton:hover {
+  color: var(--text-secondary);
+}
+
+.empty {
+  padding: 14px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+}

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { fmt, saleSectionLabel } from "../../lib/utils";
 import { EditIcon, TrashIcon, ChevronLeftIcon } from "../../components/Icons";
 import { paymentSplit } from "../../lib/payments";
-import { arStatus } from "../../lib/receivables";
-import type { SaleTransaction, Swap, Refund } from "../../lib/types";
+import { arStatus, type CollectionBatch } from "../../lib/receivables";
+import CollectionsList from "../../components/CollectionsList";
+import type { SaleTransaction, Swap, Refund, Branch } from "../../lib/types";
 import type { EditData, PendingDelete } from "./transactionsTypes";
 import styles from "./DailySalesTab.module.css";
 
@@ -13,9 +14,25 @@ interface DailySalesTabProps {
   refunds: Refund[];
   swapTotal: number;
   refundTotal: number;
+  /** The day on display. Only used to re-evaluate the side panel's default
+   *  open state when the operator moves to another date. */
+  inventoryDate: string;
   onOpenSwapModal: () => void;
   /** Opens the same RecordCollectionModal the Receivables page uses — collecting
    *  on an invoice is the same event wherever it is entered from. */
+  onOpenCollectionModal: () => void;
+
+  // ---- A/R collections recorded on this date, at this outlet ----
+  /** One row per collection, not per event — see collectionBatches(). */
+  collections: CollectionBatch[];
+  /** Every method. What was collected today, full stop. */
+  collectionTotal: number;
+  /** The cash-only subset, i.e. the part that reaches Expected Cash Remit. */
+  collectionCashTotal: number;
+  branches: Branch[];
+  onEditCollection: (batch: CollectionBatch) => void;
+  onVoidCollection: (batch: CollectionBatch) => void;
+
   // Shared inline-edit state (owned by parent)
   editingId: string | null;
   editData: EditData | null;
@@ -32,10 +49,33 @@ const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.8fr 0.
 export default function DailySalesTab({
   sorted, swaps, refunds,
   swapTotal, refundTotal,
-  onOpenSwapModal,
+  inventoryDate,
+  onOpenSwapModal, onOpenCollectionModal,
+  collections, collectionTotal, collectionCashTotal, branches,
+  onEditCollection, onVoidCollection,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  // Opens itself on a day that HAS collections, stays shut on a day that
+  // doesn't. A collapsed panel would hide the collections list behind a click
+  // the operator has no reason to make — and being seen without being looked
+  // for is the entire point of putting collections on this tab.
+  //
+  // Derived per render with an explicit override, NOT seeded into useState.
+  // Seeding would read `collections` exactly once, at mount — and the A/R
+  // listener in useReceivablesData is not covered by the dashboard's loading
+  // gate (that flag comes from useProductsData alone), so at mount
+  // arTransactions is still [] and every day looks empty. The panel would
+  // therefore initialise closed on the default path and only ever correct
+  // itself if the operator changed date. `override` stays null until the
+  // operator actually clicks the toggle, so their choice wins for the rest of
+  // that day's work and the default resumes when they move to another date.
+  const [override, setOverride] = useState<boolean | null>(null);
+  const [lastDate, setLastDate] = useState(inventoryDate);
+  if (inventoryDate !== lastDate) {
+    setLastDate(inventoryDate);
+    setOverride(null);
+  }
+  const sidePanelOpen = override ?? collections.length > 0;
 
   // Money-by-channel: swaps come in as cash, refunds are cash paid out. Folding
   // both into the Cash column makes Cash + GCash + A/R reconcile to the grand total.
@@ -222,7 +262,7 @@ export default function DailySalesTab({
         {/* Side panel toggle + collapsible Swap + Refund */}
         <div className={styles.sidePanelWrap}>
           <button
-            onClick={() => setSidePanelOpen((v) => !v)}
+            onClick={() => setOverride(!sidePanelOpen)}
             title={sidePanelOpen ? "Collapse panel" : "Expand panel"}
             className={`${styles.toggleButton} ${sidePanelOpen ? styles.toggleOpen : styles.toggleClosed}`}
           >
@@ -419,6 +459,53 @@ export default function DailySalesTab({
                       <span className={styles.panelTotalLabel}>Total</span>
                       <span className={styles.refundTotalValue}>-{fmt(refundTotal)}</span>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* A/R Collections section.
+                  Deliberately NOT folded into the Cash/GCash/A-R totals on the
+                  sales table to the left: those three reconcile the day's SALES
+                  by channel, while a collection is money against an invoice
+                  raised on some earlier day. The Sales Report keeps them on
+                  separate lines for the same reason. What this panel adds is
+                  visibility — the Add AR Collection button lives in this page's
+                  header, and until now nothing on the page showed the result,
+                  so a collection booked with the wrong method was invisible
+                  here until it turned up as a drawer shortage. */}
+              <div className={styles.panelSection}>
+                <div className={styles.panelHeading}>
+                  <div className={styles.panelHeadingInner}>
+                    <div className={`${styles.dot} ${styles.dotGreen}`} />
+                    <h3 className={styles.panelTitle}>A/R Collections</h3>
+                  </div>
+                  <div className={styles.panelHeadingActions}>
+                    <button onClick={onOpenCollectionModal} className={styles.swapNewButton}>New</button>
+                  </div>
+                </div>
+
+                <div className={styles.card}>
+                  <CollectionsList
+                    batches={collections}
+                    branches={branches}
+                    onEdit={onEditCollection}
+                    onVoid={onVoidCollection}
+                    emptyText="No collections recorded today."
+                    showDate={false}
+                  />
+                  {collections.length > 0 && (
+                    <>
+                      <div className={styles.panelTotalRow}>
+                        <span className={styles.panelTotalLabel}>Total collected</span>
+                        <span className={styles.panelTotalValue}>{fmt(collectionTotal)}</span>
+                      </div>
+                      {/* The split that actually matters for closing the day.
+                          Only the cash half is in Expected Cash Remit. */}
+                      <div className={styles.panelTotalRow}>
+                        <span className={styles.panelTotalLabel}>Of which cash (in remit)</span>
+                        <span className={styles.panelTotalValue}>{fmt(collectionCashTotal)}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

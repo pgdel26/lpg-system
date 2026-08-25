@@ -10,6 +10,7 @@ export default function ReceivablesRoutePage() {
       branches={data.branches}
       onRecordCollection={data.recordArCollection}
       onVoidCollection={data.voidArCollectionBatch}
+      onEditCollection={data.editArCollectionBatch}
       onUpdateSale={data.updateSale}
       onDeleteSale={data.deleteSale}
     />

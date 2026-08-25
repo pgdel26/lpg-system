@@ -8,7 +8,11 @@ import SaleModal from "../../../components/SaleModal";
 import SwapModal from "../../../components/SwapModal";
 import RefundModal from "../../../components/RefundModal";
 import RecordCollectionModal from "../../../components/RecordCollectionModal";
+import EditCollectionModal from "../../../components/EditCollectionModal";
+import ConfirmModal from "../../../components/ConfirmModal";
 
+import { fmt, formatDateShort } from "../../../lib/utils";
+import { arMethodLabel, type CollectionBatch } from "../../../lib/receivables";
 import type { RecordRefundInput } from "../../../lib/hooks/useRefundsData";
 import type { RecordSaleInput, RecordSalePaymentInput } from "../../../lib/hooks/useSalesData";
 
@@ -147,6 +151,8 @@ export default function OutletRoutePage() {
   // one event, and a second implementation would be a second set of FIFO rules
   // to keep in step.
   const [collectionModalOpen, setCollectionModalOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<CollectionBatch | null>(null);
+  const [pendingVoidCollection, setPendingVoidCollection] = useState<CollectionBatch | null>(null);
 
   // ---- Total Cylinder computed view (cross-section, view-only) ----
   // Relocated from the removed [branch]/inventory route page. Lives here (not
@@ -193,6 +199,8 @@ export default function OutletRoutePage() {
         onOpenSwapModal={handleOpenSwapModal}
         onOpenRefundModal={handleOpenRefundModal}
         onOpenCollectionModal={() => setCollectionModalOpen(true)}
+        onEditCollection={setEditingCollection}
+        onVoidCollection={setPendingVoidCollection}
         onUpdateSale={data.updateSale}
         onUpdateSwap={data.updateSwap}
         onUpdateRefund={data.updateRefund}
@@ -271,6 +279,36 @@ export default function OutletRoutePage() {
           defaultBranch={branch}
           onSubmit={data.recordArCollection}
           onClose={() => setCollectionModalOpen(false)}
+        />
+      )}
+
+      {editingCollection && (
+        <EditCollectionModal
+          collection={editingCollection}
+          branches={data.branches}
+          onSubmit={data.editArCollectionBatch}
+          onClose={() => setEditingCollection(null)}
+        />
+      )}
+
+      {pendingVoidCollection && (
+        <ConfirmModal
+          title="Void collection?"
+          // Spells out the method and, when it was cash, the consequence for
+          // the day being closed — voiding a cash collection lowers that day's
+          // Expected Cash Remit, which is the number the operator is holding
+          // physical money against.
+          message={`This reverses ${fmt(pendingVoidCollection.amount)} collected from ${pendingVoidCollection.customerName} by ${arMethodLabel(pendingVoidCollection.method)} across ${pendingVoidCollection.invoices.length} invoice(s), putting the balance back on their account.${
+            pendingVoidCollection.method === "cash"
+              ? ` It also reduces ${formatDateShort(pendingVoidCollection.date)}'s Expected Cash Remit by that amount.`
+              : ""
+          }`}
+          confirmLabel="Void"
+          onConfirm={async () => {
+            await data.voidArCollectionBatch(pendingVoidCollection.batchId);
+            setPendingVoidCollection(null);
+          }}
+          onCancel={() => setPendingVoidCollection(null)}
         />
       )}
 

@@ -215,6 +215,13 @@
   transition: all 0.15s;
 }
 
+.methodHint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
 .previewCard {
   margin: 14px 0;
   padding: 12px 14px;

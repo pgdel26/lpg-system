@@ -451,3 +451,27 @@
   color: var(--text-dim);
   font-style: italic;
 }
+
+/* Collections card header — sits above the shared CollectionsList rows. */
+.collectionsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.collectionsTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.collectionsTotal {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}

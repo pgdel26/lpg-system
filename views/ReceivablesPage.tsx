@@ -1,14 +1,17 @@
 import { useState, useMemo } from "react";
 import { fmt, formatDateShort } from "../lib/utils";
 import { paymentSplit } from "../lib/payments";
-import { arStatus, arCollectionEvents, collectionMethodLabel, batchSummary, arMethodLabel } from "../lib/receivables";
+import { arStatus, arCollectionEvents, collectionMethodLabel, batchSummary, arMethodLabel, collectionBatches, type CollectionBatch } from "../lib/receivables";
+
 import { EditIcon, TrashIcon, PlusIcon } from "../components/Icons";
 import ConfirmModal from "../components/ConfirmModal";
 import RecordCollectionModal from "../components/RecordCollectionModal";
+import CollectionsList from "../components/CollectionsList";
+import EditCollectionModal from "../components/EditCollectionModal";
 import TopDebtorsChart from "./TopDebtorsChart";
 import ArSummaryTab from "./receivables/ArSummaryTab";
 import type { SaleTransaction, Branch } from "../lib/types";
-import type { RecordArCollectionInput } from "../lib/hooks/useReceivablesData";
+import type { RecordArCollectionInput, EditArCollectionInput } from "../lib/hooks/useReceivablesData";
 import styles from "./ReceivablesPage.module.css";
 
 interface EditData {
@@ -36,6 +39,7 @@ interface ReceivablesPageProps {
   branches: Branch[];
   onRecordCollection: (input: RecordArCollectionInput) => Promise<string | null>;
   onVoidCollection: (batchId: string) => Promise<void>;
+  onEditCollection: (batchId: string, input: EditArCollectionInput) => Promise<string | null>;
   onUpdateSale: (saleId: string, data: { invoice?: string; customerName?: string; discount?: number; totalAmount?: number; paymentType?: string }) => Promise<void>;
   onDeleteSale: (saleId: string) => Promise<void>;
 }
@@ -45,7 +49,7 @@ const subTabs = [
   { key: "transactions", label: "Transactions" },
 ];
 
-export default function ReceivablesPage({ arTransactions, branches, onRecordCollection, onVoidCollection, onUpdateSale, onDeleteSale }: ReceivablesPageProps) {
+export default function ReceivablesPage({ arTransactions, branches, onRecordCollection, onVoidCollection, onEditCollection, onUpdateSale, onDeleteSale }: ReceivablesPageProps) {
   const [subTab, setSubTab] = useState("summary");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
@@ -65,6 +69,8 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pendingVoid, setPendingVoid] = useState<PendingVoid | null>(null);
+  const [editingCollection, setEditingCollection] = useState<CollectionBatch | null>(null);
+  const [visibleCollectionCount, setVisibleCollectionCount] = useState(ROWS_PER_PAGE);
   const [pendingDelete, setPendingDelete] = useState<SaleTransaction | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData>({ invoice: "", customerName: "", discount: 0, totalAmount: 0, paymentType: "ar" });
@@ -129,6 +135,7 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
     setVisibleRowCount(ROWS_PER_PAGE);
+    setVisibleCollectionCount(ROWS_PER_PAGE);
   }
   const visibleRows = filtered.slice(0, visibleRowCount);
   const hasMoreRows = filtered.length > visibleRowCount;
@@ -139,6 +146,32 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
     arTransactions.reduce((sum, t) => sum + arStatus(t).remaining, 0),
     [arTransactions]
   );
+
+  // One row per collection, filtered on the COLLECTION's own date — not the
+  // invoice date the table below uses. They are genuinely different axes: an
+  // invoice raised in June can be paid in August, and an operator asking "what
+  // came in on the 25th" means the payment, not the sale. The status filter is
+  // deliberately not applied here; "outstanding"/"collected" describe an
+  // invoice's state, and have no meaning for a payment that already happened.
+  const collectionRows = useMemo(() => {
+    const rows = collectionBatches(arTransactions, {
+      ...(filterFrom ? { startDate: filterFrom } : {}),
+      ...(filterTo ? { endDate: filterTo } : {}),
+    });
+    const q = customerFilter.trim().toLowerCase();
+    return q ? rows.filter((b) => b.customerName.toLowerCase().includes(q)) : rows;
+  }, [arTransactions, filterFrom, filterTo, customerFilter]);
+
+  const collectionsTotal = collectionRows.reduce((sum, b) => sum + b.amount, 0);
+
+  // Windowed like the A/R table below it. With no date filter set — the default
+  // on this page — collectionRows is every collection ever recorded (486 today
+  // and only growing), and rendering all of them unvirtualised above a table
+  // that deliberately caps itself at 50 rows would make the default view of
+  // this subtab the slowest screen in the app. The header total stays computed
+  // over the FULL filtered set, so the summary figure is never a partial sum of
+  // whatever happens to be rendered.
+  const visibleCollections = collectionRows.slice(0, visibleCollectionCount);
 
   const startEdit = (t: SaleTransaction) => {
     setEditingId(t.id);
@@ -212,6 +245,42 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
 
       <div className={styles.pageLayout}>
         <div className={styles.mainColumn}>
+          {/* Collections.
+              A collection is a transaction in its own right, and until now the
+              only way to see one was to guess which invoice it hit and expand
+              that row. Listing them here — one row per payment, not per
+              invoice-slice — is what makes a mis-keyed method visible at all.
+              The date filters read as COLLECTION dates here; see
+              collectionRows above for why that differs from the table below. */}
+          <div className={styles.tableCard}>
+            <div className={styles.collectionsHeader}>
+              <h3 className={styles.collectionsTitle}>Collections</h3>
+              {/* "all methods" said out loud: this is a receivables ledger, so
+                  every method belongs here — but the same page's remit-facing
+                  figures are cash-only, and an unlabelled peso total invites
+                  the reader to reconcile the two. */}
+              <span className={styles.collectionsTotal}>
+                {collectionRows.length} collection{collectionRows.length !== 1 ? "s" : ""} &middot; {fmt(collectionsTotal)} &middot; all methods
+              </span>
+            </div>
+            <CollectionsList
+              batches={visibleCollections}
+              branches={branches}
+              onEdit={setEditingCollection}
+              onVoid={(b) => setPendingVoid({ batchId: b.batchId, amount: b.amount, invoiceCount: b.invoices.length, date: b.date, method: b.method })}
+              emptyText="No collections match these filters."
+              showBranch
+            />
+            {collectionRows.length > visibleCollectionCount && (
+              <button
+                onClick={() => setVisibleCollectionCount((n) => n + ROWS_PER_PAGE)}
+                className={styles.loadMoreButton}
+              >
+                Load More
+              </button>
+            )}
+          </div>
+
           {/* AR table */}
           {filtered.length > 0 ? (
           <div className={styles.tableCard}>
@@ -411,6 +480,15 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
           branches={branches}
           onSubmit={onRecordCollection}
           onClose={() => setRecordModalOpen(false)}
+        />
+      )}
+
+      {editingCollection && (
+        <EditCollectionModal
+          collection={editingCollection}
+          branches={branches}
+          onSubmit={onEditCollection}
+          onClose={() => setEditingCollection(null)}
         />
       )}
 

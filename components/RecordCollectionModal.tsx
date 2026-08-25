@@ -45,7 +45,13 @@ export default function RecordCollectionModal({
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"cash" | "check" | "gcash">("cash");
+  // Check, not cash. 97-99% of collections here arrive as cheques, so a cash
+  // default is wrong far more often than it is right. A default alone only
+  // inverts which way the silent mistake falls, though — what actually removes
+  // it is the hint under the selector stating the remit consequence of whatever
+  // is currently picked, so the operator sees the effect without having to know
+  // that cash is the only method that reaches the drawer.
+  const [method, setMethod] = useState<"cash" | "check" | "gcash">("check");
   // Not state: nothing can change it, and the modal unmounts on close.
   const date = defaultDate || today();
   // Defaults to nothing when the caller doesn't supply one: Receivables is a
@@ -238,6 +244,14 @@ export default function RecordCollectionModal({
                     {arMethodLabel(opt.value)}
                   </button>
                 ))}
+              </div>
+              {/* Same sentence the edit modal shows. This is the surface where
+                  the mis-classification originates, so it is the surface that
+                  most needs to state the consequence. */}
+              <div className={styles.methodHint}>
+                {method === "cash"
+                  ? `Counts toward ${formatDateShort(date)}'s Expected Cash Remit.`
+                  : `Settles the receivable but does not touch the drawer — excluded from ${formatDateShort(date)}'s Expected Cash Remit.`}
               </div>
             </div>
 

@@ -21,6 +21,10 @@ export interface ArCollectionEventLike {
   date?: string;
   branch?: string;
   batchId?: string;
+  /** Cheque metadata, display-only — no calculation reads either. Present on
+   *  the structural type because the listing/edit surfaces round-trip them. */
+  checkDate?: string;
+  checkNumber?: string;
   voided?: boolean;
   /** Free-text note the operator typed when recording the collection. Display
    *  only — no calculation reads it. */
@@ -350,6 +354,121 @@ export function collectionsOnDate<T extends ArStatusLike>(
   branch?: string,
 ): number {
   return round2(collectionEventsOnDate(docs, date, branch).reduce((sum, { event }) => sum + (event.amount || 0), 0));
+}
+
+export interface CollectionBatch {
+  batchId: string;
+  customerName: string;
+  /** Empty only for a legacy event that never recorded one. */
+  date: string;
+  amount: number;
+  method: "cash" | "check" | "gcash";
+  branch: string;
+  checkDate?: string;
+  checkNumber?: string;
+  notes?: string;
+  /** Invoice numbers this one payment was spread across, oldest first. */
+  invoices: string[];
+  /**
+   * False when the method was never actually stored. arCollectionEvents()
+   * defaults a legacy doc's method to "cash" so that balance maths has
+   * something to work with, but a listing must not repeat that guess as fact:
+   * 72 live legacy docs have no collectionMethod, and painting them with a
+   * green "Cash" chip asserts they hit the drawer when nobody knows.
+   *
+   * Today all 72 also have no collectedDate, so they reach no day's Expected
+   * Cash Remit. That is the ONLY reason they are harmless — running
+   * scripts/backfill-collection-dates.mjs would give them dates and silently
+   * turn ₱787k of unknown-method collections into counted drawer cash.
+   */
+  methodRecorded: boolean;
+  /** True when the batch's events disagree on method — impossible through the
+   *  app's own write paths, but a legacy doc pair can produce it. The UI shows
+   *  it instead of picking one and quietly hiding the disagreement. */
+  mixedMethod: boolean;
+}
+
+export interface CollectionBatchFilter {
+  startDate?: string;
+  endDate?: string;
+  branch?: string;
+}
+
+/**
+ * One row per COLLECTION — the operator's unit — rather than one row per event,
+ * which is the storage unit. A single Record Collection action FIFO-spreads
+ * across as many invoices as the money covers, writing one event per invoice
+ * under a shared batchId; showing those raw would list one payment as three.
+ *
+ * Every listing surface (the outlet's Transactions tab, the Receivables
+ * Transactions tab) goes through this so they agree on what "a collection" is,
+ * and so the Edit action has one batch to target. Voided events are excluded:
+ * a reversed collection is not a transaction that happened.
+ *
+ * Unlike collectionEventsOnDate this does NOT filter by method — it is a
+ * ledger of what was collected, not the drawer-cash figure. Mixing those two
+ * jobs into one helper is exactly what hid the mis-booked ₱16,776.
+ */
+export function collectionBatches<T extends ArStatusLike & { customerName?: string; invoice?: string; date?: string }>(
+  docs: T[],
+  filter: CollectionBatchFilter = {},
+): CollectionBatch[] {
+  const { startDate, endDate, branch } = filter;
+  const batches = new Map<string, CollectionBatch & { _sort: Array<{ invoice: string; date: string }> }>();
+  for (const t of docs) {
+    for (const e of arCollectionEvents(t)) {
+      if (e.voided) continue;
+      if (startDate && (!e.date || e.date < startDate)) continue;
+      if (endDate && (!e.date || e.date > endDate)) continue;
+      if (branch !== undefined && e.branch !== branch) continue;
+      // Doc-unique fallback, never a shared "" bucket: the map is global across
+      // every doc, so an event with no batchId would otherwise collapse
+      // together with every other such event — different customers summed into
+      // one row under whichever name landed first. It would also be
+      // unactionable, since edit and void both match on the batchId. Mirrors
+      // the `legacy:${id}` convention arCollectionEvents already uses.
+      const id = e.batchId || `orphan:${t.id || ""}`;
+      const existing = batches.get(id);
+      const method = (e.method || "cash") as CollectionBatch["method"];
+      // Distinguishes a stored "cash" from arCollectionEvents' fallback. Has to
+      // be read off the source doc: by the time an event exists the default has
+      // already been applied and the two are indistinguishable.
+      const methodRecorded = (t.arCollections && t.arCollections.length > 0)
+        ? e.method !== undefined
+        : t.collectionMethod !== undefined;
+      if (!existing) {
+        batches.set(id, {
+          batchId: id,
+          customerName: t.customerName || "Unknown",
+          date: e.date || "",
+          amount: round2(e.amount || 0),
+          method,
+          branch: e.branch || "",
+          ...(e.checkDate ? { checkDate: e.checkDate } : {}),
+          ...(e.checkNumber ? { checkNumber: e.checkNumber } : {}),
+          ...(e.notes ? { notes: e.notes } : {}),
+          invoices: [],
+          mixedMethod: false,
+          methodRecorded,
+          _sort: [{ invoice: t.invoice || "—", date: t.date || "" }],
+        });
+      } else {
+        existing.amount = round2(existing.amount + (e.amount || 0));
+        if (existing.method !== method) existing.mixedMethod = true;
+        if (!methodRecorded) existing.methodRecorded = false;
+        existing._sort.push({ invoice: t.invoice || "—", date: t.date || "" });
+      }
+    }
+  }
+  return Array.from(batches.values())
+    .map(({ _sort, ...b }) => ({
+      ...b,
+      invoices: _sort
+        .sort((x, y) => x.date.localeCompare(y.date) || x.invoice.localeCompare(y.invoice))
+        .map((s) => s.invoice),
+    }))
+    // Newest first, matching every other transaction listing in the app.
+    .sort((a, b) => b.date.localeCompare(a.date) || a.customerName.localeCompare(b.customerName));
 }
 
 export interface BatchSummary {

@@ -266,8 +266,12 @@ export default function SalesReportTab({
             <div className={styles.subTotalRow}>
               <div>
                 <div className={styles.rowLabel}>Collections</div>
+                {/* "cash only" is load-bearing: the Transactions tab beside
+                    this one shows Total collected across ALL methods, and
+                    without the qualifier the two figures read as contradicting
+                    each other rather than as remit-input vs ledger. */}
                 <div className={styles.rowSub}>
-                  {docsCollectedToday.length} invoice{docsCollectedToday.length !== 1 ? "s" : ""}{partialCollectionsCount > 0 ? ` (${partialCollectionsCount} partial)` : ""}
+                  {docsCollectedToday.length} invoice{docsCollectedToday.length !== 1 ? "s" : ""}{partialCollectionsCount > 0 ? ` (${partialCollectionsCount} partial)` : ""} &middot; cash only
                 </div>
               </div>
               <span className={`${styles.rowValue} ${totalCollections > 0 ? styles.valueGreen : styles.valueDim}`}>

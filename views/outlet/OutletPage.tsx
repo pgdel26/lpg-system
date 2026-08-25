@@ -11,6 +11,7 @@ import type { ExpenseSubmission } from "../../components/ExpenseModal";
 
 import { exportOutletWorkbook } from "./outletExport";
 import { today } from "../../lib/utils";
+import { collectionBatches, collectionsOnDate, type CollectionBatch } from "../../lib/receivables";
 
 import type {
   EditData, PendingDelete, DailyReportWithCash, RefundItemInput,
@@ -48,6 +49,11 @@ interface OutletPageProps {
   onOpenSwapModal: () => void;
   onOpenRefundModal: () => void;
   onOpenCollectionModal: () => void;
+  /** Both take the whole batch, not just its id — the route page owns the edit
+   *  modal and the void confirmation, and each needs the collection's current
+   *  figures to prefill and to state what it is about to reverse. */
+  onEditCollection: (batch: CollectionBatch) => void;
+  onVoidCollection: (batch: CollectionBatch) => void;
   onUpdateSale: UpdateSaleFn;
   onUpdateSwap: UpdateSwapFn;
   onUpdateRefund: UpdateRefundFn;
@@ -83,6 +89,7 @@ export default function OutletPage({
   staff, dailyReport, onUpdateDailyStaff,
   arTransactions, branch,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal, onOpenCollectionModal,
+  onEditCollection, onVoidCollection,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
   onDeleteSale, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
@@ -108,6 +115,31 @@ export default function OutletPage({
 
   const swapTotal = swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const refundTotal = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
+
+  // ---- A/R collections for this outlet, on this date ----
+  // Scoped by the EVENT's branch, not the invoice's: a customer can owe at PILI
+  // and pay at CADLAN, and the outlet that physically took the money is the one
+  // that has to account for it. Same rule collectionEventsOnDate uses for the
+  // Sales Report, so the two tabs can't disagree about whose day this is.
+  const collections = useMemo(
+    () => collectionBatches(arTransactions, { startDate: inventoryDate, endDate: inventoryDate, branch }),
+    [arTransactions, inventoryDate, branch]
+  );
+  const collectionTotal = useMemo(
+    () => collections.reduce((sum, b) => sum + b.amount, 0),
+    [collections]
+  );
+  // Not derived by re-filtering `collections` on method: the Sales Report's
+  // figure comes from collectionsOnDate, and deriving this one the same way is
+  // what guarantees the panel's "of which cash" line equals the Collections row
+  // the operator reconciles against.
+  // Memoized because collectionsOnDate scans every AR doc's every event, and
+  // arTransactions is the unbounded live list — without this it re-runs on each
+  // OutletPage render, including every keystroke in the inline sale editor.
+  const collectionCashTotal = useMemo(
+    () => collectionsOnDate(arTransactions, inventoryDate, branch),
+    [arTransactions, inventoryDate, branch]
+  );
 
   // ---- Stock transfer ----
   // Lifted from the inventory sub-tab that used to own it: the button that opens
@@ -354,7 +386,15 @@ export default function OutletPage({
             refunds={refunds}
             swapTotal={swapTotal}
             refundTotal={refundTotal}
+            inventoryDate={inventoryDate}
             onOpenSwapModal={onOpenSwapModal}
+            onOpenCollectionModal={onOpenCollectionModal}
+            collections={collections}
+            collectionTotal={collectionTotal}
+            collectionCashTotal={collectionCashTotal}
+            branches={branches}
+            onEditCollection={onEditCollection}
+            onVoidCollection={onVoidCollection}
             editingId={editingId}
             editData={editData}
             setEditData={setEditData}

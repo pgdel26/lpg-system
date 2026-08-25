@@ -33,6 +33,15 @@ export interface ArCollectionEvent {
   // from every balance/report calculation in lib/receivables.ts.
   voided?: boolean;
   voidedAt?: Timestamp;
+  /** Last time an edit changed this event's method/branch/check details in
+   *  place. Only set on the allocation-neutral edit path — an amount change
+   *  voids the event and writes a replacement instead, so the old figure
+   *  stays on the record rather than being overwritten. */
+  editedAt?: Timestamp;
+  /** batchId of the collection this event replaced, set on the events written
+   *  by an amount edit. Links the replacement back to the voided originals so
+   *  the history reads as one correction, not two unrelated collections. */
+  replacesBatchId?: string;
 }
 
 // branches collection — doc ID doubles as the URL/branch slug (e.g. "pili").
