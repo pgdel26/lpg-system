@@ -8,7 +8,7 @@ import type { SaleTransaction } from "../types";
 //
 // A customer x (product + section) matrix of quantity ordered, over whatever
 // date range the screen asks for. No Firestore here; the range fetch lives in
-// lib/hooks/useCustomerOrdersData.ts, and this module stays importable by the
+// lib/hooks/useSalesRangeData.ts, and this module stays importable by the
 // cron route (see the lib/* server-reachable rule).
 //
 // EVERY sale section counts — cylinders, accessories, other brands, and any
@@ -65,8 +65,13 @@ export interface CustomerOrdersRow {
   /** columnKey -> quantity. Absent means no order, which is not zero. */
   qtyByColumn: Record<string, number>;
   /**
-   * Row total. NOT rendered — the screen shows per-column counts only. It
-   * exists to order the rows (busiest customer first).
+   * Row total. Not rendered on SCREEN — that shows per-column counts only —
+   * but the Excel export prints it, so it is operator-facing. It also orders
+   * the rows (busiest customer first).
+   *
+   * Mixed units: this adds 11KG cylinders to hoses to clamps. Fine as a
+   * busy-ness ranking, misleading as a volume figure, which is why the export
+   * labels the column "Total items" rather than "Total".
    */
   qtyTotal: number;
 }
@@ -236,7 +241,7 @@ export function buildCustomerOrdersWorkbook({
   // The product name repeats per type rather than being merged: an unmerged
   // header is what Excel's own filter and freeze-panes expect.
   const productHeaderRow = data.length;
-  data.push(["Customer", ...columns.map((c) => c.product), "Total"]);
+  data.push(["Customer", ...columns.map((c) => c.product), "Total items"]);
   const typeHeaderRow = data.length;
   data.push(["", ...columns.map((c) => c.type), ""]);
   merges.push({ s: { r: productHeaderRow, c: 0 }, e: { r: typeHeaderRow, c: 0 } });
@@ -246,9 +251,11 @@ export function buildCustomerOrdersWorkbook({
   for (const row of rows) {
     data.push([
       row.name,
-      // null, not 0 and not "—": a blank cell keeps "never ordered this"
-      // distinct from a real zero the way the screen's em-dash does, while
-      // staying a number column that SUM and AVERAGE still read correctly.
+      // null, not 0 and not "—": a blank cell keeps "no sale document at all"
+      // distinct from "a document carrying no units" the way the screen's
+      // em-dash does, while staying a number column that SUM and AVERAGE still
+      // read correctly. (Returns can't produce a zero here — this module never
+      // nets refunds off; see the header.)
       ...columns.map((c) => (row.qtyByColumn[c.key] === undefined ? null : row.qtyByColumn[c.key])),
       row.qtyTotal,
     ]);
@@ -259,7 +266,7 @@ export function buildCustomerOrdersWorkbook({
   // sell in total" gets asked, so the export carries them.
   const totalRow = data.length;
   data.push([
-    "TOTAL",
+    "TOTAL ITEMS",
     ...columns.map((c) => rows.reduce((sum, r) => sum + (r.qtyByColumn[c.key] || 0), 0)),
     rows.reduce((sum, r) => sum + r.qtyTotal, 0),
   ]);

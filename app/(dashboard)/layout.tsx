@@ -20,6 +20,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/refunds": "Returns & Refunds",
   "/income-statement": "Income Statement",
   "/reports": "Customer Orders",
+  "/product-sales": "Product Sales",
   "/staff": "Staff",
   "/restrictions": "Restrictions",
   "/notifications": "Notifications",

@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useCustomerOrdersData } from "../../../lib/hooks/useCustomerOrdersData";
+import { useSalesRangeData } from "../../../lib/hooks/useSalesRangeData";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
 import { today } from "../../../lib/utils";
 import ReportsPage from "../../../views/reports/ReportsPage";
 
 export default function ReportsRoutePage() {
   const { branches } = useAppData();
-  const { loading, error, data, fetchRange } = useCustomerOrdersData();
+  const { loading, error, data, fetchRange } = useSalesRangeData("Failed to load customer order history.");
 
   // Defaults to TODAY only, both ends. The columns are one per product+type
   // actually ordered, so a wide default range would open the screen on dozens

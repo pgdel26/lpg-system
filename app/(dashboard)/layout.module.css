@@ -30,6 +30,11 @@
 }
 
 .header {
+  /* Pinned to the token so a screen sizing itself against the viewport can
+     rely on it — see --dashboard-header-height in globals.css. The padding
+     below still sets the real height for normal content; this only stops it
+     drifting away from what other screens subtract. */
+  min-height: var(--dashboard-header-height);
   padding: 16px 24px;
   border-bottom: none;
   display: flex;
@@ -188,7 +193,7 @@
 }
 
 .main {
-  padding: 20px 24px;
+  padding: var(--dashboard-main-padding) 24px;
 }
 
 .loadingGate {

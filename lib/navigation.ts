@@ -66,6 +66,7 @@ export function navPermissions(branches: Branch[]): NavPermission[] {
 
     { key: "income-statement", label: "Income Statement", href: "/income-statement", group: "Reports" },
     { key: "reports", label: "Customer Orders", href: "/reports", group: "Reports" },
+    { key: "product-sales", label: "Product Sales", href: "/product-sales", group: "Reports" },
 
     { key: "customers", label: "Customers", href: "/customers", group: "Other" },
     { key: "staff", label: "Staff", href: "/staff", group: "Other" },

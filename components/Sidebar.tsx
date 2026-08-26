@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, PhoneIcon, BarChartIcon, ClipboardCheckIcon, DashboardIcon, BriefcaseIcon } from "./Icons";
+import { PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, PhoneIcon, BarChartIcon, ClipboardCheckIcon, TrendingUpIcon, DashboardIcon, BriefcaseIcon } from "./Icons";
 import { useAppData } from "../lib/providers/AppDataProvider";
 import type { Branch } from "../lib/types";
 import styles from "./Sidebar.module.css";
@@ -70,6 +70,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
   const reportChildren: NavItem[] = [
     { href: "/income-statement", label: "Income Statement", icon: <BarChartIcon />, permission: "income-statement" },
     { href: "/reports", label: "Customer Orders", icon: <ClipboardCheckIcon />, permission: "reports" },
+    { href: "/product-sales", label: "Product Sales", icon: <TrendingUpIcon />, permission: "product-sales" },
   ];
 
   // Matches the outlet page itself AND anything nested under it, so the row

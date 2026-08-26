@@ -22,6 +22,12 @@
   --accent-gold: #2563eb;
   --font-body: "DM Sans", "Segoe UI", sans-serif;
   --font-mono: "Space Mono", monospace;
+  /* Dashboard chrome. Declared here, and CONSUMED by (dashboard)/layout.module
+     .css, so a screen that needs to size itself against the viewport can
+     subtract real values instead of a hand-measured guess that silently rots
+     when the header changes. */
+  --dashboard-header-height: 60px;
+  --dashboard-main-padding: 20px;
 }
 
 * {

@@ -59,8 +59,9 @@ export default function CustomerOrdersTab({
     });
   };
 
-  // A cell reads "—" when the customer didn't order that product/type at all,
-  // which is a different fact from a real zero (ordered then fully returned).
+  // A cell reads "—" when there is no sale document for that product/type at
+  // all, which is a different fact from a document carrying no units. It is
+  // NOT about returns — this report never nets refunds off.
   const renderCell = (byColumn: Record<string, number>, key: string) => {
     const value = byColumn[key];
     if (value === undefined) return <span className={styles.dim}>—</span>;

@@ -6,7 +6,8 @@ import { db } from "./firebase";
  * an inclusive YYYY-MM-DD range.
  *
  * Extracted from three byte-identical copies (useDashboardData,
- * useIncomeStatementData, useCustomerOrdersData). Report screens deliberately
+ * useIncomeStatementData, and what is now useSalesRangeData). Report screens
+ * deliberately
  * use getDocs rather than onSnapshot: a multi-month window doesn't need live
  * updates, and subscribing to one is a needless memory and read-cost load.
  *
