@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { today } from "../../lib/utils";
-import { buildCustomerOrdersMatrix } from "../../lib/reports/customerOrders";
-import { SearchIcon } from "../../components/Icons";
+import { buildCustomerOrdersMatrix, exportCustomerOrdersWorkbook } from "../../lib/reports/customerOrders";
+import { SearchIcon, DownloadIcon } from "../../components/Icons";
 import type { Branch, SaleTransaction } from "../../lib/types";
 import styles from "./CustomerOrdersTab.module.css";
 
@@ -45,6 +45,19 @@ export default function CustomerOrdersTab({
   );
 
   const invalidRange = !!startDate && !!endDate && startDate > endDate;
+
+  // Exports the rows as filtered, not the whole matrix — the file should match
+  // what the operator is looking at when they click Export.
+  const handleExport = () => {
+    exportCustomerOrdersWorkbook({
+      columns: matrix.columns,
+      rows: visibleRows,
+      startDate,
+      endDate,
+      branchName: branches.find((b) => b.id === branch)?.name,
+      search: term ? search.trim() : undefined,
+    });
+  };
 
   // A cell reads "—" when the customer didn't order that product/type at all,
   // which is a different fact from a real zero (ordered then fully returned).
@@ -106,6 +119,16 @@ export default function CustomerOrdersTab({
             className={styles.searchInput}
           />
         </div>
+
+        <button
+          type="button"
+          className={styles.exportButton}
+          onClick={handleExport}
+          disabled={loading || visibleRows.length === 0}
+          title={visibleRows.length === 0 ? "Nothing to export in this range" : "Download as Excel"}
+        >
+          <DownloadIcon /> Export
+        </button>
       </div>
 
       {invalidRange && (

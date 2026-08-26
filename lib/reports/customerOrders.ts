@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx-js-style";
 import { saleSectionLabel } from "../utils";
 import { customerKey } from "../customers";
 import type { SaleTransaction } from "../types";
@@ -178,4 +179,119 @@ export function buildCustomerOrdersMatrix({
   rows.sort((a, b) => b.qtyTotal - a.qtyTotal || a.name.localeCompare(b.name));
 
   return { columns, rows };
+}
+
+// ---------------------------------------------------------------------------
+// Excel export.
+//
+// Mirrors lib/reports/incomeStatement.ts's workbook pattern (xlsx-js-style,
+// aoa_to_sheet, styles applied by walking the range) so the two reports export
+// the same way. It exports exactly what the screen is showing — the caller
+// passes the already-filtered rows, so an outlet filter or a customer search
+// narrows the file the same way it narrows the table.
+// ---------------------------------------------------------------------------
+
+export interface CustomerOrdersWorkbookInput {
+  columns: CustomerOrdersColumn[];
+  /** The rows as displayed — already outlet-filtered and search-filtered. */
+  rows: CustomerOrdersRow[];
+  startDate: string;
+  endDate: string;
+  /** Outlet name to stamp on the sheet; omit for all outlets combined. */
+  branchName?: string;
+  /** Active customer search, stamped so a partial export can't be mistaken for the whole. */
+  search?: string;
+}
+
+export function buildCustomerOrdersWorkbook({
+  columns,
+  rows,
+  startDate,
+  endDate,
+  branchName,
+  search,
+}: CustomerOrdersWorkbookInput): XLSX.WorkBook {
+  const bold = (sz: number): Record<string, unknown> => ({ font: { bold: true, sz } });
+  const headerStyle: Record<string, unknown> = { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "center", wrapText: true } };
+  const customerStyle: Record<string, unknown> = { font: { sz: 11 }, alignment: { horizontal: "left" } };
+  const totalStyle: Record<string, unknown> = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "F1F5F9" } }, border: { top: { style: "thin", color: { rgb: "94A3B8" } } } };
+  const numFmt = "#,##0";
+
+  const data: (string | number | null)[][] = [];
+  const merges: XLSX.Range[] = [];
+  // Customer + one per product/type + Total.
+  const lastCol = columns.length + 1;
+
+  data.push(["Customer Order History"]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } });
+  data.push([`${startDate} to ${endDate}  •  ${branchName || "All outlets"}`]);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } });
+  if (search) {
+    data.push([`Filtered to customers matching "${search}" — this is not the full list.`]);
+    merges.push({ s: { r: data.length - 1, c: 0 }, e: { r: data.length - 1, c: lastCol } });
+  }
+  data.push([]);
+
+  // Two header rows, matching the screen's stacked product-over-type heading.
+  // The product name repeats per type rather than being merged: an unmerged
+  // header is what Excel's own filter and freeze-panes expect.
+  const productHeaderRow = data.length;
+  data.push(["Customer", ...columns.map((c) => c.product), "Total"]);
+  const typeHeaderRow = data.length;
+  data.push(["", ...columns.map((c) => c.type), ""]);
+  merges.push({ s: { r: productHeaderRow, c: 0 }, e: { r: typeHeaderRow, c: 0 } });
+  merges.push({ s: { r: productHeaderRow, c: lastCol }, e: { r: typeHeaderRow, c: lastCol } });
+
+  const firstBodyRow = data.length;
+  for (const row of rows) {
+    data.push([
+      row.name,
+      // null, not 0 and not "—": a blank cell keeps "never ordered this"
+      // distinct from a real zero the way the screen's em-dash does, while
+      // staying a number column that SUM and AVERAGE still read correctly.
+      ...columns.map((c) => (row.qtyByColumn[c.key] === undefined ? null : row.qtyByColumn[c.key])),
+      row.qtyTotal,
+    ]);
+  }
+
+  // Column totals. The screen omits them — it has nowhere to put a footer under
+  // a scrolling body — but a spreadsheet is where "how many 11KG refills did we
+  // sell in total" gets asked, so the export carries them.
+  const totalRow = data.length;
+  data.push([
+    "TOTAL",
+    ...columns.map((c) => rows.reduce((sum, r) => sum + (r.qtyByColumn[c.key] || 0), 0)),
+    rows.reduce((sum, r) => sum + r.qtyTotal, 0),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!merges"] = merges;
+  ws["!cols"] = [{ wch: 32 }, ...columns.map(() => ({ wch: 14 })), { wch: 12 }];
+
+  const range = XLSX.utils.decode_range(ws["!ref"] as string);
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) continue;
+      if (R === 0) ws[addr].s = bold(14);
+      else if (R === 1) ws[addr].s = bold(11);
+      else if (R === productHeaderRow || R === typeHeaderRow) ws[addr].s = headerStyle;
+      else if (R === totalRow) {
+        ws[addr].s = { ...totalStyle };
+        if (typeof ws[addr].v === "number") ws[addr].s.numFmt = numFmt;
+      } else if (R >= firstBodyRow && C === 0) ws[addr].s = customerStyle;
+      else if (typeof ws[addr].v === "number") ws[addr].s = { numFmt };
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Customer Orders");
+  return wb;
+}
+
+/** Builds and downloads the Customer Order History workbook. */
+export function exportCustomerOrdersWorkbook(input: CustomerOrdersWorkbookInput): void {
+  const wb = buildCustomerOrdersWorkbook(input);
+  const outlet = input.branchName ? `_${input.branchName.replace(/[^A-Za-z0-9]+/g, "-")}` : "";
+  XLSX.writeFile(wb, `Customer_Orders${outlet}_${input.startDate}_to_${input.endDate}.xlsx`);
 }

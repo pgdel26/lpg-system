@@ -256,3 +256,28 @@
   background: var(--border);
   color: var(--text-muted);
 }
+
+/* Pushed to the far right of the control bar, and matched to the Income
+   Statement's Export button so the two reports offer the same affordance —
+   soft blue tint, not the solid blue-gradient primary, because Export is a
+   secondary action next to the filters that define what gets exported. */
+.exportButton {
+  margin-left: auto;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exportButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
