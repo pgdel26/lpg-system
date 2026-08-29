@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
 
@@ -12,6 +12,8 @@ import EditCollectionModal from "../../../components/EditCollectionModal";
 import ConfirmModal from "../../../components/ConfirmModal";
 
 import { fmt, formatDateShort } from "../../../lib/utils";
+import { useSalesRangeData } from "../../../lib/hooks/useSalesRangeData";
+import { customerTargetStatuses, monthBounds, monthOf, targetProductScope } from "../../../lib/customerTargets";
 import { arMethodLabel, type CollectionBatch } from "../../../lib/receivables";
 import type { RecordRefundInput } from "../../../lib/hooks/useRefundsData";
 import type { RecordSaleInput, RecordSalePaymentInput } from "../../../lib/hooks/useSalesData";
@@ -27,6 +29,7 @@ export default function OutletRoutePage() {
   const [saleModalNewCustomer, setSaleModalNewCustomer] = useState(false);
   const [saleModalNewName, setSaleModalNewName] = useState("");
   const [saleModalNewPhone, setSaleModalNewPhone] = useState("");
+  const [saleModalNewCategory, setSaleModalNewCategory] = useState("");
   const [saleModalError, setSaleModalError] = useState("");
 
   // ---- Swap modal UI state ----
@@ -96,6 +99,7 @@ export default function OutletRoutePage() {
       selectedCustomerId: saleModalCustomer,
       newCustomerName: saleModalNewName,
       newCustomerPhone: saleModalNewPhone,
+      newCustomerCategoryId: saleModalNewCategory,
     });
     if (err) {
       setSaleModalError(err);
@@ -107,6 +111,7 @@ export default function OutletRoutePage() {
     setSaleModalNewCustomer(false);
     setSaleModalNewName("");
     setSaleModalNewPhone("");
+    setSaleModalNewCategory("");
   };
 
   const handleRecordSwap = async () => {
@@ -181,6 +186,50 @@ export default function OutletRoutePage() {
     });
   }, [data.resolvedInventory, data.inventorySections, data.cylinderProducts]);
 
+  // ---- Monthly target volume, for the Record Sale banner ----
+  // Fetched once when the sale modal opens, not kept subscribed: this is a
+  // read-only prompt shown while one modal is open, and a standing
+  // month-of-sales listener on every outlet page would be a real cost for it.
+  //
+  // The whole month is fetched rather than this one customer's sales, because
+  // an equality-on-customerId plus range-on-date query needs a composite index
+  // that does not exist — and a screen that throws an index error at the till
+  // is worse than one getDocs per modal open.
+  const targetMonth = monthOf(data.inventoryDate);
+  const { data: targetMonthSales, fetchRange: fetchTargetMonth } =
+    useSalesRangeData("Could not check the monthly target.");
+
+  useEffect(() => {
+    if (!saleModalOpen) return;
+    const { start, end } = monthBounds(targetMonth);
+    fetchTargetMonth(start, end);
+  }, [saleModalOpen, targetMonth, fetchTargetMonth]);
+
+  // Empty for the overwhelmingly common case of a customer with no target, in
+  // which case the modal renders nothing. Also empty while in new-customer
+  // mode: a customer who does not exist yet cannot have an agreement.
+  //
+  // A LIST since targets became per product — a customer can have an agreement
+  // on the 11KG and another on the 50KG, and showing one of them as "their"
+  // target would report progress against the wrong product.
+  const saleTargetStatuses = useMemo(
+    () => (saleModalNewCustomer ? [] : customerTargetStatuses({
+      customerId: saleModalCustomer,
+      targets: data.customerTargets,
+      saleTransactions: targetMonthSales?.saleTransactions || [],
+      month: targetMonth,
+      // The SAME scope the Target Volume screen measures with, derived from
+      // the sale sections rather than spelled out again here — two spellings of
+      // "what counts" is how one screen says a target is reached while the
+      // other says six to go.
+      countedCategories: targetProductScope(data.salesSections).categories,
+    })),
+    [
+      saleModalNewCustomer, saleModalCustomer, data.customerTargets,
+      targetMonthSales, targetMonth, data.salesSections,
+    ],
+  );
+
   return (
     <>
       <OutletPage
@@ -249,6 +298,7 @@ export default function OutletRoutePage() {
 
       {saleModalOpen && (
         <SaleModal
+          targetStatuses={saleTargetStatuses}
           invoice={saleModalInvoice}
           setInvoice={setSaleModalInvoice}
           customer={saleModalCustomer}
@@ -259,6 +309,9 @@ export default function OutletRoutePage() {
           setNewName={setSaleModalNewName}
           newPhone={saleModalNewPhone}
           setNewPhone={setSaleModalNewPhone}
+          newCategory={saleModalNewCategory}
+          setNewCategory={setSaleModalNewCategory}
+          customerCategories={data.customerCategories}
           error={saleModalError}
           customers={data.customers}
           activePricebook={data.activePricebook}

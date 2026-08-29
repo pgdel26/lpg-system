@@ -40,6 +40,22 @@
   cursor: pointer;
 }
 
+/* Same soft-blue tint as the Income Statement's period presets — they set the
+   From/To pair rather than being a mode of their own, so they read as actions
+   on the pickers beside them, not as a third state. */
+.presetButton {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .searchWrap {
   position: relative;
   display: flex;
@@ -95,6 +111,83 @@
   border: 1px solid var(--border);
   color: var(--text-dim);
   font-size: 13px;
+}
+
+/* Sits with the filters rather than with Export: it narrows what the table
+   shows, the same as the outlet and product controls beside it. */
+.metToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.metToggle input {
+  cursor: pointer;
+  accent-color: var(--accent-green);
+}
+
+/* Green, matching the ✓ tag it filters on — a live filter has to be visible at
+   a glance, or a table showing four rows looks like a table of everyone. */
+.metToggleOn {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.metToggleDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.metToggleDisabled input {
+  cursor: not-allowed;
+}
+
+/* ─── Target tags ─── */
+
+/* Rides beside the figure in the cell, not on a column of its own: the grid is
+   already as wide as the products ordered, and a target is a fact about the
+   product it sits next to. */
+.targetTag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+
+.targetMet {
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--accent-green);
+}
+
+/* Grey, not red: being mid-month and short of a target is the normal state of
+   almost every agreement, and colouring it as a problem would make the whole
+   grid read as alarming. */
+.targetShort {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-dim);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .tableCard {

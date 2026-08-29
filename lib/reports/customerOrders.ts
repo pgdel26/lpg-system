@@ -1,10 +1,13 @@
 import * as XLSX from "xlsx-js-style";
 import { saleSectionLabel } from "../utils";
-import { customerKey } from "../customers";
+import { customerKey, NO_CUSTOMER_KEY, NO_CUSTOMER_LABEL } from "../customers";
 import type { SaleTransaction } from "../types";
 
 // ---------------------------------------------------------------------------
-// Customer Order History — pure aggregation.
+// Volume Per Customer — pure aggregation.
+//
+// Named "Customer Order History" until 2026-08-29; the file and its exports keep
+// the customerOrders spelling, which is only ever seen in code.
 //
 // A customer x (product + section) matrix of quantity ordered, over whatever
 // date range the screen asks for. No Firestore here; the range fetch lives in
@@ -41,10 +44,6 @@ import type { SaleTransaction } from "../types";
  */
 const CYLINDER_SECTIONS = ["refill", "cylinderWithRefill"];
 
-/** Grouping key for a sale with no customer attached. */
-const NO_CUSTOMER_KEY = "__none__";
-const NO_CUSTOMER_LABEL = "(No customer)";
-
 const columnKey = (product: string, section: string) => `${product}|${section}`;
 
 export interface CustomerOrdersColumn {
@@ -61,17 +60,24 @@ export interface CustomerOrdersColumn {
 export interface CustomerOrdersRow {
   /** customerId when present, else the trimmed name, else NO_CUSTOMER_KEY. */
   key: string;
+  /**
+   * The customers-collection id, when the sales carried one. Absent on rows
+   * grouped by name alone (legacy documents) and on the no-customer row —
+   * neither can be matched to a target, which is keyed on the id.
+   */
+  customerId?: string;
   name: string;
   /** columnKey -> quantity. Absent means no order, which is not zero. */
   qtyByColumn: Record<string, number>;
   /**
-   * Row total. Not rendered on SCREEN — that shows per-column counts only —
-   * but the Excel export prints it, so it is operator-facing. It also orders
-   * the rows (busiest customer first).
+   * Row total across EVERY column in range. Not rendered on screen, and not
+   * what the export prints either — the workbook foots to the columns it was
+   * handed, which differ once a product filter is on. This orders the rows
+   * (busiest customer first).
    *
    * Mixed units: this adds 11KG cylinders to hoses to clamps. Fine as a
    * busy-ness ranking, misleading as a volume figure, which is why the export
-   * labels the column "Total items" rather than "Total".
+   * labels its column "Total items" rather than "Total".
    */
   qtyTotal: number;
 }
@@ -94,6 +100,7 @@ export interface CustomerOrdersInput {
 
 interface Bucket {
   key: string;
+  customerId?: string;
   name: string;
   /** Latest date seen for `name`, so a renamed customer shows its newest name. */
   nameDate: string;
@@ -128,7 +135,13 @@ export function buildCustomerOrdersMatrix({
     const key = sale.customerId || (name ? customerKey(name) : "") || NO_CUSTOMER_KEY;
     let bucket = buckets.get(key);
     if (!bucket) {
-      bucket = { key, name: name || NO_CUSTOMER_LABEL, nameDate: sale.date, qtyByColumn: {} };
+      bucket = {
+        key,
+        customerId: sale.customerId || undefined,
+        name: name || NO_CUSTOMER_LABEL,
+        nameDate: sale.date,
+        qtyByColumn: {},
+      };
       buckets.set(key, bucket);
     } else if (name && sale.date >= bucket.nameDate) {
       // Renames cascade across docs, but older docs may still hold the old
@@ -173,6 +186,7 @@ export function buildCustomerOrdersMatrix({
     if (Object.keys(cells).length === 0) continue;
     rows.push({
       key: bucket.key,
+      customerId: bucket.customerId,
       name: bucket.name,
       qtyByColumn: cells,
       qtyTotal: Object.values(cells).reduce((sum, v) => sum + v, 0),
@@ -192,8 +206,9 @@ export function buildCustomerOrdersMatrix({
 // Mirrors lib/reports/incomeStatement.ts's workbook pattern (xlsx-js-style,
 // aoa_to_sheet, styles applied by walking the range) so the two reports export
 // the same way. It exports exactly what the screen is showing — the caller
-// passes the already-filtered rows, so an outlet filter or a customer search
-// narrows the file the same way it narrows the table.
+// passes the already-filtered rows AND columns, so an outlet filter, a product
+// filter, or a customer search narrows the file the same way it narrows the
+// table.
 // ---------------------------------------------------------------------------
 
 export interface CustomerOrdersWorkbookInput {
@@ -204,8 +219,12 @@ export interface CustomerOrdersWorkbookInput {
   endDate: string;
   /** Outlet name to stamp on the sheet; omit for all outlets combined. */
   branchName?: string;
+  /** Active product filter, stamped so a narrowed export says so on its face. */
+  products?: string[];
   /** Active customer search, stamped so a partial export can't be mistaken for the whole. */
   search?: string;
+  /** True when the screen was filtered to met targets — the sheet says so. */
+  metOnly?: boolean;
 }
 
 export function buildCustomerOrdersWorkbook({
@@ -214,7 +233,9 @@ export function buildCustomerOrdersWorkbook({
   startDate,
   endDate,
   branchName,
+  products,
   search,
+  metOnly,
 }: CustomerOrdersWorkbookInput): XLSX.WorkBook {
   const bold = (sz: number): Record<string, unknown> => ({ font: { bold: true, sz } });
   const headerStyle: Record<string, unknown> = { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "center", wrapText: true } };
@@ -227,10 +248,20 @@ export function buildCustomerOrdersWorkbook({
   // Customer + one per product/type + Total.
   const lastCol = columns.length + 1;
 
-  data.push(["Customer Order History"]);
+  data.push(["Volume Per Customer"]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } });
   data.push([`${startDate} to ${endDate}  •  ${branchName || "All outlets"}`]);
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } });
+  if (products && products.length > 0) {
+    // Names them in full rather than counting them: a sheet mailed on says
+    // which products it covers, and "3 products" leaves the reader guessing.
+    data.push([`Filtered to ${products.join(", ")} — only ${products.length === 1 ? "that product's" : "those products'"} columns are included.`]);
+    merges.push({ s: { r: data.length - 1, c: 0 }, e: { r: data.length - 1, c: lastCol } });
+  }
+  if (metOnly) {
+    data.push(["Filtered to customers who MET a target this month, and to the products they met it on — this is neither everyone who ordered nor everything they took."]);
+    merges.push({ s: { r: data.length - 1, c: 0 }, e: { r: data.length - 1, c: lastCol } });
+  }
   if (search) {
     data.push([`Filtered to customers matching "${search}" — this is not the full list.`]);
     merges.push({ s: { r: data.length - 1, c: 0 }, e: { r: data.length - 1, c: lastCol } });
@@ -247,6 +278,13 @@ export function buildCustomerOrdersWorkbook({
   merges.push({ s: { r: productHeaderRow, c: 0 }, e: { r: typeHeaderRow, c: 0 } });
   merges.push({ s: { r: productHeaderRow, c: lastCol }, e: { r: typeHeaderRow, c: lastCol } });
 
+  // Totalled over the columns being EXPORTED, not row.qtyTotal: with a product
+  // filter on, qtyTotal still counts the columns this sheet doesn't carry, and
+  // a Total that outruns the visible cells is the kind of figure someone
+  // reconciles against.
+  const rowTotal = (row: CustomerOrdersRow) =>
+    columns.reduce((sum, c) => sum + (row.qtyByColumn[c.key] || 0), 0);
+
   const firstBodyRow = data.length;
   for (const row of rows) {
     data.push([
@@ -257,7 +295,7 @@ export function buildCustomerOrdersWorkbook({
       // read correctly. (Returns can't produce a zero here — this module never
       // nets refunds off; see the header.)
       ...columns.map((c) => (row.qtyByColumn[c.key] === undefined ? null : row.qtyByColumn[c.key])),
-      row.qtyTotal,
+      rowTotal(row),
     ]);
   }
 
@@ -268,7 +306,7 @@ export function buildCustomerOrdersWorkbook({
   data.push([
     "TOTAL ITEMS",
     ...columns.map((c) => rows.reduce((sum, r) => sum + (r.qtyByColumn[c.key] || 0), 0)),
-    rows.reduce((sum, r) => sum + r.qtyTotal, 0),
+    rows.reduce((sum, r) => sum + rowTotal(r), 0),
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -292,13 +330,19 @@ export function buildCustomerOrdersWorkbook({
   }
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Customer Orders");
+  XLSX.utils.book_append_sheet(wb, ws, "Volume Per Customer");
   return wb;
 }
 
-/** Builds and downloads the Customer Order History workbook. */
+/** Builds and downloads the Volume Per Customer workbook. */
 export function exportCustomerOrdersWorkbook(input: CustomerOrdersWorkbookInput): void {
   const wb = buildCustomerOrdersWorkbook(input);
-  const outlet = input.branchName ? `_${input.branchName.replace(/[^A-Za-z0-9]+/g, "-")}` : "";
-  XLSX.writeFile(wb, `Customer_Orders${outlet}_${input.startDate}_to_${input.endDate}.xlsx`);
+  const slug = (s: string) => s.replace(/[^A-Za-z0-9]+/g, "-");
+  const outlet = input.branchName ? `_${slug(input.branchName)}` : "";
+  // One product names itself; several would run the filename past what any file
+  // manager shows, so they become a count. The sheet's own header lists them.
+  const picked = input.products || [];
+  const product = picked.length === 1 ? `_${slug(picked[0])}`
+    : picked.length > 1 ? `_${picked.length}-products` : "";
+  XLSX.writeFile(wb, `Volume_Per_Customer${outlet}${product}_${input.startDate}_to_${input.endDate}.xlsx`);
 }

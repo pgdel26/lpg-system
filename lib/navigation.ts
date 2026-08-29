@@ -64,11 +64,13 @@ export function navPermissions(branches: Branch[]): NavPermission[] {
     { key: "receivables", label: "Accounts Receivable", href: "/receivables", group: "Company" },
     { key: "refunds", label: "Returns & Refunds", href: "/refunds", group: "Company" },
 
-    { key: "income-statement", label: "Income Statement", href: "/income-statement", group: "Reports" },
-    { key: "reports", label: "Customer Orders", href: "/reports", group: "Reports" },
-    { key: "product-sales", label: "Product Sales", href: "/product-sales", group: "Reports" },
+    { key: "customers", label: "Customers", href: "/customers", group: "Customer Management" },
+    { key: "target-volume", label: "Target Volume", href: "/target-volume", group: "Customer Management" },
 
-    { key: "customers", label: "Customers", href: "/customers", group: "Other" },
+    { key: "income-statement", label: "Income Statement", href: "/income-statement", group: "Reports" },
+    { key: "product-sales", label: "Monthly Sales", href: "/product-sales", group: "Reports" },
+    { key: "reports", label: "Volume Per Customer", href: "/reports", group: "Reports" },
+
     { key: "staff", label: "Staff", href: "/staff", group: "Other" },
     { key: "contact", label: "Contact Us", href: "/contact", group: "Other" },
   ];

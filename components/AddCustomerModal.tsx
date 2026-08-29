@@ -1,22 +1,27 @@
 import { useState } from "react";
 import { XIcon } from "./Icons";
+import type { CustomerCategory } from "../lib/types";
 import styles from "./AddCustomerModal.module.css";
 
 export default function AddCustomerModal({
+  categories,
   onSubmit,
   onClose,
 }: {
-  onSubmit: (name: string, phone: string) => Promise<boolean>;
+  /** Categories to file the new customer under; empty until any are set up. */
+  categories: CustomerCategory[];
+  onSubmit: (name: string, phone: string, categoryId: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     setError("");
     if (!name.trim()) { setError("Customer name is required."); return; }
-    const ok = await onSubmit(name.trim(), phone.trim());
+    const ok = await onSubmit(name.trim(), phone.trim(), categoryId);
     // Rejected (e.g. name/phone conflict) — the hook already toasts why;
     // keep the modal open so the operator can see and correct it.
     if (!ok) return;
@@ -48,7 +53,7 @@ export default function AddCustomerModal({
           />
         </div>
 
-        <div className={styles.fieldLast}>
+        <div className={categories.length > 0 ? styles.field : styles.fieldLast}>
           <label className={styles.label}>Phone</label>
           <input
             value={phone}
@@ -58,6 +63,23 @@ export default function AddCustomerModal({
             className={`${styles.input} ${styles.inputMono}`}
           />
         </div>
+
+        {/* Only offered once categories exist — an empty picklist reading
+            "Uncategorised" and nothing else is a field that can't be answered.
+            Optional either way: filing can happen later from the list. */}
+        {categories.length > 0 && (
+          <div className={styles.fieldLast}>
+            <label className={styles.label}>Category</label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className={styles.input}
+            >
+              <option value="">Uncategorised</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
 
         {error && <p className={styles.error}>{error}</p>}
 

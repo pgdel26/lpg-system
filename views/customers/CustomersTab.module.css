@@ -1,0 +1,224 @@
+/* The list lives inside the tab panel's card, so nothing here draws a card of
+   its own — the toolbar and rows are separated by borders instead. */
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 34px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.filterSelect {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+/* A live filter has to be visible from a glance — a list silently showing one
+   category looks like a list of everyone. */
+.filterActive {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 80px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.emptyState {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.custRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 80px;
+  padding: 12px 20px;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.custRow:hover {
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.custName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.custAddedDate {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 8px;
+}
+
+/* Quiet by design: the category labels a row, it doesn't rank it, so this reads
+   as a tag rather than as a status anyone has to act on. */
+.categoryBadge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.noCategory {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.custPhoneRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custPhone {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.custActionsCell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+/* ---- Inline edit ---- */
+
+.listEditRow {
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.listEditFields {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.inlineEditField {
+  flex: 1;
+  min-width: 150px;
+}
+
+.editFieldLabelBlock {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.editInput {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.editButtonGroupBottom {
+  display: flex;
+  gap: 6px;
+}
+
+.cancelButton {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}

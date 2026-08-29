@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, PhoneIcon, BarChartIcon, ClipboardCheckIcon, TrendingUpIcon, DashboardIcon, BriefcaseIcon } from "./Icons";
+import { PackageIcon, TagIcon, UsersIcon, FlameIcon, ChevronLeftIcon, ChevronDownIcon, ListIcon, CartIcon, UserIcon, DollarIcon, PhoneIcon, BarChartIcon, ClipboardCheckIcon, TrendingUpIcon, DashboardIcon, BriefcaseIcon, TargetIcon } from "./Icons";
 import { useAppData } from "../lib/providers/AppDataProvider";
 import type { Branch } from "../lib/types";
 import styles from "./Sidebar.module.css";
@@ -41,6 +41,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
   const data = useAppData();
   const [salesInventoryOpen, setSalesInventoryOpen] = useState(true);
   const [reportsOpen, setReportsOpen] = useState(true);
+  const [customersOpen, setCustomersOpen] = useState(true);
 
   // One link per outlet — Sales and Inventory are sections of that outlet's own
   // page now (see [branch]/layout.tsx), so they no longer need nav rows of their
@@ -69,8 +70,8 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
   // report is a row here plus its route.
   const reportChildren: NavItem[] = [
     { href: "/income-statement", label: "Income Statement", icon: <BarChartIcon />, permission: "income-statement" },
-    { href: "/reports", label: "Customer Orders", icon: <ClipboardCheckIcon />, permission: "reports" },
-    { href: "/product-sales", label: "Product Sales", icon: <TrendingUpIcon />, permission: "product-sales" },
+    { href: "/product-sales", label: "Monthly Sales", icon: <TrendingUpIcon />, permission: "product-sales" },
+    { href: "/reports", label: "Volume Per Customer", icon: <ClipboardCheckIcon />, permission: "reports" },
   ];
 
   // Matches the outlet page itself AND anything nested under it, so the row
@@ -81,6 +82,16 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
     (b) => pathname === `/${b.id}` || pathname.startsWith(`/${b.id}/`),
   );
   const isReportsActive = reportChildren.some((c) => c.href === pathname);
+
+  // Customer Management — the customer list and the monthly target volumes that
+  // are agreed with those same customers. Grouped rather than left as two flat
+  // rows because Target Volume is meaningless without the customers it is set
+  // against, and a reader scanning the sidebar should see that.
+  const customerChildren: NavItem[] = [
+    { href: "/customers", label: "Customers", icon: <UsersIcon />, permission: "customers" },
+    { href: "/target-volume", label: "Target Volume", icon: <TargetIcon />, permission: "target-volume" },
+  ];
+  const isCustomersActive = customerChildren.some((c) => c.href === pathname);
 
   // One gate, applied to every list before it renders. A group with all its
   // children hidden disappears entirely rather than leaving an empty header.
@@ -169,15 +180,15 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
         {/* Divider */}
         {!collapsed && <div className={styles.divider} />}
 
-        {/* Reports group */}
-        {renderGroup("Reports", reportsOpen, setReportsOpen, allowed(reportChildren), isReportsActive)}
+        {/* Customer Management group */}
+        {renderGroup("Customer Management", customersOpen, setCustomersOpen,
+          allowed(customerChildren), isCustomersActive)}
 
         {/* Divider */}
         {!collapsed && <div className={styles.divider} />}
 
-        {/* Customers */}
-        {data.canAccess("customers")
-          && renderNavLink({ href: "/customers", label: "Customers", icon: <UsersIcon />, permission: "customers" }, 0)}
+        {/* Reports group */}
+        {renderGroup("Reports", reportsOpen, setReportsOpen, allowed(reportChildren), isReportsActive)}
 
         {/* Staff */}
         {data.canAccess("staff")

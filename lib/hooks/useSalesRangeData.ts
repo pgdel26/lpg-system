@@ -4,7 +4,7 @@ import type { SaleTransaction } from "../types";
 
 // ---------------------------------------------------------------------------
 // One-shot range fetch of saleTransactions, shared by every report that reads
-// a free date range of sales (Customer Orders, Product Sales).
+// a free date range of sales (Volume Per Customer, Monthly Sales).
 //
 // getDocs rather than onSnapshot: a multi-month report window doesn't need live
 // updates, and subscribing to one is a needless read-cost and memory load.

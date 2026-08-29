@@ -1,0 +1,151 @@
+/* Owned by ProductPicker. The control-group and label rules are duplicated
+   from the tab's module rather than shared: a CSS module is per-component in
+   this codebase, and the picker has to stand on its own. */
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.controlLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Products multi-select ─── */
+
+/* position:relative here, not on .controlGroup, so the dropdown anchors to the
+   button itself rather than to the button-plus-label pair. */
+.pickerWrap {
+  position: relative;
+}
+
+.pickerButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 130px;
+  justify-content: space-between;
+}
+
+/* A live filter has to be visible from the closed state — otherwise a report
+   silently showing three products looks like a report of everything. */
+.pickerActive {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.pickerPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 260px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.pickerSearchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.pickerSearchIcon {
+  position: absolute;
+  left: 17px;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.pickerSearchInput {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.pickerActions {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.pickerAction {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pickerAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pickerList {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.pickerOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pickerOption:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.pickerOption input {
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+}
+
+.pickerEmpty,
+.pickerFooter {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.pickerFooter {
+  border-top: 1px solid var(--border-light);
+  background: rgba(241, 245, 249, 0.5);
+}

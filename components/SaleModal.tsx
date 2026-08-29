@@ -2,8 +2,10 @@ import { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt, getPricebookSrp, today } from "../lib/utils";
 import CustomerSearch from "./CustomerSearch";
+import { formatMonth } from "../lib/customerTargets";
+import type { CustomerTargetStatus } from "../lib/customerTargets";
 import styles from "./SaleModal.module.css";
-import type { Customer, Pricebook, PaymentType } from "../lib/types";
+import type { Customer, CustomerCategory, Pricebook, PaymentType } from "../lib/types";
 import type { RecordSaleInput, RecordSalePaymentInput } from "../lib/hooks/useSalesData";
 
 type SaleItem = RecordSaleInput["items"][number];
@@ -39,10 +41,26 @@ interface SaleModalProps {
   setNewName: (v: string) => void;
   newPhone: string;
   setNewPhone: (v: string) => void;
+  /** Category for a newly typed customer. Also decides whether an existing
+      record of that name is reused rather than duplicated — see matchCustomer. */
+  newCategory: string;
+  setNewCategory: (v: string) => void;
+  customerCategories: CustomerCategory[];
   error: string;
   customers: Customer[];
   activePricebook: Pricebook | null;
   inventoryDate: string;
+  /**
+   * The selected customer's standing on every product they have a monthly
+   * target for — empty when they have none. One line per product, because an
+   * agreement is per product: a customer can be over on the 11KG and short on
+   * the 50KG at the same time, and a single blended line would be true of
+   * neither. READ ONLY — this modal never applies the discount, it only says
+   * whether one has been earned. Making it automatic would put a rule this
+   * screen can't see onto the money path; the operator still types the figure
+   * into Discount below.
+   */
+  targetStatuses?: CustomerTargetStatus[];
   salesSections: SalesSection[];
   onClose: () => void;
   onSubmit: (
@@ -59,8 +77,11 @@ export default function SaleModal({
   invoice, setInvoice,
   customer, setCustomer,
   newCustomer, setNewCustomer,
+  targetStatuses,
   newName, setNewName,
   newPhone, setNewPhone,
+  newCategory, setNewCategory,
+  customerCategories,
   error,
   customers, activePricebook, inventoryDate,
   salesSections,
@@ -255,6 +276,7 @@ export default function SaleModal({
                 setCustomer("");
                 setNewName("");
                 setNewPhone("");
+                setNewCategory("");
               }}
               className={styles.toggleButton}
             >
@@ -277,6 +299,22 @@ export default function SaleModal({
                 placeholder="Phone number (optional)"
                 className={styles.textInput}
               />
+              {/* Only offered once categories exist. It files the new customer
+                  AND decides identity: the same name under the same category is
+                  the same customer and is reused rather than duplicated. */}
+              {customerCategories.length > 0 && (
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className={styles.textInput}
+                  aria-label="Customer category"
+                >
+                  <option value="">Uncategorised</option>
+                  {customerCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           ) : (
             <CustomerSearch
@@ -285,6 +323,37 @@ export default function SaleModal({
               onChange={setCustomer}
             />
           )}
+
+          {/* One line per product this customer has a target for. Says what
+              has been earned; changes nothing. The Discount field below stays
+              exactly as it was — typed by hand. Every line names its product:
+              without that, two lines showing different numbers for "the
+              target" would be unreadable. */}
+          {(targetStatuses || []).map((status) => (
+            <div
+              key={status.product}
+              className={status.reached ? styles.targetReached : styles.targetShort}
+            >
+              {status.reached ? (
+                <>
+                  <strong>
+                    {status.product} — {formatMonth(status.month)} target reached
+                    {" "}({status.actualQty.toLocaleString("en-PH")}/{status.targetQty.toLocaleString("en-PH")})
+                  </strong>
+                  {status.discountPerUnit > 0 && (
+                    <> — earns {fmt(status.discountPerUnit)}/unit, {fmt(status.earned)} so far this month.</>
+                  )}
+                </>
+              ) : (
+                <>
+                  <strong>{status.product}</strong> — {formatMonth(status.month)} target:
+                  {" "}{status.actualQty.toLocaleString("en-PH")}/{status.targetQty.toLocaleString("en-PH")}
+                  {" "}— <strong>{status.remaining.toLocaleString("en-PH")} to go</strong> before the
+                  {" "}{fmt(status.discountPerUnit)}/unit discount applies.
+                </>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* 4. Products Bought */}

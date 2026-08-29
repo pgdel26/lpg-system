@@ -521,3 +521,33 @@
 .arInput {
   margin-top: 4px;
 }
+
+/* ─── Monthly target volume (read-only) ─── */
+
+/* Sits directly under the customer picker, because it is a fact ABOUT the
+   customer just selected. Deliberately not styled as a control and not near the
+   Discount field: it reports what has been earned, it never fills anything in.
+   The operator still types the discount. */
+.targetReached,
+.targetShort {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.targetReached {
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid var(--accent-green);
+  color: var(--text-secondary);
+}
+
+/* Neutral, not a warning: being short of a target is the ordinary state for
+   most of the month, and an orange banner every time would train the operator
+   to ignore the one that matters. */
+.targetShort {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}

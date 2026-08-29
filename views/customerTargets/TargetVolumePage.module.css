@@ -1,0 +1,463 @@
+/* Follows ProductSalesPage.module.css's control and table conventions so the
+   screens read as one family — same control heights, same card and table
+   treatment, same sticky header/footer behaviour. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--dashboard-header-height) - (2 * var(--dashboard-main-padding)));
+  height: calc(100dvh - var(--dashboard-header-height) - (2 * var(--dashboard-main-padding)));
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.controlLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.presetButton {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ─── Banners ─── */
+
+.notice,
+.error {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.notice {
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid var(--border);
+}
+
+.error {
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid var(--accent-red);
+}
+
+.empty {
+  max-width: 560px;
+  padding: 32px;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── Two-pane layout ─── */
+
+/* Master-detail: the customer list stays on screen while their product grid is
+   edited. A fixed 300px column beside a fluid one, rather than two fractions —
+   the list holds one name per row and gains nothing from extra width, while the
+   grid has four columns that do.
+
+   min-height:0 on both panes is what lets each scroll independently: without
+   it a grid child floors at its content height and the whole page scrolls
+   instead, taking the search box and the headings away with it. */
+.split {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.customerPane,
+.productPane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Stacks on a narrow screen. The list keeps a bounded height there so the grid
+   it controls is never pushed off the bottom of the viewport. */
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 240px) minmax(0, 1fr);
+  }
+}
+
+.paneHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* The customer pane's own control stack: search on its own line, then the
+   filters. .paneHead stays a single row for the right pane's heading. */
+.listControls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.listFilters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* A live filter has to be visible at a glance — a list silently showing one
+   category looks like a list of everyone. */
+.selectActive {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.paneFoot {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-light);
+  background: #f8fafc;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.paneEmpty {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ─── Customer list ─── */
+
+.customerList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.customerItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customerItem:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+/* The selected row has to stay obvious while the eye is on the grid to its
+   right — a hover tint alone would leave the two panes looking unconnected. */
+.customerItemActive,
+.customerItemActive:hover {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-blue);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--accent-blue);
+}
+
+.customerName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "reached/set". Grey while any target is outstanding, green once they are all
+   met, so the list can be read down without opening each customer. */
+.countBadge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.countBadgeAll {
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--accent-green);
+}
+
+/* ─── Selected customer ─── */
+
+.selectedName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.selectedSub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ─── Product grid ─── */
+
+.tableScroll {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* separate + zero spacing, NOT collapse: with border-collapse:collapse a sticky
+   cell loses its borders in WebKit, because collapsed borders belong to the
+   table rather than the cell. Borders are declared per cell below. */
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+/* Every sticky surface here is OPAQUE, and must stay that way: a stuck cell is
+   lifted out of flow, so any transparency in its background shows the rows
+   travelling underneath it. */
+.cornerHead,
+.colHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 14px;
+  background: #eef2f7;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.cornerHead {
+  text-align: left;
+}
+
+.colHead {
+  text-align: right;
+}
+
+.row:hover {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.rowReached {
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.productCell {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.numCell {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Editable in place, no edit mode: these are the two numbers the screen exists
+   to set, and hiding them behind a pencil would make the common action the
+   slow one. Borderless until hovered or focused so the table still reads as a
+   table rather than a wall of form fields. */
+.cellInput {
+  width: 80px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-align: right;
+  outline: none;
+}
+
+/* The peso sign rides with the input, right-aligned as one unit, so the column
+   still lines up on the decimal point. */
+.moneyField {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pesoSign {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* Held in place, invisible, on a row with nothing set: without it the empty
+   rows' inputs would sit a few pixels right of the filled ones. Spelled out
+   rather than `composes` — nothing else in this codebase uses it, and one
+   file quietly depending on a CSS Modules feature is how a style breaks on a
+   toolchain upgrade with nothing pointing at the cause. */
+.pesoSignBlank {
+  font-size: 11px;
+  font-weight: 700;
+  visibility: hidden;
+}
+
+.cellInput:hover {
+  border-color: var(--border);
+  background: #fff;
+}
+
+.cellInput:focus {
+  border-color: var(--accent-blue);
+  background: #fff;
+}
+
+/* Actual is read-only, so it carries no input chrome — the progress note under
+   it is a reading of this same number, which is why it lives in this cell
+   rather than in a Status column of its own. */
+.actualValue {
+  display: block;
+}
+
+.reachedNote,
+.shortNote {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.reachedNote {
+  color: var(--accent-green);
+}
+
+.shortNote {
+  color: var(--text-dim);
+}
+
+/* ─── Search and filter ─── */
+
+/* Sits at the top of the customer pane, not in the page's control strip: it
+   filters that list and nothing else, and the grid beside it stays put while
+   someone types. */
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px 7px 30px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-blue);
+}
+
+.filterToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filterToggle input {
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+}

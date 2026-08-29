@@ -86,8 +86,59 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  /**
+   * The customerCategories document this customer belongs to, or absent/"" for
+   * uncategorised — which is what every customer is until someone files them.
+   *
+   * An ID, not the category's name: renaming a category then costs one write on
+   * the category document instead of a cascade across every customer in it. The
+   * opposite trade-off from `customerName` on a sale, which IS copied and does
+   * cascade, because a sale document has to stay readable on its own.
+   */
+  categoryId?: string;
   createdAt: Timestamp;
 }
+
+// customerCategories collection — the operator's own filing scheme for
+// customers (dealer, walk-in, institutional…). Deliberately free-form: these
+// are business labels, not a fixed enum in code, so the app never has to ship
+// to add one.
+export interface CustomerCategory {
+  id: string;
+  name: string;
+  createdAt?: Timestamp;
+}
+
+// customerTargets collection — one doc per customer per product per month, doc
+// id `${customerId}_${month}_${product}` (see targetDocId in
+// lib/customerTargets.ts). Keyed
+// rather than auto-id so writing a target is an idempotent upsert: one customer
+// can never end up with two rows competing for the same product in one month.
+export interface CustomerTarget {
+  id: string;
+  customerId: string;
+  /** "YYYY-MM". */
+  month: string;
+  /**
+   * The product this agreement is for. OPTIONAL only because legacy documents
+   * predate per-product targets — one figure per customer per month, written
+   * before the owner asked for it per product. Those documents are left in
+   * Firestore and never read: every consumer skips a target with no `product`,
+   * so a blended old figure can't be shown as one product's agreement. Anything
+   * this app writes today always sets it.
+   */
+  product?: string;
+  /** Units of that product the customer must buy in the month to earn the discount. */
+  targetQty: number;
+  /** Pesos off per unit, once the target is reached. */
+  discountPerUnit: number;
+  updatedAt?: Timestamp;
+}
+
+// NOTE: settings/customerTargets (the old countedCategories list) is orphaned.
+// Targets are per product now, so the product itself says what counts, and the
+// scope is derived from the catalog's sale sections — see targetProductScope in
+// lib/customerTargets.ts. The document is left in Firestore, read by nothing.
 
 // A doc's own share of one payment method. Multiple sale docs (one per line
 // item) can each carry a payments array — see lib/payments.ts for how they're

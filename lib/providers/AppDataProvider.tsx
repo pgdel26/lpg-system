@@ -19,18 +19,19 @@ import { useNotificationsData, type UseNotificationsData } from "../hooks/useNot
 import { useReceivablesData, type UseReceivablesData } from "../hooks/useReceivablesData";
 import { useBranchesData, type UseBranchesData } from "../hooks/useBranchesData";
 import { usePermissionsData, type UsePermissionsData } from "../hooks/usePermissionsData";
+import { useCustomerTargetsData, type UseCustomerTargetsData } from "../hooks/useCustomerTargetsData";
 import { isAdminEmail } from "../allowedEmails";
 import type { InventoryState, Refund } from "../types";
 
 // The composed context value: the union of every domain hook's return shape.
-// The 12 interfaces have no overlapping property names, so this intersection
+// The interfaces have no overlapping property names, so this intersection
 // is a clean merge (verified during the integration step). If two hooks ever
 // export the same field name with incompatible types, TS will error here.
 export interface AppData extends
   UseProductsData, UsePricebooksData, UseInventoryData, UseCustomersData,
   UseSalesData, UseSwapsData, UsePurchasesData, UseRefundsData,
   UseExpensesData, UseStaffData, UseNotificationsData, UseReceivablesData,
-  UseBranchesData, UsePermissionsData {
+  UseBranchesData, UsePermissionsData, UseCustomerTargetsData {
   // Cross-domain derived values computed in the provider (not owned by any
   // single hook). resolvedInventory merges raw inventory + movements; refunds
   // is allRefunds filtered to the viewed date (page.js passed this as `refunds`).
@@ -121,6 +122,9 @@ export function AppDataProvider({
   const receivables = useReceivablesData(onToast);
   const branches = useBranchesData();
   const permissions = usePermissionsData(onToast);
+  // Company-wide, not branch-scoped: a target is an agreement with the
+  // customer, and they can buy at either outlet.
+  const customerTargets = useCustomerTargetsData(onToast);
 
   // ---- Cross-domain effect 1: resolved inventory ----
   // Relocated verbatim from app/page.js. This computation merges raw inventory
@@ -324,6 +328,7 @@ export function AppDataProvider({
     ...receivables,
     ...branches,
     ...permissions,
+    ...customerTargets,
     resolvedInventory,
     refunds: dateRefunds,
     isAdmin,

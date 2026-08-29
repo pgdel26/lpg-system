@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import ConfirmModal from "../../components/ConfirmModal";
 import SalesReportTab from "../transactions/SalesReportTab";
 import DailySalesTab from "../transactions/DailySalesTab";
+import OtherTransactionsTab from "../transactions/OtherTransactionsTab";
 import InventoryPage from "../InventoryPage";
 import TransferModal from "../../components/TransferModal";
 import { DownloadIcon, PlusIcon } from "../../components/Icons";
@@ -78,8 +79,9 @@ interface OutletPageProps {
 
 const subTabs = [
   { key: "report", label: "Sales Report" },
-  { key: "sales", label: "Transactions" },
   { key: "inventory", label: "Inventory" },
+  { key: "sales", label: "Sales Transactions" },
+  { key: "other", label: "Other Transactions" },
 ];
 
 export default function OutletPage({
@@ -379,14 +381,43 @@ export default function OutletPage({
           />
         )}
 
+        {subTab === "inventory" && (
+          <InventoryPage
+            inventoryDate={inventoryDate}
+            resolvedInventory={resolvedInventory}
+            totalCylinderData={totalCylinderData}
+            inventorySections={inventorySections}
+            // InventoryPage types `field` as the wider `string`; our handler (from
+            // the provider) narrows it to keyof InventoryCell. The fields
+            // InventoryTable emits are always real cell keys, so widen here.
+            onInventoryChange={(sectionKey, product, field, value) => onInventoryChange(sectionKey, product, field as keyof InventoryCell, value)}
+            onSaveSection={onSaveSection}
+          />
+        )}
+
         {subTab === "sales" && (
           <DailySalesTab
             sorted={sorted}
+            // Still passed though the rows moved: the Cash column is
+            // money-by-channel, so it folds swap cash in and nets refunds out.
+            swapTotal={swapTotal}
+            refundTotal={refundTotal}
+            editingId={editingId}
+            editData={editData}
+            setEditData={setEditData}
+            startEdit={startEdit}
+            cancelEdit={cancelEdit}
+            saveEdit={saveEdit}
+            setPendingDelete={setPendingDelete}
+          />
+        )}
+
+        {subTab === "other" && (
+          <OtherTransactionsTab
             swaps={swaps}
             refunds={refunds}
             swapTotal={swapTotal}
             refundTotal={refundTotal}
-            inventoryDate={inventoryDate}
             onOpenSwapModal={onOpenSwapModal}
             onOpenCollectionModal={onOpenCollectionModal}
             collections={collections}
@@ -405,19 +436,6 @@ export default function OutletPage({
           />
         )}
 
-        {subTab === "inventory" && (
-          <InventoryPage
-            inventoryDate={inventoryDate}
-            resolvedInventory={resolvedInventory}
-            totalCylinderData={totalCylinderData}
-            inventorySections={inventorySections}
-            // InventoryPage types `field` as the wider `string`; our handler (from
-            // the provider) narrows it to keyof InventoryCell. The fields
-            // InventoryTable emits are always real cell keys, so widen here.
-            onInventoryChange={(sectionKey, product, field, value) => onInventoryChange(sectionKey, product, field as keyof InventoryCell, value)}
-            onSaveSection={onSaveSection}
-          />
-        )}
       </div>
 
       {transferModalOpen && fromBranch && (

@@ -97,3 +97,51 @@ export function presetLastMonth(todayStr: string): { start: string; end: string 
   const lastDay = new Date(Date.UTC(prevY, prevM, 0)).getUTCDate();
   return { start: ymd(prevY, prevM, 1), end: ymd(prevY, prevM, lastDay) };
 }
+
+/**
+ * The trailing `count` calendar months ending with the one `todayStr` falls in,
+ * OLDEST FIRST — the Monthly Sales report's columns, left to right.
+ *
+ * Chronological rather than newest-first because the columns are read as a
+ * trend line: rising or falling is a shape the eye picks up left to right, and
+ * reversing that reads every trend backwards.
+ *
+ * The current month stops at today rather than running to month-end, so the
+ * figure is what has actually sold. That makes it a PARTIAL month sitting
+ * beside complete ones — flagged here rather than left for the reader to
+ * remember, because a half-finished August looking like a collapse against a
+ * full July is the obvious way to misread this table.
+ */
+export function trailingMonths(
+  todayStr: string,
+  count: number,
+): { start: string; end: string; label: string; partial: boolean }[] {
+  const [y, m] = todayStr.split("-").map(Number);
+  const out: { start: string; end: string; label: string; partial: boolean }[] = [];
+
+  for (let back = count - 1; back >= 0; back--) {
+    // Month arithmetic through a single running month-index, so stepping back
+    // across a January doesn't need a year-rollover branch of its own.
+    const index = y * 12 + (m - 1) - back;
+    const year = Math.floor(index / 12);
+    const month = (index % 12) + 1;
+    // Day 0 of the NEXT month is the last day of this one — leap years and
+    // 30-day months included, with no table of month lengths to keep correct.
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const monthEnd = ymd(year, month, lastDay);
+    const isCurrent = back === 0;
+
+    out.push({
+      start: ymd(year, month, 1),
+      end: isCurrent ? todayStr : monthEnd,
+      // UTC-pinned: these are calendar months, not instants, and formatting a
+      // local-midnight date can slip into the previous month west of the line.
+      label: new Date(Date.UTC(year, month - 1, 1))
+        .toLocaleDateString("en-PH", { month: "short", year: "numeric", timeZone: "UTC" }),
+      // A month whose last day has arrived is complete, current or not.
+      partial: isCurrent && todayStr < monthEnd,
+    });
+  }
+
+  return out;
+}

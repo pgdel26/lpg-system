@@ -1,0 +1,401 @@
+/* The three non-sale sections, lifted out of DailySalesTab's side panel when
+   they became a tab of their own. Same rules, same look — a swap row that moved
+   tabs should not also change shape.
+
+   Three columns where there is room, stacking below 1100px. auto-fit rather than
+   a fixed 3, so a narrow window gives two readable columns instead of three
+   cramped ones. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+/* No bottom margin — the grid's gap spaces these now, and a margin on top of
+   it would leave an uneven gutter between the rows of a wrapped grid. */
+.panelSection {
+  margin: 0;
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.panelHeadingInner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panelHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dotBlue {
+  background: #3b82f6;
+}
+
+.dotRed {
+  background: #ef4444;
+}
+
+.dotGreen {
+  background: #22c55e;
+}
+
+.panelTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.swapNewButton {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.panelRow {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.panelRowInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.swapText {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.swapProduct {
+  font-weight: 600;
+}
+
+.swapArrow {
+  color: var(--text-dim);
+  margin: 0 6px;
+}
+
+.panelRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swapPrice {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-gold);
+}
+
+.panelEmpty {
+  padding: 12px 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.panelTotalRow {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panelTotalLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.panelTotalValue {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-size: 12px;
+}
+
+.refundTotalValue {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+  font-size: 12px;
+}
+
+/* ---- Refund row ---- */
+
+.refundRowInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refundInfo {
+  min-width: 0;
+}
+
+.refundLine1 {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.refundInvoice {
+  font-weight: 600;
+}
+
+.refundLine2 {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+.refundDefective {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.refundRowRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.refundAmount {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #f87171;
+}
+
+/* ---- Inline edit (shared sale/swap) ---- */
+
+.editRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.editFields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.editFieldLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.editInput {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editInputInvoice {
+  width: 100px;
+  display: block;
+}
+
+.editInputCustomer {
+  width: 140px;
+  display: block;
+}
+
+.editInputDiscount {
+  width: 80px;
+  display: block;
+}
+
+.editInputReason {
+  width: 160px;
+  display: block;
+}
+
+.editInputValue {
+  width: 70px;
+}
+
+.editInputMono {
+  font-family: var(--font-mono);
+}
+
+.editFooterEnd {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
+}
+
+.arrowEdit {
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+
+.cancelButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.saveButton {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-blue);
+  cursor: pointer;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+/* ---- Refund inline edit ---- */
+
+.refundEditRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.refundEditFields {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.refundEditItem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(241, 245, 249, 0.6);
+}
+
+.refundItemLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.refundItemValue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pesoSign {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.defectiveLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.defectiveCheckbox {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.defectiveText {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.defectiveTextOn {
+  color: #f87171;
+}
+
+.refundEditFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.refundEditTotal {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #f87171;
+}

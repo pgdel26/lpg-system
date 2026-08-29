@@ -37,6 +37,9 @@ export interface RecordSaleInput {
   selectedCustomerId: string;
   newCustomerName: string;
   newCustomerPhone: string;
+  /** Category to file a newly typed customer under; also decides whether an
+      existing record of that name is reused — see matchCustomer. */
+  newCustomerCategoryId?: string;
   deliveryCharge?: number;
   checkData?: { checkDate: string; checkAmount: number } | null;
 }
@@ -55,6 +58,7 @@ export interface UseSalesDataDeps {
     selectedId: string,
     newName: string,
     newPhone: string,
+    newCategoryId?: string,
   ) => Promise<{ id: string; name: string }>;
   onToast: ToastFn;
 }
@@ -166,6 +170,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       selectedCustomerId,
       newCustomerName,
       newCustomerPhone,
+      newCustomerCategoryId = "",
       deliveryCharge = 0,
       checkData = null,
     } = input;
@@ -203,6 +208,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         selectedCustomerId,
         newCustomerName,
         newCustomerPhone,
+        newCustomerCategoryId,
       );
 
       const invoiceTrimmed = invoice.trim();
