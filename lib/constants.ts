@@ -64,6 +64,15 @@ export interface SectionColumn {
   salesSource?: string;
   /** Purchase-section key (or array of keys) whose counts are summed. */
   purchaseSource?: string | string[];
+  /**
+   * Skip inter-outlet transfers when summing `purchaseSource`.
+   *
+   * A transfer writes a purchases document at each outlet, so without this a
+   * transfer of FULL cylinders moves the empty count too — inventing empties at
+   * the source and destroying them at the destination, when no empty changed
+   * hands at all.
+   */
+  excludeTransfers?: true;
   /** Swap direction: "to" = outbound (full), "from" = inbound (empty). */
   swapSource?: "to" | "from";
   /**
@@ -131,6 +140,17 @@ export interface ProductSeedEntry {
 // Inventory section definitions — columns match the spreadsheet
 // Cylinders automatically split into full and empty sub-categories
 // ---------------------------------------------------------------------------
+/**
+ * The purchase sections that put full cylinders on the yard.
+ *
+ * FULL.planta and EMPTY.toPlanta MUST count the same set: one is the cylinders
+ * that arrived, the other is the empties handed over for them. toPlanta used to
+ * mirror planta directly, which made that agreement impossible to break; it now
+ * counts for itself (to exclude transfers), so the shared list is what keeps the
+ * two from drifting. Adding a third cylinder purchase section here reaches both.
+ */
+const CYLINDER_PURCHASE_SECTIONS = ["cylinderWithRefill", "refill"];
+
 export function buildInventorySections(
   cylinderProducts: string[],
   singlePriceCategories: SinglePriceCategory[],
@@ -143,7 +163,7 @@ export function buildInventorySections(
       color: "#f59e42",
       columns: [
         { field: "beg", label: "BEG" },
-        { field: "planta", label: "PURCHASES", purchaseSource: ["cylinderWithRefill", "refill"] },
+        { field: "planta", label: "PURCHASES", purchaseSource: CYLINDER_PURCHASE_SECTIONS },
         { field: "sold", label: "SOLD FULL", salesSource: "cylinderWithRefill" },
         { field: "refillSales", label: "REFILL", salesSource: "refill" },
         { field: "swap", label: "SWAP", swapSource: "to" },
@@ -165,7 +185,15 @@ export function buildInventorySections(
       color: "#3b82f6",
       columns: [
         { field: "beg", label: "BEG" },
-        { field: "toPlanta", label: "PLANTA", source: { section: "full", field: "planta" } },
+        // Empties handed OVER to the planta: one per cylinder bought there, so
+        // the same sections FULL.planta counts, minus transfers. See
+        // purchaseCountsBySection for why transfers have to come out.
+        {
+          field: "toPlanta",
+          label: "PLANTA",
+          purchaseSource: CYLINDER_PURCHASE_SECTIONS,
+          excludeTransfers: true,
+        },
         { field: "refillIn", label: "REFILL", source: { section: "full", field: "refillSales" } },
         { field: "swapIn", label: "SWAP", swapSource: "from" },
         { field: "returned", label: "RETURNED", refundSource: { section: "emptyCylinder" } },

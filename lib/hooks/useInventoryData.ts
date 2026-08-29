@@ -256,6 +256,11 @@ export function useInventoryData(
       // section) rather than a hardcoded field list, so a new product category
       // brings its columns along with no change here — see
       // .claude/skills/safe-category-change.md.
+      //
+      // NOTE: it is the FULL section that a transfer keeps alive. EMPTY
+      // deliberately no longer counts transfers (see excludeTransfers), so an
+      // outlet whose only activity on a day is an inbound transfer writes a FULL
+      // document and no EMPTY one — which is correct, since no empty moved.
       const movementFields = (section?.columns || [])
         .filter((c) => c.salesSource || c.purchaseSource || c.swapSource || c.refundSource || c.source)
         .map((c) => c.field);

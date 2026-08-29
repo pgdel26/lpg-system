@@ -117,7 +117,16 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
             if (col.purchaseSource) {
               const purchaseVal = mergedRow[col.field as keyof InventoryCell] as number || 0;
               return (
-                <td key={col.field} className={styles.sourcedCell} title="From Purchases">
+                <td
+                  key={col.field}
+                  className={styles.sourcedCell}
+                  // Says so where it matters: this is the one column that counts
+                  // a different set of purchases from the PURCHASES column
+                  // beside it, and the difference is invisible otherwise.
+                  title={col.excludeTransfers
+                    ? "From Purchases — inter-outlet transfers excluded"
+                    : "From Purchases"}
+                >
                   {purchaseVal || "—"}
                 </td>
               );

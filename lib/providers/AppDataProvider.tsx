@@ -5,6 +5,7 @@ import React, {
 import { useParams } from "next/navigation";
 import Toast from "../../components/Toast";
 import { DEFAULT_BRANCH_ID } from "../constants";
+import { purchaseCountsBySection } from "../inventoryPurchases";
 import { useProductsData, type UseProductsData } from "../hooks/useProductsData";
 import { usePricebooksData, type UsePricebooksData } from "../hooks/usePricebooksData";
 import { useInventoryData, type UseInventoryData } from "../hooks/useInventoryData";
@@ -152,12 +153,13 @@ export function AppDataProvider({
     // branch (see usePurchasesData) — unlike purchaseTransactions, which is
     // paginated and not guaranteed to cover every date, this listener always
     // has the full set for whatever date is currently viewed.
-    const purchaseCounts: Record<string, Record<string, number>> = {};
-    purchases.datePurchaseTransactions.forEach((t) => {
-      if (!purchaseCounts[t.purchaseSection]) purchaseCounts[t.purchaseSection] = {};
-      purchaseCounts[t.purchaseSection][t.product] =
-        (purchaseCounts[t.purchaseSection][t.product] || 0) + (t.quantity || 0);
-    });
+    //
+    // TWO maps: most columns count every document, EMPTY.toPlanta counts only
+    // real purchases. See purchaseCountsBySection for why.
+    const purchaseCounts = purchaseCountsBySection(purchases.datePurchaseTransactions);
+    const purchaseCountsNoTransfers = purchaseCountsBySection(
+      purchases.datePurchaseTransactions, { excludeTransfers: true },
+    );
 
     // Aggregate refund quantities by section+product: { [refundSection]: { [product]: qty } }
     // Also track non-defective counts separately
@@ -199,8 +201,9 @@ export function AppDataProvider({
           }
           if (col.purchaseSource) {
             const sources = Array.isArray(col.purchaseSource) ? col.purchaseSource : [col.purchaseSource];
+            const counts = col.excludeTransfers ? purchaseCountsNoTransfers : purchaseCounts;
             row[col.field] = sources.reduce(
-              (sum: number, src: string) => sum + ((purchaseCounts[src] || {})[product] || 0),
+              (sum: number, src: string) => sum + ((counts[src] || {})[product] || 0),
               0,
             );
           }
