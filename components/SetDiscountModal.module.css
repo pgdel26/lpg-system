@@ -1,0 +1,166 @@
+/* Same dialog chrome as AddCategoryModal. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+.fieldLast {
+  margin-bottom: 20px;
+}
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.error {
+  font-size: 11px;
+  color: var(--accent-red);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+.saveButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  font-family: inherit;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+/* The row this dialog is about, stated once at the top: a discount belongs to a
+   (customer, product) pair, and a dialog that named only one of them would be
+   ambiguous the moment two products are open in a session. */
+.subject {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.subjectProduct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.subjectCustomer {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.currentRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.currentRow strong {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* The peso sign sits beside the field, not in it: a number input can only hold
+   a number — same treatment as the Target Volume grid. */
+.moneyField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pesoSign {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.moneyField .input {
+  margin-top: 0;
+  font-family: var(--font-mono);
+}
+
+.note {
+  margin-bottom: 16px;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.saveButton:disabled,
+.cancelButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

@@ -29,10 +29,11 @@ export default function KpiRow({ summary, pendingAr, canOpen }: KpiRowProps) {
         <div className={styles.cardHead}>
           <div>
             {/* NOT "Net Sales": the Sales Report has a row by that name that
-                subtracts the day's expenses. This is netBilled, which does not
-                — the two would differ by exactly the expenses shown in the card
-                beside this one. "Net Revenue" is lib/reports/incomeStatement.ts's
-                own name for this figure, so all three surfaces now agree. */}
+                subtracts the day's expenses AND adds the tax collected, because
+                it answers what must be remitted. This is netBilled, which does
+                neither — tax is netted out of it (see lib/reports/billed.ts),
+                so it still equals lib/reports/incomeStatement.ts's Net Revenue
+                to the centavo. That agreement is the reason for the name. */}
             <div className={styles.cardTitle}>Net Revenue Today</div>
             <div className={styles.cardSub}>All outlets · before expenses</div>
           </div>

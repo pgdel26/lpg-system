@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useSalesRangeData } from "../../../lib/hooks/useSalesRangeData";
 import { useAppData } from "../../../lib/providers/AppDataProvider";
 import { monthBounds, monthOf, targetProductScope } from "../../../lib/customerTargets";
@@ -9,12 +9,18 @@ import TargetVolumePage from "../../../views/customerTargets/TargetVolumePage";
 export default function TargetVolumeRoutePage() {
   const {
     customers, customerCategories, salesSections, customerTargets, targetsLoaded,
-    saveCustomerTarget, removeCustomerTarget, copyTargetsToMonth,
+    saveCustomerTargetQty, setCustomerDiscount, removeCustomerTarget,
   } = useAppData();
   const { loading, error, data, fetchRange } =
     useSalesRangeData("Failed to load this month's sales.");
 
-  const [month, setMonth] = useState(() => monthOf(today()));
+  // Fixed to the current month, and no longer a control. The agreements are
+  // standing, so there is no other month to look at — this only decides the
+  // window the Actual column measures, which always resets on the 1st.
+  //
+  // Computed once per mount: a page left open across midnight keeps the month it
+  // loaded with, the same as every other screen here.
+  const month = useMemo(() => monthOf(today()), []);
 
   // The Firestore call sits in the route page, not the view — see CLAUDE.md's
   // data-layer rule. A one-shot range fetch rather than a live subscription:
@@ -38,16 +44,15 @@ export default function TargetVolumeRoutePage() {
   return (
     <TargetVolumePage
       month={month}
-      onChangeMonth={setMonth}
       customers={customers}
       customerCategories={customerCategories}
       products={scope.products}
       countedCategories={scope.categories}
       targets={customerTargets}
       saleTransactions={data?.saleTransactions || []}
-      onSaveTarget={saveCustomerTarget}
+      onSaveTargetQty={saveCustomerTargetQty}
+      onSetDiscount={setCustomerDiscount}
       onRemoveTarget={removeCustomerTarget}
-      onCopyTargets={copyTargetsToMonth}
       loading={loading || !targetsLoaded}
       error={error}
     />

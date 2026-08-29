@@ -1,0 +1,141 @@
+/* Same dialog chrome as AddCategoryModal. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dialog {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+/* The row this dialog is about, stated once at the top: a discount belongs to a
+   (customer, product) pair, and a dialog that named only one of them would be
+   ambiguous the moment two products are open in a session. */
+.subject {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.subjectProduct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.subjectCustomer {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rate {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.per {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.range {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Marks the rate the app is actually using — the rest are history. */
+.currentBadge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--accent-green);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.empty {
+  margin-bottom: 16px;
+  padding: 20px 16px;
+  border-radius: 10px;
+  background: rgba(241, 245, 249, 0.6);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}

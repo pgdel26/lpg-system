@@ -1,6 +1,6 @@
 import { categoryOf, saleUnits } from "./productCategory";
 import type { SalesSection } from "./constants";
-import type { Customer, CustomerTarget, SaleTransaction } from "./types";
+import type { Customer, CustomerTarget, DiscountChange, SaleTransaction } from "./types";
 
 // ---------------------------------------------------------------------------
 // Customer monthly target volumes — pure logic.
@@ -9,6 +9,13 @@ import type { Customer, CustomerTarget, SaleTransaction } from "./types";
 // peso-per-unit discount on that product. This module answers, for one month:
 // how much of each product did a customer actually buy, did they reach the
 // target, and what did that earn.
+//
+// THE AGREEMENT IS STANDING; only the MEASUREMENT is monthly. One document per
+// (customer, product), no month in it — the owner's rule is that the discounts
+// do not change month to month, and keying them by month meant every edit
+// applied to one month and silently left the others saying something else. The
+// volume still resets on the 1st, because that is what "N units in a month"
+// means.
 //
 // PER PRODUCT, not per customer. It began as one figure per customer per month
 // and the owner asked for it per product — a customer takes 300 of the 11KG and
@@ -34,8 +41,8 @@ import type { Customer, CustomerTarget, SaleTransaction } from "./types";
 // ---------------------------------------------------------------------------
 
 /**
- * Doc id for one customer's target on one product in one month. Keyed, not
- * auto-id, so writing is an idempotent upsert — the same shape as
+ * Doc id for one customer's standing target on one product. Keyed, not auto-id,
+ * so writing is an idempotent upsert — the same shape as
  * `products/{category}_{name}`.
  *
  * The product is percent-encoded: a name is free text and a "/" would otherwise
@@ -44,8 +51,8 @@ import type { Customer, CustomerTarget, SaleTransaction } from "./types";
  * an address, though — every read takes the product from the document's own
  * `product` field.
  */
-export const targetDocId = (customerId: string, month: string, product: string): string =>
-  `${customerId}_${month}_${encodeURIComponent(product)}`;
+export const targetDocId = (customerId: string, product: string): string =>
+  `${customerId}_${encodeURIComponent(product)}`;
 
 /** The "YYYY-MM" a "YYYY-MM-DD" belongs to. */
 export const monthOf = (dateStr: string): string => dateStr.slice(0, 7);
@@ -62,14 +69,6 @@ export function monthBounds(month: string): { start: string; end: string } {
   const [y, m] = month.split("-").map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return { start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, "0")}` };
-}
-
-/** The month before this one. "2026-01" -> "2025-12". */
-export function previousMonth(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  const prevY = m === 1 ? y - 1 : y;
-  const prevM = m === 1 ? 12 : m - 1;
-  return `${prevY}-${String(prevM).padStart(2, "0")}`;
 }
 
 /** "2026-08" -> "August 2026", for headings. */
@@ -113,12 +112,16 @@ export function targetProductScope(
 }
 
 /**
- * Targets for one month that are per-product, i.e. everything this app writes
- * today. A document with no `product` is a legacy customer-level agreement and
- * is skipped everywhere — see the header.
+ * The standing agreements — everything this app writes today.
+ *
+ * Two generations of legacy document are skipped here, and nowhere else has to
+ * know about either: one with no `product` (the original per-customer figure),
+ * and one carrying a `month` (the per-month generation). Reading a month-keyed
+ * row as standing would apply a figure agreed for one month to every month
+ * after it.
  */
-const productTargetsIn = (targets: CustomerTarget[], month: string): CustomerTarget[] =>
-  targets.filter((t) => t.month === month && !!t.product);
+const standingTargets = (targets: CustomerTarget[]): CustomerTarget[] =>
+  targets.filter((t) => !!t.product && !t.month);
 
 export interface ProductTargetRow {
   product: string;
@@ -136,6 +139,8 @@ export interface ProductTargetRow {
   reached: boolean;
   /** Units still needed. 0 once reached. */
   remaining: number;
+  /** The discount's change log, for the history modal. Absent until one is set. */
+  discountHistory: DiscountChange[];
   /**
    * Pesos earned on this product. Zero until its target is reached, then the
    * discount applies to EVERY unit of it bought in the month, including those
@@ -212,7 +217,7 @@ export interface BuildProductTargetRowsInput {
    * has ever bought it.
    */
   products: string[];
-  /** Every target, all months — filtered to `month` here. */
+  /** Every target. Standing agreements; `month` below only measures the volume. */
   targets: CustomerTarget[];
   /** Sales spanning at least the month; anything outside it is ignored here. */
   saleTransactions: SaleTransaction[];
@@ -239,7 +244,7 @@ export function buildProductTargetRows({
   month,
   countedCategories,
 }: BuildProductTargetRowsInput): ProductTargetRow[] {
-  const mine = productTargetsIn(targets, month).filter((t) => t.customerId === customerId);
+  const mine = standingTargets(targets).filter((t) => t.customerId === customerId);
   const targetByProduct = new Map(mine.map((t) => [t.product as string, t]));
   const volumes = volumeByCustomerProduct(saleTransactions, month, countedCategories)
     .get(customerId) || new Map<string, number>();
@@ -264,6 +269,7 @@ export function buildProductTargetRows({
       hasTarget: !!target,
       targetQty,
       discountPerUnit,
+      discountHistory: target?.discountHistory || [],
       actualQty,
       reached,
       remaining: reached ? 0 : Math.max(0, targetQty - actualQty),
@@ -300,11 +306,11 @@ export function buildCustomerTargetSummaries({
   month,
   countedCategories,
 }: BuildCustomerSummaryInput): CustomerTargetSummaryRow[] {
-  const monthTargets = productTargetsIn(targets, month).filter((t) => Number(t.targetQty) > 0);
+  const agreements = standingTargets(targets).filter((t) => Number(t.targetQty) > 0);
   const volumes = volumeByCustomerProduct(saleTransactions, month, countedCategories);
 
   const byCustomer = new Map<string, CustomerTarget[]>();
-  for (const t of monthTargets) {
+  for (const t of agreements) {
     const list = byCustomer.get(t.customerId);
     if (list) list.push(t);
     else byCustomer.set(t.customerId, [t]);
@@ -347,8 +353,8 @@ export function summarizeProductTargets(rows: ProductTargetRow[]): {
 }
 
 /**
- * Every (customer, product) target for one month, indexed for cell-by-cell
- * lookup — what the Volume Per Customer grid tags its cells from.
+ * Every (customer, product) agreement measured against one month, indexed for
+ * cell-by-cell lookup — what the Volume Per Customer grid tags its cells from.
  *
  * ONE scan of the sales for the whole index, rather than customerTargetStatuses
  * per row: that grid runs to hundreds of customers, and calling a per-customer
@@ -391,7 +397,7 @@ export function buildTargetStatusIndex({
   countedCategories: string[];
 }): Map<string, CustomerTargetStatus> {
   const index = new Map<string, CustomerTargetStatus>();
-  const mine = productTargetsIn(targets, month).filter((t) => Number(t.targetQty) > 0);
+  const mine = standingTargets(targets).filter((t) => Number(t.targetQty) > 0);
   if (mine.length === 0) return index;
 
   const volumes = volumeByCustomerProduct(saleTransactions, month, countedCategories);
@@ -443,7 +449,7 @@ export function customerTargetStatuses({
   countedCategories: string[];
 }): CustomerTargetStatus[] {
   if (!customerId) return [];
-  const mine = productTargetsIn(targets, month)
+  const mine = standingTargets(targets)
     .filter((t) => t.customerId === customerId && Number(t.targetQty) > 0);
   if (mine.length === 0) return [];
 

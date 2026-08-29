@@ -6,6 +6,7 @@ import { AppDataProvider, useAppData } from "../../lib/providers/AppDataProvider
 import { auth } from "../../lib/firebase";
 import LoginPage from "../../components/LoginPage";
 import Sidebar from "../../components/Sidebar";
+import { useMediaQuery } from "../../lib/hooks/useMediaQuery";
 import { LoadingIcon, MenuIcon, UserIcon } from "../../components/Icons";
 import { navPermissions, permissionKeyForPath, isAdminOnlyPath } from "../../lib/navigation";
 import type { Branch } from "../../lib/types";
@@ -96,7 +97,30 @@ function DashboardChrome({
   useEffect(() => {
     if (deniedPath) router.replace(fallbackHref);
   }, [deniedPath, fallbackHref, router]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Below this the 250px rail costs more than it gives: on a 900px window it
+  // takes a third of the screen, and the report tables are the widest thing in
+  // the app. The sidebar collapses itself to the 60px icon rail instead.
+  const isNarrow = useMediaQuery("(max-width: 1100px)");
+
+  // Derived default with an override: the breakpoint decides, until the operator
+  // says otherwise, and their choice holds until the window crosses the
+  // breakpoint again. Seeding useState from `isNarrow` instead would read it
+  // once at mount and then ignore every resize; forcing collapse outright would
+  // leave no way to read the labels on a narrow window.
+  //
+  // The reset is React's documented "adjust state during render" — the same
+  // shape the data hooks use to clear stale rows on a branch switch (see
+  // useSalesData). React re-renders immediately with the new value rather than
+  // painting the stale one first, which an effect would.
+  const [override, setOverride] = useState<boolean | null>(null);
+  const [lastNarrow, setLastNarrow] = useState(isNarrow);
+  if (isNarrow !== lastNarrow) {
+    setLastNarrow(isNarrow);
+    setOverride(null);
+  }
+  const sidebarCollapsed = override ?? isNarrow;
+  const toggleSidebar = () => setOverride(!sidebarCollapsed);
+
   const [accountOpen, setAccountOpen] = useState(false);
   const sidebarWidth = sidebarCollapsed ? 60 : 250;
   const title = resolveTitle(pathname, data.branches);
@@ -107,14 +131,14 @@ function DashboardChrome({
       <div className={styles.glowTop} />
       <div className={styles.glowBottom} />
 
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
 
       <div className={styles.contentArea} style={{ marginLeft: `${sidebarWidth}px` }}>
         {/* Header */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={toggleSidebar}
               className={styles.menuButton}
             >
               <MenuIcon />

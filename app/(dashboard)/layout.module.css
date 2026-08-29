@@ -27,6 +27,14 @@
 .contentArea {
   transition: margin-left 0.25s ease;
   min-height: 100vh;
+  /* CLIP, not hidden. Both stop the page growing a horizontal scrollbar when a
+     wide report table is on screen — but `hidden` makes this element a scroll
+     CONTAINER, and per CSS Overflow 3 the other axis then computes to `auto`
+     too. .contentArea has no bounded height, so it never actually scrolls; the
+     body does. A sticky child of a scrollport that never scrolls never sticks,
+     which silently unpinned the dashboard header on every long page in the app.
+     `clip` does the same clipping without establishing a scroll container. */
+  overflow-x: clip;
 }
 
 .header {
@@ -194,6 +202,29 @@
 
 .main {
   padding: var(--dashboard-main-padding) 24px;
+}
+
+/* Narrow windows: buy back the horizontal room the 24px gutters take, and let
+   the header's own contents wrap rather than squeezing the page title. */
+@media (max-width: 700px) {
+  .main {
+    padding: var(--dashboard-main-padding) 12px;
+  }
+
+  .header {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .headerRight {
+    gap: 10px;
+  }
+
+  /* The date is the first thing worth losing — it is context, not a control,
+     and the header's controls have to stay reachable. */
+  .dateText {
+    display: none;
+  }
 }
 
 .loadingGate {

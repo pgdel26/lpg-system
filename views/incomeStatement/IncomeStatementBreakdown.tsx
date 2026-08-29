@@ -77,6 +77,21 @@ export default function IncomeStatementBreakdown({ result, staff, isPerBranchVie
         </span>
       </div>
 
+      {result.totalTax > 0 && (
+        <div className={styles.row}>
+          <div>
+            <div className={styles.rowLabel}>Memo: Taxes billed</div>
+            {/* Sits BELOW Net Revenue on purpose — it is not part of that
+                total. Shown because the money is real and a reader reconciling
+                against the day's takings needs the difference to have a name. */}
+            <div className={styles.rowSub}>
+              collected for the BIR on {result.taxCount} sale{result.taxCount !== 1 ? "s" : ""} — not revenue
+            </div>
+          </div>
+          <span className={`${styles.rowValue} ${styles.valueDim}`}>{fmt(result.totalTax)}</span>
+        </div>
+      )}
+
       <div className={styles.row}>
         <div className={styles.rowLabel}>Less: Cost of Purchases</div>
         <span className={`${styles.totalValue} ${result.totalCostOfPurchases > 0 ? styles.valueRed : styles.valueDim}`}>
@@ -143,6 +158,21 @@ export default function IncomeStatementBreakdown({ result, staff, isPerBranchVie
           {fmt(result.operatingResult)}
         </span>
       </div>
+
+      {result.totalTax > 0 && (
+        <div className={styles.row}>
+          <div>
+            <div className={styles.rowLabel}>+ Taxes Collected</div>
+            {/* In the walk, unlike above: the customer paid it, so it is in the
+                drawer until it is remitted. Without this the walk would not
+                foot and the day would read short by exactly the tax. */}
+            <div className={styles.rowSub}>held for the BIR — money in, not earnings</div>
+          </div>
+          <span className={`${styles.rowValue} ${styles.valueNeutral}`}>
+            + {fmt(result.totalTax)}
+          </span>
+        </div>
+      )}
 
       {/* A/R collected this period, checks included. The channel lines beneath
           are informational — every one is already inside the figure above, and
@@ -229,7 +259,16 @@ export default function IncomeStatementBreakdown({ result, staff, isPerBranchVie
         <span className={`${styles.rowValue} ${result.salesAr > 0 ? styles.valueNeutral : styles.valueDim}`}>{fmt(result.salesAr)}</span>
       </div>
       <div className={styles.totalRow}>
-        <span className={styles.totalLabel}>Total Billed</span>
+        <div>
+          <span className={styles.totalLabel}>Total Billed</span>
+          {/* Says so here, because the Taxes memo is far above under Net
+              Revenue: a reader adding Gross Sales + Delivery − Discounts and
+              comparing to this figure is otherwise off by exactly the tax, with
+              nothing nearby naming the difference. */}
+          {result.totalTax > 0 && (
+            <div className={styles.rowSub}>includes {fmt(result.totalTax)} tax billed</div>
+          )}
+        </div>
         <span className={styles.totalValue}>{fmt(result.totalBilled)}</span>
       </div>
       {/* The detector, not an explainer — it renders only when the two sides of

@@ -5,7 +5,9 @@ import CustomerDetail from "./CustomerDetail";
 import AddCustomerModal from "../../components/AddCustomerModal";
 import AddCategoryModal from "../../components/AddCategoryModal";
 import BulkAssignCategoryModal from "../../components/BulkAssignCategoryModal";
-import { PlusIcon, TagIcon } from "../../components/Icons";
+import MergeCustomersModal from "../../components/MergeCustomersModal";
+import { PlusIcon } from "../../components/Icons";
+import type { MergePreview, MergeResult } from "../../lib/hooks/useCustomersData";
 import type { Customer, CustomerCategory, CustomerTransaction } from "../../lib/types";
 import styles from "./CustomersPage.module.css";
 
@@ -23,6 +25,8 @@ interface CustomersPageProps {
   onUpdateCategory: (categoryId: string, name: string) => Promise<boolean>;
   onDeleteCategory: (categoryId: string) => Promise<boolean>;
   onBulkAssignCategory: (customerIds: string[], categoryId: string) => Promise<number>;
+  onPreviewMerge: (customerIds: string[]) => Promise<MergePreview | null>;
+  onMergeCustomers: (survivorId: string, doomedIds: string[]) => Promise<MergeResult | null>;
 }
 
 const subTabs = [
@@ -48,6 +52,8 @@ export default function CustomersPage({
   onUpdateCategory,
   onDeleteCategory,
   onBulkAssignCategory,
+  onPreviewMerge,
+  onMergeCustomers,
 }: CustomersPageProps) {
   const [subTab, setSubTab] = useState("customers");
   // An ID, not the Customer object: holding the object would freeze the detail
@@ -62,6 +68,7 @@ export default function CustomersPage({
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
 
   // The detail view REPLACES the page rather than sitting inside a tab: it is a
   // different screen about one customer, and leaving the tab bar above it would
@@ -95,6 +102,12 @@ export default function CustomersPage({
           <button onClick={() => setShowAddCategory(true)} className={styles.groupButton}>
             <PlusIcon /> Add Category
           </button>
+          {/* Deletes records, unlike the two beside it — which is what the
+              dialog's three steps and its red confirm button are for, since
+              nothing in this bar distinguishes it. */}
+          <button onClick={() => setShowMerge(true)} className={styles.groupButton}>
+            Merge Customers
+          </button>
           {/* Disabled until a category exists: there would be nothing to assign
               to, and an empty picklist is a question that can't be answered. */}
           <button
@@ -105,7 +118,7 @@ export default function CustomersPage({
               ? "Add a category first"
               : "File many customers into one category at once"}
           >
-            <TagIcon /> Bulk Assign Categories
+            Bulk Assign Categories
           </button>
         </div>
       </div>
@@ -153,6 +166,16 @@ export default function CustomersPage({
         <AddCategoryModal
           onSubmit={onAddCategory}
           onClose={() => setShowAddCategory(false)}
+        />
+      )}
+
+      {showMerge && (
+        <MergeCustomersModal
+          customers={customers}
+          categories={customerCategories}
+          onPreview={onPreviewMerge}
+          onMerge={onMergeCustomers}
+          onClose={() => setShowMerge(false)}
         />
       )}
 

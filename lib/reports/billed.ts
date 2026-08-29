@@ -10,12 +10,21 @@ import type { SaleTransaction, Swap, Refund } from "../types";
 // whatever subset of documents they care about.
 //
 //   sale    + totalAmount   already net of discount AND already inclusive of
-//                           deliveryCharge — see the line computation in
+//              - tax         deliveryCharge — see the line computation in
 //                           useSalesData (lineSubtotal - lineDiscount +
-//                           lineDelivery). Adding deliveryCharge on top would
-//                           double-count it, and deliveryCharge is only written
-//                           to the FIRST line of a multi-item sale, so the
-//                           error would be inconsistent as well as wrong.
+//                           lineDelivery + lineTax). Adding deliveryCharge on
+//                           top would double-count it, and deliveryCharge is
+//                           only written to the FIRST line of a multi-item
+//                           sale, so the error would be inconsistent as well
+//                           as wrong.
+//
+//                           TAX IS SUBTRACTED BACK OUT. It is inside
+//                           totalAmount because the customer pays it, but it is
+//                           collected for the BIR and remitted — it was never
+//                           the business's to earn. Leaving it in would make
+//                           the dashboard's "Net Revenue Today" exceed the
+//                           Income Statement's Net Revenue by exactly the tax,
+//                           two screens using one word for two numbers.
 //   swap    + price         a swap is money received.
 //   refund  - totalRefund   money going back out.
 //
@@ -24,7 +33,8 @@ import type { SaleTransaction, Swap, Refund } from "../types";
 // figures get reconciled against the Income Statement to the centavo.
 //
 // This matches the Income Statement's `netRevenue` (gross + swaps + delivery
-// − discounts − refunds). It deliberately does NOT match salesReport.ts's
+// − discounts − refunds), which is built from srp × quantity and therefore
+// never included tax either. It deliberately does NOT match salesReport.ts's
 // `netSales`, which additionally subtracts expenses because it answers a
 // different question — what the operator must remit. Anything labelled with
 // this rule must say "before expenses" if there is any chance of confusion.
@@ -34,9 +44,9 @@ import type { SaleTransaction, Swap, Refund } from "../types";
 
 const toCentavos = (n: number | undefined): number => Math.round((Number(n) || 0) * 100);
 
-/** A sale line's contribution to billed revenue, in centavos. */
-const saleBilledCentavos = (sale: Pick<SaleTransaction, "totalAmount">): number =>
-  toCentavos(sale.totalAmount);
+/** A sale line's contribution to billed revenue, in centavos. Net of tax. */
+const saleBilledCentavos = (sale: Pick<SaleTransaction, "totalAmount" | "tax">): number =>
+  toCentavos(sale.totalAmount) - toCentavos(sale.tax);
 
 /** A swap's contribution to billed revenue, in centavos. */
 const swapBilledCentavos = (swap: Pick<Swap, "price">): number =>
@@ -51,7 +61,7 @@ const refundBilledCentavos = (refund: Pick<Refund, "totalRefund">): number =>
  * range / branch you want before calling — this applies no filtering of its own.
  */
 export function netBilled(
-  sales: Array<Pick<SaleTransaction, "totalAmount">>,
+  sales: Array<Pick<SaleTransaction, "totalAmount" | "tax">>,
   swaps: Array<Pick<Swap, "price">>,
   refunds: Array<Pick<Refund, "totalRefund">>,
 ): number {

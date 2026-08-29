@@ -312,7 +312,11 @@ export default function ReceivablesPage({ arTransactions, branches, onRecordColl
               // A doc with a payments array can't be safely inline-edited —
               // changing discount/total/paymentType would desync it from
               // the per-row payment allocation. Delete and re-record instead.
-              const isSplitPayment = (t.payments?.length ?? 0) > 0;
+              // `!!t.payments`, matching DailySalesTab: a doc with an EMPTY
+              // payments array is still a doc the modern writer produced, and
+              // letting it through to a raw totalAmount edit would desync that
+              // total from the doc's own discount/delivery/tax fields.
+              const isSplitPayment = !!t.payments;
               const status = arStatus(t);
               const hasCollections = status.collected > 0;
               const events = arCollectionEvents(t);

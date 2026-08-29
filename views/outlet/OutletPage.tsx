@@ -229,6 +229,7 @@ export default function OutletPage({
         srp: t.srp || 0,
         quantity: t.quantity || 1,
         deliveryCharge: t.deliveryCharge || 0,
+        tax: t.tax || 0,
       });
     } else if (type === "swap") {
       const s = item as Swap;

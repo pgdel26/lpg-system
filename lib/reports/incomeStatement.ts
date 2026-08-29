@@ -47,9 +47,21 @@ export interface IncomeStatementResult {
   deliveryRevenue: number;
   deliveryCount: number;
   /**
+   * Tax billed to customers this period. NOT revenue and NOT in netRevenue —
+   * it is collected on the BIR's behalf and remitted, so it is a liability the
+   * moment it is charged.
+   *
+   * It IS in netCashMovement, because the customer paid it: the money arrives
+   * and sits in the drawer until it is remitted. That is why cash can exceed
+   * profit by this figure, and why the statement shows it on its own line
+   * rather than letting it hide inside the walk.
+   */
+  totalTax: number;
+  taxCount: number;
+  /**
    * Product revenue only (sum of revenueLines) — deliberately excludes
    * swapRevenue, unlike this app's other "Gross Sales" figures (e.g. the
-   * Sales Report tab's), so that grossSales + deliveryRevenue −
+   * Sales Report tab's), so that grossSales + deliveryRevenue + totalTax −
    * totalDiscounts equals totalBilled exactly (swap fees have no payment
    * channel — they're not billed to a customer through a sale doc — so
    * folding them in here would break that identity). Swap fees still
@@ -96,8 +108,10 @@ export interface IncomeStatementResult {
   salesGcash: number;
   salesAr: number;
   /**
-   * salesCash + salesGcash + salesAr === grossSales + deliveryRevenue −
-   * totalDiscounts exactly (grossSales here is product revenue only — see
+   * salesCash + salesGcash + salesAr === grossSales + deliveryRevenue +
+   * totalTax − totalDiscounts exactly (tax is in totalBilled because
+   * paymentSplit reads the tax-inclusive totalAmount — it is what the customer
+   * paid, even though it is not revenue) (grossSales here is product revenue only — see
    * its own comment) for every doc recordSale writes (payments are
    * validated to the centavo at write time — see useSalesData.ts). A legacy
    * doc missing `totalAmount` falls back to paymentSplit()'s per-unit
@@ -106,7 +120,7 @@ export interface IncomeStatementResult {
    */
   totalBilled: number;
   /**
-   * totalBilled − (grossSales + deliveryRevenue − totalDiscounts): the payments
+   * totalBilled − (grossSales + deliveryRevenue + totalTax − totalDiscounts): the payments
    * side measured against the revenue side. Zero for everything recordSale
    * writes, which validates the two to the centavo before saving.
    *
@@ -134,7 +148,7 @@ export interface IncomeStatementResult {
   arCollectedTotal: number;
 
   /**
-   * operatingResult − salesAr + arCollectedTotal.
+   * operatingResult + totalTax − salesAr + arCollectedTotal.
    *
    * The accrual-to-cash bridge: back out credit sales BILLED this period (no
    * money arrived), then add everything COLLECTED on invoices (money did
@@ -282,6 +296,17 @@ export function computeIncomeStatement({
   const deliveryRevenue = deliverySales.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
   const deliveryCount = deliverySales.length;
 
+  // NOT revenue. Tax is collected on the business's behalf and remitted to the
+  // BIR, so it never enters netRevenue — and it never did, because revenue here
+  // is built from srp × quantity plus delivery, which tax was never part of.
+  //
+  // It still has to appear twice below, because the MONEY is real: it is inside
+  // what the customer paid, so it is inside totalBilled (the identity check),
+  // and it is inside what reached the drawer (the cash walk).
+  const taxSales = saleTransactions.filter((t) => (t.tax || 0) > 0);
+  const totalTax = taxSales.reduce((sum, t) => sum + (t.tax || 0), 0);
+  const taxCount = taxSales.length;
+
   // Product revenue only — see the field comment on why swapRevenue is
   // deliberately excluded here and added back in below for netRevenue.
   const grossSales = revenueLines.reduce((sum, l) => sum + l.amount, 0);
@@ -366,8 +391,12 @@ export function computeIncomeStatement({
   // reconcile a money figure against a restatement of itself.
   // Rounded to the centavo: this is a float subtraction of two large sums, and an
   // unrounded 9.000000001 would trip the > 0.01 display test with noise.
+  // totalTax belongs on the revenue side of this identity even though it is not
+  // revenue: the identity compares what was BILLED against what the invoice was
+  // made of, and the invoice includes the tax. Leaving it out would light the
+  // anchor up by exactly the tax on every taxed sale.
   const billingIdentityGap =
-    Math.round((totalBilled - (grossSales + deliveryRevenue - totalDiscounts)) * 100) / 100;
+    Math.round((totalBilled - (grossSales + deliveryRevenue + totalTax - totalDiscounts)) * 100) / 100;
 
   // AR collected THIS period, from any invoice regardless of when it was
   // sold — collectionEventsInRange takes the unbounded arTransactions list
@@ -396,13 +425,21 @@ export function computeIncomeStatement({
   // Expenses, so nothing here re-subtracts them. The two adjustments are the
   // A/R movement: out with what was billed on credit, in with what was actually
   // collected. See the field comment for the expanded form.
-  const netCashMovement = operatingResult - salesAr + arCollectedTotal;
+  //
+  // totalTax is added because it is money that arrived and is NOT in
+  // operatingResult: the customer paid it, so it is in the drawer (or in the
+  // A/R that will be collected), but it is owed to the BIR rather than earned.
+  // Cash goes up, profit does not. Leaving it out would show the day short by
+  // exactly the tax the customer handed over.
+  const netCashMovement = operatingResult + totalTax - salesAr + arCollectedTotal;
 
   return {
     revenueLines,
     swapRevenue,
     swapCount,
     deliveryRevenue,
+    totalTax,
+    taxCount,
     deliveryCount,
     grossSales,
     totalDiscounts,
@@ -535,6 +572,12 @@ export function buildIncomeStatementWorkbook({
   r = data.length;
   data.push(["Net Revenue", ...amountsFor((res) => res.netRevenue)]);
   totalRows.push(r);
+  // Below the total, deliberately: it is not part of the arithmetic above it.
+  // Printed all the same, because a reader comparing this statement to the
+  // day's takings needs to know the difference has a name.
+  if (allResults.some((res) => res.totalTax > 0)) {
+    data.push(["Memo: Taxes billed (collected for the BIR, not revenue)", ...amountsFor((res) => res.totalTax)]);
+  }
   data.push([]);
 
   r = data.length;
@@ -618,12 +661,18 @@ export function buildIncomeStatementWorkbook({
   sectionRows.push(r);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
-  data.push(["Period movements, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses; the two adjustments below are the A/R movement — out with credit billed, in with cash collected. Assumes swap fees and expenses are settled in cash."]);
+  data.push(["Period movements, not a running balance. Starts from Operating Result, which already nets out Cost of Purchases (paid COD), Refunds and Expenses; the adjustments below are the A/R movement — out with credit billed, in with cash collected — plus any tax collected, which is money received but owed onward to the BIR. Assumes swap fees and expenses are settled in cash."]);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
   data.push(["", ...columnLabels]);
   tableHeaderRows.push(r);
   data.push(["Operating Result", ...amountsFor((res) => res.operatingResult)]);
+  if (allResults.some((res) => res.totalTax > 0)) {
+    // Money in that is not profit: the customer paid it, so it is in the drawer
+    // until it is remitted. Without this line the walk would not foot, and the
+    // day would read short by exactly the tax collected.
+    data.push(["+ Taxes Collected (held for the BIR)", ...amountsFor((res) => res.totalTax)]);
+  }
   data.push(["+ A/R Collected This Period", ...amountsFor((res) => res.arCollectedTotal)]);
   // Channel sub-lines are informational, not adjustments — every one of them is
   // already inside the figure above, checks included.
@@ -659,7 +708,7 @@ export function buildIncomeStatementWorkbook({
   sectionRows.push(r);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
-  data.push(["Memo. Describes this period's sales by payment channel and foots to Total Billed — NOT a breakdown of Net Cash Movement above, which includes purchases and expenses that have no payment channel."]);
+  data.push(["Memo. Describes this period's sales by payment channel and foots to Total Billed — NOT a breakdown of Net Cash Movement above, which includes purchases and expenses that have no payment channel. Tax billed is inside these figures, because it is inside what the customer paid."]);
   merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
   r = data.length;
   data.push(["", ...columnLabels]);

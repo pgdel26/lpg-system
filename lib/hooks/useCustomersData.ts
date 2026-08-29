@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDocs, query,
+  collection, onSnapshot, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query,
   orderBy, where, Timestamp, writeBatch,
+  type DocumentData, type DocumentReference,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import type { Customer, CustomerCategory, CustomerTransaction } from "../types";
+import type { Customer, CustomerCategory, CustomerTransaction, SaleTransaction } from "../types";
 import { customerKey, matchCustomer } from "../customers";
+import { arStatus } from "../receivables";
+import { targetDocId } from "../customerTargets";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
@@ -13,6 +16,12 @@ type ToastFn = (t: { type: string; message: string }) => void;
 // re-exported: leaving the old path alive would keep the hazard reachable (this
 // module pulls in React, and lib/receivables + lib/reports are imported by the
 // admin-SDK cron route, where that fails the build).
+
+/**
+ * The collections a merge repoints. customerTargets is handled separately —
+ * its doc id embeds the customerId, so those are rewritten rather than updated.
+ */
+const MERGED_COLLECTIONS = ["saleTransactions", "swaps", "refunds"] as const;
 
 // Identity is (name, category) — see matchCustomer in lib/customers.ts for the
 // rules, including why an uncategorised record matches any category.
@@ -30,6 +39,36 @@ function findMatchingCustomer(
   categoryId?: string,
 ): Customer | undefined {
   return matchCustomer(customers, name, categoryId) || undefined;
+}
+
+/** What a merge would move, per customer, so the operator sees it before agreeing. */
+export interface MergePreviewRow {
+  customerId: string;
+  name: string;
+  /** saleTransactions + swaps + refunds that name or point at this customer. */
+  docCount: number;
+  /** Monthly target agreements attached to them. */
+  targetCount: number;
+  /** Outstanding A/R across their sale documents. */
+  outstanding: number;
+}
+
+export interface MergePreview {
+  rows: MergePreviewRow[];
+  totalDocs: number;
+  totalOutstanding: number;
+}
+
+export interface MergeResult {
+  survivorName: string;
+  /** Transaction documents repointed at the survivor. */
+  repointed: number;
+  /** Customer records deleted. */
+  deleted: number;
+  /** Target agreements moved across. */
+  targetsMoved: number;
+  /** Targets dropped because the survivor already had one for that month+product. */
+  targetsSkipped: number;
 }
 
 export interface UseCustomersData {
@@ -51,6 +90,13 @@ export interface UseCustomersData {
   deleteCustomerCategory: (categoryId: string) => Promise<boolean>;
   /** Files many customers at once. `""` clears the category. Returns how many were written. */
   bulkAssignCustomerCategory: (customerIds: string[], categoryId: string) => Promise<number>;
+  /** What a merge of these customers would move. Reads only; writes nothing. */
+  previewCustomerMerge: (customerIds: string[]) => Promise<MergePreview | null>;
+  /**
+   * Repoints every transaction of `doomedIds` at `survivorId`, then deletes those
+   * customer records. Null when the merge was refused — see the guard.
+   */
+  mergeCustomers: (survivorId: string, doomedIds: string[]) => Promise<MergeResult | null>;
   fetchCustomerTransactions: (customerId: string) => Promise<CustomerTransaction[]>;
   findOrCreateCustomer: (
     isNew: boolean,
@@ -390,6 +436,274 @@ export function useCustomersData(onToast: ToastFn): UseCustomersData {
     }
   }, [customerCategories, onToast]);
 
+  // ---- Merge customers ----
+  //
+  // Does in the app what the one-off merge scripts did by hand (PILI PETRON,
+  // HANNWASH, SHAKEYS), and follows the same procedure, because that procedure
+  // is what kept those merges honest:
+  //
+  //   1. Match on customerName AS WELL AS customerId. Old documents carry a
+  //      stale or missing customerId, so an id-only match silently misses them
+  //      and leaves them orphaned against a customer that no longer exists.
+  //   2. Compute outstanding A/R BEFORE, from the shared arStatus().
+  //   3. Repoint the documents.
+  //   4. Re-read, and abort BEFORE deleting anything if a straggler remains or
+  //      the outstanding total moved by a centavo.
+  //   5. Only then delete the duplicate customer records.
+  //
+  // The app's own rename cascade can't do this: it is keyed on customerId and
+  // renames one customer, it cannot fold two together.
+  /**
+   * Every transaction document naming or pointing at one customer.
+   *
+   * `mergeIds` is the whole set being merged. It matters because the name query
+   * is what catches pre-customerId documents — and two DIFFERENT customers can
+   * legitimately share a name under different categories (see matchCustomer).
+   * Without this filter, merging one of them would sweep the other's sales and
+   * their outstanding A/R onto the survivor, and neither guard could see it:
+   * the stray check passes because the documents did move, and the outstanding
+   * check passes because the foreign balance was inside the "before" figure too.
+   */
+  const loadCustomerDocs = useCallback(async (customer: Customer, mergeIds: Set<string>) => {
+    const found = new Map<string, { ref: DocumentReference; collection: string; data: DocumentData }>();
+    for (const name of MERGED_COLLECTIONS) {
+      const col = collection(db, name);
+      const [byId, byName] = await Promise.all([
+        getDocs(query(col, where("customerId", "==", customer.id))),
+        // The name match is what catches pre-customerId documents. Exact, not
+        // normalised: a differently-spelled record is a separate customer the
+        // operator selects in its own right.
+        customer.name ? getDocs(query(col, where("customerName", "==", customer.name))) : null,
+      ]);
+      for (const snap of [byId, byName]) {
+        if (!snap) continue;
+        for (const d of snap.docs) {
+          const data = d.data();
+          // A document carrying the id of a live customer OUTSIDE this merge
+          // belongs to a same-name-different-category account. Never touch it.
+          const owner = data.customerId as string | undefined;
+          if (owner && !mergeIds.has(owner) && customers.some((c) => c.id === owner)) continue;
+          found.set(`${name}/${d.id}`, { ref: d.ref, collection: name, data });
+        }
+      }
+    }
+    return found;
+  }, [customers]);
+
+  /** Outstanding across a set of documents — the guard figure. */
+  const outstandingOf = (
+    docs: Map<string, { collection: string; data: DocumentData }>,
+  ): number => {
+    let total = 0;
+    for (const { collection: col, data } of docs.values()) {
+      if (col !== "saleTransactions") continue;
+      total += arStatus(data as unknown as SaleTransaction).remaining;
+    }
+    return Math.round(total * 100) / 100;
+  };
+
+  const previewCustomerMerge = useCallback(async (
+    customerIds: string[],
+  ): Promise<MergePreview | null> => {
+    const mergeIds = new Set(customerIds);
+    try {
+      const picked = customerIds
+        .map((id) => customers.find((c) => c.id === id))
+        .filter((c): c is Customer => !!c);
+
+      const perCustomer = await Promise.all(picked.map(async (customer) => ({
+        customer,
+        docs: await loadCustomerDocs(customer, mergeIds),
+        targets: await getDocs(
+          query(collection(db, "customerTargets"), where("customerId", "==", customer.id)),
+        ),
+      })));
+
+      // The TOTALS come from a merged map, not from summing the rows. Two
+      // selected customers with the same name return the same documents — which
+      // is the typical merge — so summing rows multiplies both the count and the
+      // outstanding A/R by however many same-named records were picked. That
+      // figure sits directly above the confirm button, described as the money
+      // the merge will preserve, so an inflated one is read at the worst moment.
+      const combined = new Map<string, { collection: string; data: DocumentData }>();
+      for (const { docs } of perCustomer) {
+        for (const [key, entry] of docs) combined.set(key, entry);
+      }
+
+      return {
+        rows: perCustomer.map(({ customer, docs, targets }) => ({
+          customerId: customer.id,
+          name: customer.name,
+          docCount: docs.size,
+          targetCount: targets.size,
+          outstanding: outstandingOf(docs),
+        })),
+        totalDocs: combined.size,
+        totalOutstanding: outstandingOf(combined),
+      };
+    } catch (error) {
+      console.error("Preview customer merge error:", error);
+      onToast({ type: "error", message: "Could not read those customers' transactions." });
+      return null;
+    }
+  }, [customers, loadCustomerDocs, onToast]);
+
+  const mergeCustomers = useCallback(async (
+    survivorId: string,
+    doomedIds: string[],
+  ): Promise<MergeResult | null> => {
+    const survivor = customers.find((c) => c.id === survivorId);
+    const doomed = doomedIds
+      .filter((id) => id !== survivorId)
+      .map((id) => customers.find((c) => c.id === id))
+      .filter((c): c is Customer => !!c);
+    if (!survivor || doomed.length === 0) {
+      onToast({ type: "error", message: "Pick a customer to keep and at least one to merge into it." });
+      return null;
+    }
+
+    try {
+      // ---- Read everything first, including the survivor's own documents:
+      // the guard compares the WHOLE group's outstanding, and leaving the
+      // survivor out would let their balance move unnoticed.
+      const mergeIds = new Set([survivorId, ...doomed.map((c) => c.id)]);
+      const all = new Map<string, { ref: DocumentReference; collection: string; data: DocumentData }>();
+      for (const docs of await Promise.all(
+        [survivor, ...doomed].map((c) => loadCustomerDocs(c, mergeIds)),
+      )) {
+        for (const [key, entry] of docs) all.set(key, entry);
+      }
+      const before = outstandingOf(all);
+
+      const toRepoint = [...all.values()].filter(
+        ({ data }) => data.customerName !== survivor.name || data.customerId !== survivorId,
+      );
+
+      // ---- Repoint, 450 at a time (Firestore's limit is 500 per batch).
+      for (let i = 0; i < toRepoint.length; i += 450) {
+        const batch = writeBatch(db);
+        for (const { ref, data } of toRepoint.slice(i, i + 450)) {
+          const patch: Record<string, unknown> = {
+            customerName: survivor.name,
+            customerId: survivorId,
+          };
+          // Keeps where the sale was actually written, the way the HANNWASH
+          // merge did. Never overwrites one that already exists.
+          if (!data.customerNameOriginal && data.customerName && data.customerName !== survivor.name) {
+            patch.customerNameOriginal = data.customerName;
+          }
+          batch.update(ref, patch);
+        }
+        await batch.commit();
+      }
+
+      // ---- Targets, AFTER the verification below has passed. They were moved
+      // here from above the guard: a target delete that ran before an abort
+      // made "Nothing was deleted" untrue, and an agreement destroyed on a
+      // failed merge has no undo.
+      //
+      // Their doc id embeds the customerId, so they are moved by rewriting
+      // under the survivor rather than updated in place. The survivor's own
+      // agreement always wins: copying forward never overwrites a figure
+      // someone deliberately typed.
+      const moveTargets = async (): Promise<{ moved: number; skipped: number }> => {
+        let moved = 0;
+        let skipped = 0;
+        const survivorTargets = await getDocs(
+          query(collection(db, "customerTargets"), where("customerId", "==", survivorId)),
+        );
+        // STANDING docs only, keyed on the product alone. Counting the
+        // survivor's legacy documents as agreements would treat a doomed
+        // customer's real agreement as a collision and drop it — leaving the
+        // survivor with the legacy row nothing reads and no usable target.
+        const survivorHas = new Set(
+          survivorTargets.docs
+            .filter((d) => d.data().product && !d.data().month)
+            .map((d) => d.data().product as string),
+        );
+        for (const c of doomed) {
+          const theirs = await getDocs(
+            query(collection(db, "customerTargets"), where("customerId", "==", c.id)),
+          );
+          for (const d of theirs.docs) {
+            const t = d.data();
+            const key = (t.product as string) || "";
+            // Legacy documents — one with no product, one carrying a month —
+            // are read by nothing (see standingTargets), so they are dropped
+            // rather than carried onto the survivor as permanent dead weight.
+            if (t.product && !t.month && !survivorHas.has(key)) {
+              await setDoc(doc(db, "customerTargets", targetDocId(survivorId, t.product as string)), {
+                customerId: survivorId,
+                product: t.product,
+                targetQty: Number(t.targetQty) || 0,
+                discountPerUnit: Number(t.discountPerUnit) || 0,
+                // The log comes across with the rate. Dropping it would leave a
+                // live discount with an empty history — the exact hole the
+                // read-only discount cell exists to prevent, punched on the one
+                // path where the trail matters most.
+                discountHistory: t.discountHistory || [],
+                updatedAt: Timestamp.now(),
+              });
+              survivorHas.add(key);
+              moved++;
+            } else {
+              skipped++;
+            }
+            await deleteDoc(d.ref);
+          }
+        }
+        return { moved, skipped };
+      };
+
+      // ---- Verify BEFORE deleting. A straggler here would be a document left
+      // pointing at a customer that is about to stop existing.
+      const after = new Map<string, { ref: DocumentReference; collection: string; data: DocumentData }>();
+      for (const docs of await Promise.all(
+        [survivor, ...doomed].map((c) => loadCustomerDocs(c, mergeIds)),
+      )) {
+        for (const [key, entry] of docs) after.set(key, entry);
+      }
+      const strays = [...after.values()].filter(
+        ({ data }) => data.customerId !== survivorId || data.customerName !== survivor.name,
+      );
+      if (strays.length > 0) {
+        onToast({
+          type: "error",
+          message: `Stopped before deleting: ${strays.length} transaction(s) did not move. Nothing was deleted — try again.`,
+        });
+        return null;
+      }
+      const afterTotal = outstandingOf(after);
+      if (Math.abs(afterTotal - before) > 0.005) {
+        onToast({
+          type: "error",
+          message: `Stopped before deleting: outstanding A/R moved by ${(afterTotal - before).toFixed(2)}. Nothing was deleted.`,
+        });
+        return null;
+      }
+
+      const { moved: targetsMoved, skipped: targetsSkipped } = await moveTargets();
+
+      for (const c of doomed) await deleteDoc(doc(db, "customers", c.id));
+
+      onToast({
+        type: "success",
+        message: `Merged ${doomed.length} customer${doomed.length === 1 ? "" : "s"} into ${survivor.name}. ${toRepoint.length} transaction${toRepoint.length === 1 ? "" : "s"} moved.`,
+      });
+      return {
+        survivorName: survivor.name,
+        repointed: toRepoint.length,
+        deleted: doomed.length,
+        targetsMoved,
+        targetsSkipped,
+      };
+    } catch (error) {
+      console.error("Merge customers error:", error);
+      onToast({ type: "error", message: "The merge failed part-way. Nothing was deleted — check the customers and try again." });
+      return null;
+    }
+  }, [customers, loadCustomerDocs, onToast]);
+
   // ---- Fetch all transactions for a customer ----
   const fetchCustomerTransactions = useCallback(async (customerId: string): Promise<CustomerTransaction[]> => {
     try {
@@ -488,6 +802,8 @@ export function useCustomersData(onToast: ToastFn): UseCustomersData {
     updateCustomerCategory,
     deleteCustomerCategory,
     bulkAssignCustomerCategory,
+    previewCustomerMerge,
+    mergeCustomers,
     fetchCustomerTransactions,
     findOrCreateCustomer,
   };

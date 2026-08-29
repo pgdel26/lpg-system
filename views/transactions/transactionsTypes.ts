@@ -21,6 +21,14 @@ export type EditData =
       srp: number;
       quantity: number;
       deliveryCharge: number;
+      /**
+       * Carried so the discount recompute can put it back into totalAmount.
+       * Read-only in the edit row — Tax is set on the sale, not corrected here —
+       * but leaving it out of the formula would strip the tax out of
+       * totalAmount while the doc's own `tax` field kept it, lighting up the
+       * Income Statement's billingIdentityGap with nothing to trace it to.
+       */
+      tax: number;
     }
   | {
       type: "swap";

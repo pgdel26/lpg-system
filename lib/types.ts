@@ -109,16 +109,26 @@ export interface CustomerCategory {
   createdAt?: Timestamp;
 }
 
-// customerTargets collection — one doc per customer per product per month, doc
-// id `${customerId}_${month}_${product}` (see targetDocId in
-// lib/customerTargets.ts). Keyed
+// customerTargets collection — one doc per customer per product, doc id
+// `${customerId}_${product}` (see targetDocId in lib/customerTargets.ts). Keyed
 // rather than auto-id so writing a target is an idempotent upsert: one customer
-// can never end up with two rows competing for the same product in one month.
+// can never end up with two rows competing for the same product.
+//
+// STANDING agreements, not monthly ones. They were keyed by month until the
+// owner said the discounts don't change month to month — so a month in the key
+// only created drift, where editing in September silently left August saying
+// something else. The VOLUME is still measured per calendar month; it is the
+// agreement that no longer moves.
 export interface CustomerTarget {
   id: string;
   customerId: string;
-  /** "YYYY-MM". */
-  month: string;
+  /**
+   * "YYYY-MM" on LEGACY month-keyed documents only. Standing agreements carry
+   * no month, and every consumer skips a document that has one — a month-keyed
+   * row is from the old model and would otherwise be read as a standing
+   * agreement that happens to apply forever.
+   */
+  month?: string;
   /**
    * The product this agreement is for. OPTIONAL only because legacy documents
    * predate per-product targets — one figure per customer per month, written
@@ -128,11 +138,41 @@ export interface CustomerTarget {
    * this app writes today always sets it.
    */
   product?: string;
-  /** Units of that product the customer must buy in the month to earn the discount. */
+  /** Units of that product the customer must buy in a month to earn the discount. */
   targetQty: number;
-  /** Pesos off per unit, once the target is reached. */
+  /**
+   * Pesos off per unit, once the target is reached. THE CURRENT RATE — every
+   * reader uses this field; `discountHistory` is the log of how it got here.
+   *
+   * The duplication is deliberate: deriving the current rate by sorting the log
+   * would make every consumer of a discount depend on the log's shape, and a
+   * malformed entry would then change what the app charges rather than just
+   * what the history modal shows.
+   */
   discountPerUnit: number;
+  /**
+   * Log of what this discount has been, oldest first. Written only by
+   * setCustomerDiscount — which is why the grid's Discount cell is read-only: a
+   * second way to change the rate would leave holes in this.
+   *
+   * Appended by read-modify-write, so it is last-write-wins rather than truly
+   * append-only: two people setting a rate on the same product within a second
+   * of each other would lose the earlier entry. `discountPerUnit` is a separate
+   * scalar and stays correct either way, so the risk is a missing line in the
+   * history modal, not a wrong rate.
+   */
+  discountHistory?: DiscountChange[];
   updatedAt?: Timestamp;
+}
+
+/** One entry in a target's discount log. */
+export interface DiscountChange {
+  /** Pesos off per unit from `from` until the next entry (or until now). */
+  discountPerUnit: number;
+  /** "YYYY-MM-DD" the rate took effect — the day it was set. */
+  from: string;
+  /** When the row was written, for ordering two changes made on one day. */
+  changedAt?: Timestamp;
 }
 
 // NOTE: settings/customerTargets (the old countedCategories list) is orphaned.
@@ -158,6 +198,16 @@ export interface SaleTransaction {
   srp: number;
   discount: number;
   deliveryCharge: number;
+  /**
+   * Tax charged on top of this line, in pesos. Stamped whole onto a sale's
+   * FIRST line document, like deliveryCharge — it belongs to the sale, not to
+   * any one item.
+   *
+   * Already INSIDE totalAmount: it is what the customer pays, and the payment
+   * split matches the total. Kept in its own field so a report can show or net
+   * out the tax; today every report reads totalAmount as revenue, tax included.
+   */
+  tax?: number;
   finalPrice: number;
   quantity: number;
   totalAmount: number;

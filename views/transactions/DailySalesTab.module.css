@@ -306,8 +306,10 @@
 }
 
 .tableInner {
-  /* guaranteed column breathing room; below this width the card scrolls sideways */
-  min-width: 1150px;
+  /* guaranteed column breathing room; below this width the card scrolls sideways.
+     Raised from 1150px when the Tax column was added — the floor has to grow
+     with the columns, or they take the room out of Customer and Product. */
+  min-width: 1250px;
   display: flex;
   flex-direction: column;
 }

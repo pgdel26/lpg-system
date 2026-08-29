@@ -16,6 +16,8 @@ interface ReportSaleTransaction {
   srp?: number;
   discount?: number;
   deliveryCharge?: number;
+  /** Tax charged on top, already inside totalAmount — see SaleTransaction. */
+  tax?: number;
   totalAmount?: number;
   finalPrice?: number;
   paymentType?: string;
@@ -103,6 +105,15 @@ export interface SalesReportInput {
  * operator remits against, so they're built in exactly one place regardless of
  * which file they end up in.
  */
+/**
+ * Last column index of the per-sale table — Invoice…GCash Ref No.
+ *
+ * Hoisted so the section banners and the table can't drift apart: they did when
+ * the Tax column was added, leaving every blue band one column short of the
+ * table it headed.
+ */
+const LAST_COL = 12;
+
 export function buildSalesReportSheet({
   date,
   saleTransactions = [],
@@ -126,10 +137,15 @@ export function buildSalesReportSheet({
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const totalDelivery = saleTransactions.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
+  // Tax is charged ON TOP and is paid with the invoice, so it is money that
+  // arrives — it has to be in Net Sales or Expected Cash Remit comes out short
+  // by exactly the tax the customer handed over. grossSales is srp × qty, which
+  // never included it.
+  const totalTax = saleTransactions.reduce((sum, t) => sum + (t.tax || 0), 0);
   const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
   const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = refunds.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
-  const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
+  const netSales = grossSales + totalDelivery + totalTax - totalDiscount - totalExpenses - totalRefunds;
   // paymentSplit() is the one shared implementation of the channel rule (also
   // used by DailySalesTab.tsx, SalesReportTab.tsx, ReceivablesPage.tsx,
   // TopDebtorsChart.tsx) — summing across ALL docs (not filtering by
@@ -167,15 +183,15 @@ export function buildSalesReportSheet({
   let r: number;
 
   data.push(["DAILY SALES REPORT"]);
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 11 } });
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: LAST_COL } });
   data.push([`Date: ${date}`]);
-  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 11 } });
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: LAST_COL } });
   data.push([]);
 
   r = data.length;
   data.push(["STAFF ON DUTY"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: LAST_COL } });
   r = data.length;
   data.push(["Role", "Name"]);
   tableHeaderRows.push(r);
@@ -189,12 +205,13 @@ export function buildSalesReportSheet({
   r = data.length;
   data.push(["SALES DAILY BREAKDOWN"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: LAST_COL } });
   r = data.length;
   data.push(["", "Amount"]);
   tableHeaderRows.push(r);
   data.push(["Gross Sales", grossSales]);
   data.push(["Delivery Charge", totalDelivery > 0 ? totalDelivery : 0]);
+  data.push(["Taxes", totalTax > 0 ? totalTax : 0]);
   data.push(["Discounts", totalDiscount > 0 ? -totalDiscount : 0]);
   data.push(["Expenses", totalExpenses > 0 ? -totalExpenses : 0]);
   data.push(["Refunds", totalRefunds > 0 ? -totalRefunds : 0]);
@@ -220,7 +237,7 @@ export function buildSalesReportSheet({
   r = data.length;
   data.push(["EXPENSES"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: LAST_COL } });
   if (expenses.length > 0) {
     r = data.length;
     data.push(["Description", "Amount"]);
@@ -243,10 +260,10 @@ export function buildSalesReportSheet({
   r = data.length;
   data.push(["DAILY SALES"]);
   sectionRows.push(r);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 11 } });
+  merges.push({ s: { r, c: 0 }, e: { r, c: LAST_COL } });
   if (sorted.length > 0 || swaps.length > 0 || refunds.length > 0) {
     r = data.length;
-    data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Delivery", "Cash", "GCash", "A/R", "GCash Ref No"]);
+    data.push(["Invoice", "Customer", "Product", "Type", "Qty", "SRP", "Discount", "Delivery", "Tax", "Cash", "GCash", "A/R", "GCash Ref No"]);
     tableHeaderRows.push(r);
     // Route each sale's amount into the columns matching its payment split —
     // a split-payment sale can populate two or three of Cash/GCash/A/R for
@@ -256,7 +273,7 @@ export function buildSalesReportSheet({
       data.push([
         t.invoice || "", t.customerName || "", t.product || "",
         saleSectionLabel(t.saleSection || ""), t.quantity || 1, t.srp || 0,
-        t.discount || 0, t.deliveryCharge || 0,
+        t.discount || 0, t.deliveryCharge || 0, t.tax || 0,
         split.cash > 0 ? split.cash : "",
         split.gcash > 0 ? split.gcash : "",
         split.ar > 0 ? split.ar : "",
@@ -267,7 +284,7 @@ export function buildSalesReportSheet({
     swaps.forEach((s) => {
       data.push([
         "", s.customerName || "", `${s.productFrom} → ${s.productTo}`,
-        "Swap", 1, s.price || 0, 0, "", s.price || 0, "", "", "",
+        "Swap", 1, s.price || 0, 0, "", "", s.price || 0, "", "", "",
       ]);
     });
     // Refunds are cash paid out of the drawer → Cash column (negative).
@@ -276,29 +293,30 @@ export function buildSalesReportSheet({
         rf.invoice || "", rf.customerName || "",
         (rf.items || []).map((it) => it.product).join(", "),
         "Refund", (rf.items || []).reduce((sum, it) => sum + (it.qty || 0), 0),
-        "", "", "", -(rf.totalRefund || 0), "", "", "",
+        "", "", "", "", -(rf.totalRefund || 0), "", "", "",
       ]);
     });
     // Money-by-channel: Cash = cash sales + swaps − refunds; GCash = gcash
     // sales; A/R = ar sales. The three reconcile to the day's grand total.
     const salesTotalDiscount = sorted.reduce((sum, t) => sum + (t.discount || 0), 0);
+    const salesTotalTax = sorted.reduce((sum, t) => sum + (t.tax || 0), 0);
     const cashTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).cash, 0)
       + swaps.reduce((sum, s) => sum + (s.price || 0), 0)
       - refunds.reduce((sum, rf) => sum + (rf.totalRefund || 0), 0);
     const gcashTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).gcash, 0);
     const arTotal = sorted.reduce((sum, t) => sum + paymentSplit(t).ar, 0);
     r = data.length;
-    data.push(["", "", "", "", "", "", salesTotalDiscount, "", cashTotal, gcashTotal, arTotal, ""]);
+    data.push(["", "", "", "", "", "", salesTotalDiscount, "", salesTotalTax, cashTotal, gcashTotal, arTotal, ""]);
     totalRows.push(r);
   } else {
-    data.push(["No sales recorded.", "", "", "", "", "", "", "", "", "", "", ""]);
+    data.push(["No sales recorded.", "", "", "", "", "", "", "", "", "", "", "", ""]);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 22 }, { wch: 20 }, { wch: 24 }, { wch: 14 },
-    { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+    { wch: 6 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
   ];
 
   const range = XLSX.utils.decode_range(ws["!ref"] as string);

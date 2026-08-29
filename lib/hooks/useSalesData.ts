@@ -41,6 +41,17 @@ export interface RecordSaleInput {
       existing record of that name is reused — see matchCustomer. */
   newCustomerCategoryId?: string;
   deliveryCharge?: number;
+  /**
+   * Tax charged ON TOP of the sale, in pesos. Handled exactly like
+   * deliveryCharge: it belongs to the sale, not to any one line, so it is
+   * stamped whole onto the first line's document rather than split across them.
+   *
+   * It is INSIDE totalAmount, because that is what the customer pays and what
+   * the payment split has to match. It is also stored in its own field so a
+   * report that needs sales net of tax can subtract it — nothing does that
+   * today, and every report still reads totalAmount as revenue.
+   */
+  tax?: number;
   checkData?: { checkDate: string; checkAmount: number } | null;
 }
 
@@ -172,6 +183,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       newCustomerPhone,
       newCustomerCategoryId = "",
       deliveryCharge = 0,
+      tax = 0,
       checkData = null,
     } = input;
     // --- Validation ---
@@ -234,6 +246,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         qty: number;
         lineDiscount: number;
         lineDelivery: number;
+        lineTax: number;
         totalAmount: number;
       }> = [];
 
@@ -260,9 +273,13 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
         // Add delivery charge to the first item only
         const lineDelivery = i === 0 ? (deliveryCharge || 0) : 0;
-        const totalAmount = Math.max(0, lineSubtotal - lineDiscount + lineDelivery);
+        // Same first-line-only rule as delivery: one charge on the sale, not a
+        // per-item one, so splitting it across lines would invent a division
+        // nobody made.
+        const lineTax = i === 0 ? (tax || 0) : 0;
+        const totalAmount = Math.max(0, lineSubtotal - lineDiscount + lineDelivery + lineTax);
 
-        lineComputations.push({ item, saleSec, srp, qty, lineDiscount, lineDelivery, totalAmount });
+        lineComputations.push({ item, saleSec, srp, qty, lineDiscount, lineDelivery, lineTax, totalAmount });
       }
 
       // Grand total must match the sum of payments exactly — compare in
@@ -312,7 +329,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       };
 
       for (let i = 0; i < lineComputations.length; i++) {
-        const { item, saleSec, srp, qty, lineDiscount, lineDelivery, totalAmount } = lineComputations[i];
+        const { item, saleSec, srp, qty, lineDiscount, lineDelivery, lineTax, totalAmount } = lineComputations[i];
         if (!saleSec) continue;
         const linePays = linePayments[i];
         const paymentType = dominantPaymentType(linePays);
@@ -325,6 +342,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
           srp,
           discount: lineDiscount,
           deliveryCharge: lineDelivery,
+          tax: lineTax,
           finalPrice: srp,
           quantity: qty,
           totalAmount,

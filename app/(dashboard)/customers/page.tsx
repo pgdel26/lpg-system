@@ -16,6 +16,8 @@ export default function CustomersRoutePage() {
       onUpdateCategory={data.updateCustomerCategory}
       onDeleteCategory={data.deleteCustomerCategory}
       onBulkAssignCategory={data.bulkAssignCustomerCategory}
+      onPreviewMerge={data.previewCustomerMerge}
+      onMergeCustomers={data.mergeCustomers}
     />
   );
 }

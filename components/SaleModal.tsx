@@ -70,6 +70,7 @@ interface SaleModalProps {
     deliveryCharge: number,
     checkData: { checkDate: string; checkAmount: number } | null,
     payments: RecordSalePaymentInput[],
+    tax: number,
   ) => void;
 }
 
@@ -102,6 +103,7 @@ export default function SaleModal({
   const [saleDate, setSaleDate] = useState(inventoryDate || today());
   const [discount, setDiscount] = useState("");
   const [deliveryCharge, setDeliveryCharge] = useState("");
+  const [tax, setTax] = useState("");
   const [checkDate, setCheckDate] = useState("");
   const [checkAmount, setCheckAmount] = useState("");
 
@@ -154,7 +156,11 @@ export default function SaleModal({
   const subtotal = items.reduce((sum, item) => sum + getLineTotal(item), 0);
   const discountNum = parseFloat(discount) || 0;
   const deliveryNum = parseFloat(deliveryCharge) || 0;
-  const grandTotal = Math.max(0, subtotal - discountNum + deliveryNum);
+  // Tax is charged ON TOP, like delivery — the price it is added to is
+  // tax-exclusive. It is in the grand total, so the payment split has to cover
+  // it: what the customer hands over includes the tax.
+  const taxNum = parseFloat(tax) || 0;
+  const grandTotal = Math.max(0, subtotal - discountNum + deliveryNum + taxNum);
 
   // ---- Split payment helpers ----
   const enabledMethods = METHOD_ORDER.filter((m) => splitEnabled[m]);
@@ -227,7 +233,7 @@ export default function SaleModal({
       ? { checkDate, checkAmount: parseFloat(checkAmount) || 0 }
       : null;
 
-    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, payments);
+    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, payments, taxNum);
   };
 
   return (
@@ -560,9 +566,23 @@ export default function SaleModal({
           />
         </div>
 
-        {/* 8. Total Amount */}
+        {/* 8. Tax — sits under Discount and Delivery because it is the third
+            adjustment to the same figure, and is added on top of them. */}
+        <div className={styles.fieldGroup}>
+          <label className={styles.label}>Tax (₱)</label>
+          <input
+            type="number"
+            min="0"
+            value={tax}
+            onChange={(e) => setTax(e.target.value)}
+            placeholder="0"
+            className={styles.monoInput}
+          />
+        </div>
+
+        {/* 9. Total Amount */}
         <div className={styles.totalsCard}>
-          {(discountNum > 0 || deliveryNum > 0) && (
+          {(discountNum > 0 || deliveryNum > 0 || taxNum > 0) && (
             <div className={styles.totalsRow}>
               <span className={styles.subtotalLabel}>Subtotal</span>
               <span className={styles.subtotalValue}>{fmt(subtotal)}</span>
@@ -578,6 +598,12 @@ export default function SaleModal({
             <div className={styles.totalsRow}>
               <span className={styles.deliveryLabel}>Delivery</span>
               <span className={styles.deliveryValue}>+{fmt(deliveryNum)}</span>
+            </div>
+          )}
+          {taxNum > 0 && (
+            <div className={styles.totalsRow}>
+              <span className={styles.deliveryLabel}>Tax</span>
+              <span className={styles.deliveryValue}>+{fmt(taxNum)}</span>
             </div>
           )}
           <div className={styles.totalsRowFinal}>

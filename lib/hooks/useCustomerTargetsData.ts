@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, Timestamp,
+  collection, doc, onSnapshot, setDoc, deleteDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { targetDocId } from "../customerTargets";
+import { today } from "../utils";
 import type { CustomerTarget } from "../types";
 
 // Declared locally, matching every sibling hook — there is no shared toast module.
@@ -19,17 +20,25 @@ export interface UseCustomerTargetsData {
   customerTargets: CustomerTarget[];
   /** False until the targets listener has reported once. */
   targetsLoaded: boolean;
-  /** Creates or overwrites one customer's target for one product in one month. */
-  saveCustomerTarget: (
+  /**
+   * Sets the target VOLUME on one product, leaving the discount untouched.
+   *
+   * Split from the discount deliberately: the discount is logged, and a single
+   * save that wrote both would either log every volume edit as a discount
+   * change or let the volume path overwrite a rate without logging it.
+   */
+  saveCustomerTargetQty: (
     customerId: string,
-    month: string,
     product: string,
     targetQty: number,
-    discountPerUnit: number,
   ) => Promise<void>;
-  removeCustomerTarget: (customerId: string, month: string, product: string) => Promise<void>;
-  /** Copies a month's targets forward. Returns how many were written. */
-  copyTargetsToMonth: (fromMonth: string, toMonth: string) => Promise<number>;
+  /** Sets a new discount and appends it to the product's history. */
+  setCustomerDiscount: (
+    customerId: string,
+    product: string,
+    discountPerUnit: number,
+  ) => Promise<boolean>;
+  removeCustomerTarget: (customerId: string, product: string) => Promise<void>;
 }
 
 export function useCustomerTargetsData(onToast: ToastFn): UseCustomerTargetsData {
@@ -37,10 +46,9 @@ export function useCustomerTargetsData(onToast: ToastFn): UseCustomerTargetsData
   const [targetsSeen, setTargetsSeen] = useState(false);
 
   // ---- FIREBASE: targets listener ----
-  // The WHOLE collection, unscoped by month. A target is one small document per
-  // customer per product per month, and only a handful of customers have
-  // agreements, so this stays in the low thousands for years — cheaper than a
-  // re-subscribe every time the operator pages back to look at July.
+  // The whole collection. One small document per customer per product, standing
+  // rather than per month, so it no longer grows with time at all — only with
+  // the number of agreements, which is a handful.
   // No auth gate needed: AppDataProvider only mounts after authentication.
   useEffect(() => {
     const unsub = onSnapshot(
@@ -59,24 +67,24 @@ export function useCustomerTargetsData(onToast: ToastFn): UseCustomerTargetsData
     return () => unsub();
   }, []);
 
-  const saveCustomerTarget = useCallback(async (
+  const saveCustomerTargetQty = useCallback(async (
     customerId: string,
-    month: string,
     product: string,
     targetQty: number,
-    discountPerUnit: number,
   ) => {
     try {
-      // Keyed doc id + merge: saving the same customer-month-product twice
-      // updates the one row instead of racing a second one into existence.
+      // Keyed doc id + merge: saving the same customer-product twice updates the
+      // one row instead of racing a second one into existence. merge also means
+      // this never clears a discount it wasn't given.
+      //
+      // No `month` is written. A standing agreement that carried one would be
+      // skipped by every reader as a legacy row — see standingTargets().
       await setDoc(
-        doc(db, "customerTargets", targetDocId(customerId, month, product)),
+        doc(db, "customerTargets", targetDocId(customerId, product)),
         {
           customerId,
-          month,
           product,
           targetQty: Number(targetQty) || 0,
-          discountPerUnit: Number(discountPerUnit) || 0,
           updatedAt: Timestamp.now(),
         },
         { merge: true },
@@ -87,74 +95,65 @@ export function useCustomerTargetsData(onToast: ToastFn): UseCustomerTargetsData
     }
   }, [onToast]);
 
+  const setCustomerDiscount = useCallback(async (
+    customerId: string,
+    product: string,
+    discountPerUnit: number,
+  ): Promise<boolean> => {
+    const rate = Number(discountPerUnit) || 0;
+    const existing = customerTargets.find(
+      (t) => t.customerId === customerId && t.product === product && !t.month,
+    );
+    // Setting the same rate again is not a change. Logging it would fill the
+    // history with entries that say nothing happened.
+    if (existing && Number(existing.discountPerUnit) === rate) {
+      onToast({ type: "error", message: "That is already the current discount." });
+      return false;
+    }
+
+    try {
+      await setDoc(
+        doc(db, "customerTargets", targetDocId(customerId, product)),
+        {
+          customerId,
+          product,
+          discountPerUnit: rate,
+          // arrayUnion would drop an entry identical to one already in the log —
+          // the same rate could legitimately come back later. The array is read,
+          // appended and written whole instead.
+          discountHistory: [
+            ...(existing?.discountHistory || []),
+            { discountPerUnit: rate, from: today(), changedAt: Timestamp.now() },
+          ],
+          updatedAt: Timestamp.now(),
+        },
+        { merge: true },
+      );
+      return true;
+    } catch (err) {
+      console.error("Set customer discount error:", err);
+      onToast({ type: "error", message: "Could not save the discount." });
+      return false;
+    }
+  }, [customerTargets, onToast]);
+
   const removeCustomerTarget = useCallback(async (
     customerId: string,
-    month: string,
     product: string,
   ) => {
     try {
-      await deleteDoc(doc(db, "customerTargets", targetDocId(customerId, month, product)));
+      await deleteDoc(doc(db, "customerTargets", targetDocId(customerId, product)));
     } catch (err) {
       console.error("Remove customer target error:", err);
       onToast({ type: "error", message: "Could not remove the target." });
     }
   }, [onToast]);
 
-  const copyTargetsToMonth = useCallback(async (fromMonth: string, toMonth: string) => {
-    // Legacy customer-level documents (no product) are never copied forward —
-    // nothing reads them any more, so duplicating one would only plant another
-    // invisible row in a new month.
-    const pairKey = (customerId: string, product: string) => `${customerId}\u0000${product}`;
-    const source = customerTargets.filter((t) => t.month === fromMonth && !!t.product);
-    const existing = new Set(
-      customerTargets
-        .filter((t) => t.month === toMonth && !!t.product)
-        .map((t) => pairKey(t.customerId, t.product as string)),
-    );
-    // Never overwrites a target the destination month already has. Copying
-    // forward is a convenience for the rows nobody has set yet; silently
-    // replacing a figure someone deliberately typed is not.
-    const toWrite = source.filter((t) => !existing.has(pairKey(t.customerId, t.product as string)));
-    // Says so out loud: a button that silently does nothing on a month already
-    // populated is indistinguishable from a broken one.
-    if (toWrite.length === 0) {
-      onToast({ type: "success", message: "Nothing to copy — every target here is already set." });
-      return 0;
-    }
-
-    try {
-      const batch = writeBatch(db);
-      for (const t of toWrite) {
-        batch.set(
-          doc(db, "customerTargets", targetDocId(t.customerId, toMonth, t.product as string)),
-          {
-            customerId: t.customerId,
-            month: toMonth,
-            product: t.product,
-            targetQty: Number(t.targetQty) || 0,
-            discountPerUnit: Number(t.discountPerUnit) || 0,
-            updatedAt: Timestamp.now(),
-          },
-        );
-      }
-      await batch.commit();
-      onToast({
-        type: "success",
-        message: `Copied ${toWrite.length} target${toWrite.length === 1 ? "" : "s"} forward.`,
-      });
-      return toWrite.length;
-    } catch (err) {
-      console.error("Copy targets error:", err);
-      onToast({ type: "error", message: "Could not copy last month's targets." });
-      return 0;
-    }
-  }, [customerTargets, onToast]);
-
   return {
     customerTargets,
     targetsLoaded: targetsSeen,
-    saveCustomerTarget,
+    saveCustomerTargetQty,
+    setCustomerDiscount,
     removeCustomerTarget,
-    copyTargetsToMonth,
   };
 }

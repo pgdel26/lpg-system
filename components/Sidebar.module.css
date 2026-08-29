@@ -1,6 +1,16 @@
+/* A FIXED height, not min-height. With min-height the aside grew past the
+   viewport whenever the nav did — and because it is position:fixed, that
+   overflow was simply unreachable: the page body scrolls, the fixed element
+   doesn't. With both groups expanded that put Staff, Restrictions, Contact Us
+   and the collapse toggle off the bottom of the screen with no way to reach
+   them. Pinning the height is what gives .nav something to scroll inside.
+
+   dvh as well as vh: on mobile browsers vh counts the chrome that hides on
+   scroll, so a 100vh sidebar is taller than what you can actually see. */
 .aside {
   width: 250px;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: linear-gradient(180deg, #1e3a8a, #1d4ed8);
   border-right: none;
   position: fixed;
@@ -16,7 +26,10 @@
 }
 
 /* Logo / brand link */
+/* flex-shrink:0 so it keeps its full height instead of being squeezed by a long
+   nav — it and the toggle are the two fixed ends the nav scrolls between. */
 .logoLink {
+  flex-shrink: 0;
   padding: 16px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
@@ -55,9 +68,38 @@
 }
 
 /* Nav */
+/* The scrolling middle. min-height:0 is the load-bearing half: a flex child's
+   default min-height is auto, which floors it at its content height, so it
+   would refuse to shrink and the overflow would push the toggle off the bottom
+   instead of scrolling. */
 .nav {
   padding: 12px 8px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Don't hand the scroll to the page when this reaches its end. */
+  overscroll-behavior: contain;
+  /* Thin and translucent — a default scrollbar is a light-grey slab on this
+     dark blue. Firefox/standards first, then WebKit's own properties. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.nav:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* Group button (Operations / Accounting) */
@@ -142,7 +184,9 @@
 }
 
 /* Collapse toggle */
+/* flex-shrink:0 keeps it pinned to the bottom edge while the nav scrolls. */
 .toggleButton {
+  flex-shrink: 0;
   padding: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background: none;

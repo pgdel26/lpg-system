@@ -28,8 +28,8 @@ interface DailySalesTabProps {
   setPendingDelete: (d: PendingDelete | null) => void;
 }
 
-// Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Delivery | Cash | GCash | A/R | GCash Ref | actions
-const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
+// Columns: # | Invoice | Customer | Product | Type | Qty | SRP | Disc. | Delivery | Tax | Cash | GCash | A/R | GCash Ref | actions
+const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.7fr 0.8fr 0.8fr 0.8fr 1fr 52px";
 
 export default function DailySalesTab({
   sorted,
@@ -44,6 +44,10 @@ export default function DailySalesTab({
   const cashTotal = sorted.reduce((s, t) => s + paymentSplit(t).cash, 0) + swapTotal - refundTotal;
   const gcashTotal = sorted.reduce((s, t) => s + paymentSplit(t).gcash, 0);
   const arTotal = sorted.reduce((s, t) => s + paymentSplit(t).ar, 0);
+  // Sits INSIDE the three above, not beside them: tax is charged on top of the
+  // sale and paid with it, so it is already in whichever channel settled the
+  // invoice. Shown so the day's tax is readable, never added to the total.
+  const taxTotal = sorted.reduce((s, t) => s + (t.tax || 0), 0);
 
   return (
     <div>
@@ -54,7 +58,7 @@ export default function DailySalesTab({
           to those panels specifically. */}
 
       {/* Full width now that the swap/refund/collection panels have their own
-          tab — the sales table has fourteen columns and wants every pixel. */}
+          tab — the sales table has fifteen columns and wants every pixel. */}
       <div className={styles.tableCol}>
         <h3 className={styles.tableHeading}>Sales</h3>
         <div className={`${styles.card} ${styles.tableCard}`}>
@@ -69,6 +73,7 @@ export default function DailySalesTab({
             <span className={styles.alignRight}>SRP</span>
             <span className={styles.alignRight}>Disc.</span>
             <span className={styles.alignRight}>Delivery</span>
+            <span className={styles.alignRight}>Tax</span>
             <span className={styles.alignRight}>Cash</span>
             <span className={styles.alignRight}>GCash</span>
             <span className={styles.alignRight}>A/R</span>
@@ -98,11 +103,13 @@ export default function DailySalesTab({
                       <span className={styles.editFieldLabel}>Discount</span>
                       <input type="number" value={editData.discount} onChange={(e) => {
                         const disc = parseFloat(e.target.value) || 0;
-                        // Must include deliveryCharge — it's already baked into the
-                        // doc's totalAmount, and dropping it here would understate
-                        // this doc's totalAmount without touching its deliveryCharge
-                        // field, silently desyncing the two.
-                        setEditData((p) => (p && p.type === "sale" ? { ...p, discount: disc, totalAmount: Math.max(0, (p.srp * p.quantity) - disc + p.deliveryCharge) } : p));
+                        // Must include deliveryCharge AND tax — both are already
+                        // baked into the doc's totalAmount, and dropping either
+                        // here would understate totalAmount without touching the
+                        // doc's own deliveryCharge/tax fields, silently desyncing
+                        // them. This is the same formula as useSalesData's line
+                        // computation; the two have to stay identical.
+                        setEditData((p) => (p && p.type === "sale" ? { ...p, discount: disc, totalAmount: Math.max(0, (p.srp * p.quantity) - disc + p.deliveryCharge + p.tax) } : p));
                       }} className={`${styles.editInput} ${styles.editInputDiscount} ${styles.editInputMono}`} />
                     </div>
                     <div>
@@ -152,6 +159,12 @@ export default function DailySalesTab({
                 <span className={`${styles.discCell} ${t.deliveryCharge > 0 ? styles.deliveryActive : styles.discDim}`}>
                   {t.deliveryCharge > 0 ? `+${fmt(t.deliveryCharge)}` : "—"}
                 </span>
+                {/* Signed "+" like Delivery, because it too is already inside
+                    the Cash/GCash/A-R figures to its right — part of what was
+                    charged, not a separate collection. */}
+                <span className={`${styles.discCell} ${(t.tax || 0) > 0 ? styles.deliveryActive : styles.discDim}`}>
+                  {(t.tax || 0) > 0 ? `+${fmt(t.tax || 0)}` : "—"}
+                </span>
                 <span className={split.cash > 0 ? `${styles.amountCell} ${styles.amountCash}` : styles.amountOff}>
                   {split.cash > 0 ? fmt(split.cash) : "—"}
                 </span>
@@ -199,6 +212,10 @@ export default function DailySalesTab({
               <span /><span /><span /><span /><span /><span /><span />
               <span className={styles.totalRowLabel}>Total</span>
               <span />
+              {/* Tax column: totalled, because a day's tax is a figure worth
+                  reading, and an empty cell under a column of numbers reads as
+                  an oversight. */}
+              <span className={`${styles.totalRowValue} ${styles.deliveryActive}`}>{fmt(taxTotal)}</span>
               <span className={`${styles.totalRowValue} ${styles.amountCash}`}>{fmt(cashTotal)}</span>
               <span className={`${styles.totalRowValue} ${styles.amountGcash}`}>{fmt(gcashTotal)}</span>
               <span className={`${styles.totalRowValue} ${styles.amountAr}`}>{fmt(arTotal)}</span>

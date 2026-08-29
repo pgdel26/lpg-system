@@ -49,11 +49,16 @@ export default function SalesReportTab({
   const grossSales = saleTransactions.reduce((sum, t) => sum + ((t.srp || 0) * (t.quantity || 1)), 0)
     + swaps.reduce((sum, s) => sum + (s.price || 0), 0);
   const totalDelivery = saleTransactions.reduce((sum, t) => sum + (t.deliveryCharge || 0), 0);
+  // In Net Sales, not beside it: tax is charged on top and paid with the
+  // invoice, so leaving it out would show the drawer short by exactly the tax
+  // the customer handed over. Kept identical to salesReport.ts's spelling of
+  // this rule — the two are read side by side when a day is closed.
+  const totalTax = saleTransactions.reduce((sum, t) => sum + (t.tax || 0), 0);
   const totalDiscount = saleTransactions.reduce((sum, t) => sum + (t.discount || 0), 0);
   const discountByCustomer = groupDiscountsByCustomer(saleTransactions);
   const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRefunds = (refunds || []).reduce((sum, r) => sum + (r.totalRefund || 0), 0);
-  const netSales = grossSales + totalDelivery - totalDiscount - totalExpenses - totalRefunds;
+  const netSales = grossSales + totalDelivery + totalTax - totalDiscount - totalExpenses - totalRefunds;
   // paymentSplit() is the one shared implementation of the channel rule
   // (also used by DailySalesTab.tsx, salesReport.ts, ReceivablesPage.tsx,
   // TopDebtorsChart.tsx) — summing across all docs correctly attributes a
@@ -109,6 +114,19 @@ export default function SalesReportTab({
               </div>
               <span className={`${styles.rowValue} ${totalDelivery > 0 ? styles.valueGreen : styles.valueDim}`}>
                 {totalDelivery > 0 ? `+ ${fmt(totalDelivery)}` : fmt(0)}
+              </span>
+            </div>
+
+            {/* Taxes row */}
+            <div className={styles.breakdownRow}>
+              <div>
+                <div className={styles.rowLabel}>Taxes</div>
+                <div className={styles.rowSub}>
+                  {saleTransactions.filter((t) => (t.tax || 0) > 0).length} taxed sale{saleTransactions.filter((t) => (t.tax || 0) > 0).length !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <span className={`${styles.rowValue} ${totalTax > 0 ? styles.valueGreen : styles.valueDim}`}>
+                {totalTax > 0 ? `+ ${fmt(totalTax)}` : fmt(0)}
               </span>
             </div>
 
