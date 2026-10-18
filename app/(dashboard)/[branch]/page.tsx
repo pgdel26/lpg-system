@@ -86,6 +86,7 @@ export default function OutletRoutePage() {
     checkData: { checkDate: string; checkAmount: number } | null = null,
     payments: RecordSalePaymentInput[] = [],
     tax = 0,
+    incentiveItems: RecordSaleInput["incentiveItems"] = [],
   ) => {
     setSaleModalError("");
     const err = await data.recordSale({
@@ -94,6 +95,7 @@ export default function OutletRoutePage() {
       saleDate,
       deliveryCharge,
       tax,
+      incentiveItems,
       checkData,
       payments,
       invoice: saleModalInvoice,

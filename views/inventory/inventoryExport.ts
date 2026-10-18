@@ -20,7 +20,7 @@ const getMergedRow = (
       const srcData = resolvedInventory[col.source.section] || {};
       row[col.field] = (srcData[product] as Record<string, unknown> | undefined)?.[col.source.field] || 0;
     }
-    if (col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) {
+    if (col.salesSource || col.incentiveSource || col.purchaseSource || col.swapSource || col.refundSource) {
       row[col.field] = (sectionData[product] as Record<string, unknown> | undefined)?.[col.field] || 0;
     }
   }

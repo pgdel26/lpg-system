@@ -27,7 +27,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
         const srcRow = srcData[product] || {};
         row[col.field] = (srcRow as Record<string, unknown>)[col.source.field] || 0;
       }
-      if (col.salesSource) {
+      if (col.salesSource || col.incentiveSource) {
         row[col.field] = data[product]?.[col.field as keyof InventoryCell] || 0;
       }
       if (col.purchaseSource) {
@@ -70,7 +70,7 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
   const getColThColor = (col: SectionColumn): string => {
     if (col.calc) return "var(--accent-orange)";
     if (col.auditSource || col.auditReason) return "#22c55e";
-    if (col.source || col.salesSource || col.purchaseSource || col.swapSource || col.refundSource) return "var(--accent-blue)";
+    if (col.source || col.salesSource || col.incentiveSource || col.purchaseSource || col.swapSource || col.refundSource) return "var(--accent-blue)";
     return "var(--text-muted)";
   };
 
@@ -106,10 +106,10 @@ export default function InventoryTable({ section, data, allInventory, onChange, 
                 </td>
               );
             }
-            if (col.salesSource) {
+            if (col.salesSource || col.incentiveSource) {
               const salesVal = mergedRow[col.field as keyof InventoryCell] as number || 0;
               return (
-                <td key={col.field} className={styles.sourcedCell} title="From Sales">
+                <td key={col.field} className={styles.sourcedCell} title={col.incentiveSource ? "From Sales — free incentives" : "From Sales"}>
                   {salesVal || "—"}
                 </td>
               );

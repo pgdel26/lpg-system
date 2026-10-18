@@ -199,6 +199,13 @@ export function AppDataProvider({
           if (col.salesSource) {
             row[col.field] = (sales.sales[col.salesSource] || {})[product] || 0;
           }
+          if (col.incentiveSource) {
+            const sources = Array.isArray(col.incentiveSource) ? col.incentiveSource : [col.incentiveSource];
+            row[col.field] = sources.reduce(
+              (sum: number, src: string) => sum + ((sales.incentives[src] || {})[product] || 0),
+              0,
+            );
+          }
           if (col.purchaseSource) {
             const sources = Array.isArray(col.purchaseSource) ? col.purchaseSource : [col.purchaseSource];
             const counts = col.excludeTransfers ? purchaseCountsNoTransfers : purchaseCounts;
@@ -238,6 +245,7 @@ export function AppDataProvider({
   }, [
     inventory.inventory,
     sales.sales,
+    sales.incentives,
     purchases.datePurchaseTransactions,
     swaps.swaps,
     dateRefunds,
@@ -284,6 +292,7 @@ export function AppDataProvider({
     return () => clearTimeout(timer);
   }, [
     sales.sales,
+    sales.incentives,
     purchases.datePurchaseTransactions,
     purchases.datePurchasesLoaded,
     inventory.inventoryLoaded,

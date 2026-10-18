@@ -189,6 +189,13 @@ export interface SalePayment {
   gcashRef?: string;
 }
 
+// A product given away free with a sale — see SaleTransaction.incentiveItems.
+export interface SaleIncentiveItem {
+  saleSection: string;
+  product: string;
+  quantity: number;
+}
+
 // saleTransactions collection (plus AR fields set by handleMarkArCollected)
 export interface SaleTransaction {
   id: string;
@@ -208,6 +215,17 @@ export interface SaleTransaction {
    * out the tax; today every report reads totalAmount as revenue, tax included.
    */
   tax?: number;
+  /**
+   * Products handed to the customer FREE with this sale. Stamped onto the
+   * sale's FIRST line document only, like tax and deliveryCharge.
+   *
+   * They leave stock through the INCENTIVE inventory columns — but they are
+   * not sales: no price, not inside totalAmount, and deliberately kept off the
+   * line documents so no report counts them as units sold or target volume.
+   * deleteSale moves them to a surviving line of the same saleGroupId.
+   * Absent on sales without incentives.
+   */
+  incentiveItems?: SaleIncentiveItem[];
   finalPrice: number;
   quantity: number;
   totalAmount: number;
@@ -387,9 +405,9 @@ export type NotificationRecipient = string; // email
 // dailyInventory collection — verified against saveSection (app/page.js ~line 593)
 // Doc shape: { date, section, items, updatedAt }
 // Per-product cell fields come from buildInventorySections (lib/constants.js):
-//   full section:        beg, planta, sold, refillSales, swap, returns, end, aud, audReason, var
-//   empty section:       beg, toPlanta, refillIn, swapIn, returned, end, aud, audReason, var
-//   accessories section: beg, delivery, sold, defective, end, aud, audReason, var
+//   full section:        beg, planta, sold, refillSales, incentive, swap, returns, end, aud, audReason, var
+//   empty section:       beg, toPlanta, refillIn, incentiveIn, swapIn, returned, end, aud, audReason, var
+//   accessories section: beg, delivery, sold, incentive, defective, end, aud, audReason, var
 // `end` is computed by calcEnd and persisted; `var` is also computed.
 // `aud`/`audReason` may be cleared via deleteField() so they can be absent.
 export interface InventoryCell {
@@ -398,11 +416,13 @@ export interface InventoryCell {
   planta?: number;
   sold?: number;
   refillSales?: number;
+  incentive?: number; // also single-price sections
   swap?: number;
   returns?: number;
   // empty cylinder fields
   toPlanta?: number;
   refillIn?: number;
+  incentiveIn?: number;
   swapIn?: number;
   returned?: number;
   // accessories fields

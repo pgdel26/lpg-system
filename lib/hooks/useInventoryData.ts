@@ -252,7 +252,7 @@ export function useInventoryData(
       // every section at every outlet.
       //
       // The movement columns are derived from the section's own definition
-      // (anything sourced from sales / purchases / swaps / refunds / another
+      // (anything sourced from sales / incentives / purchases / swaps / refunds / another
       // section) rather than a hardcoded field list, so a new product category
       // brings its columns along with no change here — see
       // .claude/skills/safe-category-change.md.
@@ -262,7 +262,7 @@ export function useInventoryData(
       // outlet whose only activity on a day is an inbound transfer writes a FULL
       // document and no EMPTY one — which is correct, since no empty moved.
       const movementFields = (section?.columns || [])
-        .filter((c) => c.salesSource || c.purchaseSource || c.swapSource || c.refundSource || c.source)
+        .filter((c) => c.salesSource || c.incentiveSource || c.purchaseSource || c.swapSource || c.refundSource || c.source)
         .map((c) => c.field);
       const hasMovement = Object.values(resolvedItems).some((row) => {
         const cells = row as Record<string, unknown>;

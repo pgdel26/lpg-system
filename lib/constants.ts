@@ -62,6 +62,12 @@ export interface SectionColumn {
   auditReason?: true;
   /** Sale-section key whose count populates this column. */
   salesSource?: string;
+  /**
+   * Sale-section key (or array of keys) whose FREE incentive units populate
+   * this column — see SaleTransaction.incentiveItems. Kept apart from
+   * salesSource so SOLD stays paid units only.
+   */
+  incentiveSource?: string | string[];
   /** Purchase-section key (or array of keys) whose counts are summed. */
   purchaseSource?: string | string[];
   /**
@@ -166,6 +172,9 @@ export function buildInventorySections(
         { field: "planta", label: "PURCHASES", purchaseSource: CYLINDER_PURCHASE_SECTIONS },
         { field: "sold", label: "SOLD FULL", salesSource: "cylinderWithRefill" },
         { field: "refillSales", label: "REFILL", salesSource: "refill" },
+        // Free cylinders handed out with a sale, full or refill: either way a
+        // full one leaves the yard.
+        { field: "incentive", label: "INCENTIVE", incentiveSource: ["cylinderWithRefill", "refill"] },
         { field: "swap", label: "SWAP", swapSource: "to" },
         { field: "returns", label: "RETURN", refundSource: { section: "fullCylinder", defective: false } },
         { field: "end", label: "END", calc: true },
@@ -175,7 +184,7 @@ export function buildInventorySections(
       ],
       calcEnd: (r) =>
         (r.beg || 0) + (r.planta || 0) -
-        (r.sold || 0) - (r.refillSales || 0) - (r.swap || 0) +
+        (r.sold || 0) - (r.refillSales || 0) - (r.incentive || 0) - (r.swap || 0) +
         (r.returns || 0),
     },
     {
@@ -195,6 +204,9 @@ export function buildInventorySections(
           excludeTransfers: true,
         },
         { field: "refillIn", label: "REFILL", source: { section: "full", field: "refillSales" } },
+        // A free REFILL still takes the customer's empty in, exactly like a
+        // paid one — the empty-side twin of FULL.incentive's refill share.
+        { field: "incentiveIn", label: "INCENTIVE", incentiveSource: "refill" },
         { field: "swapIn", label: "SWAP", swapSource: "from" },
         { field: "returned", label: "RETURNED", refundSource: { section: "emptyCylinder" } },
         { field: "end", label: "END", calc: true },
@@ -203,7 +215,7 @@ export function buildInventorySections(
         { field: "var", label: "DIFF", calc: true },
       ],
       calcEnd: (r) =>
-        (r.beg || 0) - (r.toPlanta || 0) + (r.refillIn || 0) +
+        (r.beg || 0) - (r.toPlanta || 0) + (r.refillIn || 0) + (r.incentiveIn || 0) +
         (r.swapIn || 0) + (r.returned || 0),
     },
     // One section per single-price category (accessories + any future category).
@@ -221,6 +233,7 @@ export function buildInventorySections(
         { field: "beg", label: "BEG" },
         { field: "delivery", label: "DELIVERY", purchaseSource: cat.category },
         { field: "sold", label: "SOLD", salesSource: cat.category },
+        { field: "incentive", label: "INCENTIVE", incentiveSource: cat.category },
         { field: "defective", label: "DEFECTIVE" },
         { field: "end", label: "END", calc: true },
         { field: "aud", label: "AUDIT", auditSource: true },
@@ -228,7 +241,7 @@ export function buildInventorySections(
         { field: "var", label: "DIFF", calc: true },
       ],
       calcEnd: (r) =>
-        (r.beg || 0) + (r.delivery || 0) - (r.sold || 0) - (r.defective || 0),
+        (r.beg || 0) + (r.delivery || 0) - (r.sold || 0) - (r.incentive || 0) - (r.defective || 0),
     })),
   ];
 }

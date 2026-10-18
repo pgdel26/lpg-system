@@ -149,7 +149,17 @@ export default function DailySalesTab({
                 <span className={styles.indexCell}>{i + 1}</span>
                 <span className={styles.invoiceCell}>{t.invoice || "—"}</span>
                 <span className={styles.secondaryCell}>{t.customerName || "—"}</span>
-                <span className={styles.productCell}>{t.product}</span>
+                <span className={styles.productCell}>
+                  {t.product}
+                  {/* Free giveaways ride on this line's doc. Shown here because
+                      they move stock (the Inventory INCENTIVE columns) and this
+                      is the row whose delete would otherwise lose them. */}
+                  {(t.incentiveItems || []).map((inc) => (
+                    <span key={`${inc.saleSection}|${inc.product}`} className={styles.freeNote}>
+                      + Free: {inc.product} ×{inc.quantity}
+                    </span>
+                  ))}
+                </span>
                 <span className={styles.typeCell}>{saleSectionLabel(t.saleSection)}</span>
                 <span className={styles.qtyCell}>{t.quantity || 1}</span>
                 <span className={styles.srpCell}>{fmt(t.srp || 0)}</span>

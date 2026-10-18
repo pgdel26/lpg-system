@@ -2,6 +2,7 @@ import { useState } from "react";
 import { XIcon, PlusIcon } from "./Icons";
 import { fmt, getPricebookSrp, today } from "../lib/utils";
 import CustomerSearch from "./CustomerSearch";
+import SaleLineCard from "./SaleLineCard";
 import { formatMonth } from "../lib/customerTargets";
 import type { CustomerTargetStatus } from "../lib/customerTargets";
 import styles from "./SaleModal.module.css";
@@ -71,6 +72,7 @@ interface SaleModalProps {
     checkData: { checkDate: string; checkAmount: number } | null,
     payments: RecordSalePaymentInput[],
     tax: number,
+    incentiveItems: SaleItem[],
   ) => void;
 }
 
@@ -104,6 +106,9 @@ export default function SaleModal({
   const [discount, setDiscount] = useState("");
   const [deliveryCharge, setDeliveryCharge] = useState("");
   const [tax, setTax] = useState("");
+  // Products given FREE with the sale. They come out of stock but carry no
+  // price, so nothing here touches the totals or the payment split.
+  const [incentives, setIncentives] = useState<SaleItem[]>([]);
   const [checkDate, setCheckDate] = useState("");
   const [checkAmount, setCheckAmount] = useState("");
 
@@ -117,28 +122,31 @@ export default function SaleModal({
   const [splitAmount, setSplitAmount] = useState<Record<PaymentType, string>>({ cash: "", gcash: "", ar: "" });
   const [splitGcashRef, setSplitGcashRef] = useState("");
 
-  const updateItem = (index: number, field: string, value: string | number) => {
-    setItems((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      if (field === "section") {
-        const prods = getProductsForSection(String(value));
-        next[index] = { ...next[index], product: prods[0] || "" };
-      }
-      return next;
-    });
-  };
-
-  const addItem = () => {
-    setItems((prev) => [
-      ...prev,
-      { section: defaultSection, product: defaultProduct, qty: "1" },
-    ]);
-  };
-
-  const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  };
+  // Same add/update/remove for paid product lines and free incentive lines.
+  const lineHandlers = (setLines: React.Dispatch<React.SetStateAction<SaleItem[]>>) => ({
+    update: (index: number, field: string, value: string | number) => {
+      setLines((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], [field]: value };
+        if (field === "section") {
+          const prods = getProductsForSection(String(value));
+          next[index] = { ...next[index], product: prods[0] || "" };
+        }
+        return next;
+      });
+    },
+    add: () => {
+      setLines((prev) => [
+        ...prev,
+        { section: defaultSection, product: defaultProduct, qty: "1" },
+      ]);
+    },
+    remove: (index: number) => {
+      setLines((prev) => prev.filter((_, i) => i !== index));
+    },
+  });
+  const itemLines = lineHandlers(setItems);
+  const incentiveLines = lineHandlers(setIncentives);
 
   const getLineSrp = (item: SaleItem): number => {
     const sec = salesSections.find((s) => s.key === item.section);
@@ -233,7 +241,7 @@ export default function SaleModal({
       ? { checkDate, checkAmount: parseFloat(checkAmount) || 0 }
       : null;
 
-    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, payments, taxNum);
+    onSubmit(items, discountNum, saleDate, deliveryNum, checkData, payments, taxNum, incentives);
   };
 
   return (
@@ -367,72 +375,47 @@ export default function SaleModal({
           <label className={styles.smallLabel}>Products</label>
 
           {items.map((item, idx) => {
-            const products = getProductsForSection(String(item.section));
             const srp = getLineSrp(item);
-            const qty = parseInt(String(item.qty)) || 1;
-            const lineTotal = srp * qty;
-
             return (
-              <div key={idx} className={styles.itemCard}>
-                {/* Row 1: Section + Product + Remove */}
-                <div className={styles.itemRow1}>
-                  <select
-                    value={String(item.section)}
-                    onChange={(e) => updateItem(idx, "section", e.target.value)}
-                    className={styles.fieldSelect}
-                  >
-                    {salesSections.map((s) => (
-                      <option key={s.key} value={s.key}>{s.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={String(item.product)}
-                    onChange={(e) => updateItem(idx, "product", e.target.value)}
-                    className={styles.fieldSelect}
-                  >
-                    {products.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  {items.length > 1 && (
-                    <button onClick={() => removeItem(idx)} className={styles.removeButton}>
-                      <XIcon />
-                    </button>
-                  )}
-                </div>
-
-                {/* Row 2: Qty × SRP = Line total */}
-                <div className={styles.itemRow2}>
-                  <div className={styles.qtyGroup}>
-                    <span className={styles.dimLabel}>Qty</span>
-                    <button
-                      type="button"
-                      onClick={() => updateItem(idx, "qty", Math.max(1, (parseInt(String(item.qty)) || 1) - 1))}
-                      className={styles.stepButton}
-                    >−</button>
-                    <input
-                      type="number"
-                      min="1"
-                      value={String(item.qty)}
-                      onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                      className={styles.qtyInput}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => updateItem(idx, "qty", (parseInt(String(item.qty)) || 1) + 1)}
-                      className={styles.stepButton}
-                    >+</button>
-                  </div>
-                  <span className={styles.dimLabel}>×</span>
-                  <span className={styles.srpDisplay}>{fmt(srp)}</span>
-                  <span className={styles.lineTotal}>{fmt(lineTotal)}</span>
-                </div>
-              </div>
+              <SaleLineCard
+                key={idx}
+                item={item}
+                salesSections={salesSections}
+                products={getProductsForSection(String(item.section))}
+                onChange={(field, value) => itemLines.update(idx, field, value)}
+                onRemove={items.length > 1 ? () => itemLines.remove(idx) : undefined}
+                trailing={
+                  <>
+                    <span className={styles.dimLabel}>×</span>
+                    <span className={styles.srpDisplay}>{fmt(srp)}</span>
+                    <span className={styles.lineTotal}>{fmt(getLineTotal(item))}</span>
+                  </>
+                }
+              />
             );
           })}
 
-          <button onClick={addItem} className={styles.addItemButton}>
+          <button onClick={itemLines.add} className={styles.addItemButton}>
             <PlusIcon /> Add Item
+          </button>
+
+          {incentives.length > 0 && (
+            <label className={`${styles.smallLabel} ${styles.incentivesLabel}`}>Incentives</label>
+          )}
+          {incentives.map((inc, idx) => (
+            <SaleLineCard
+              key={idx}
+              item={inc}
+              salesSections={salesSections}
+              products={getProductsForSection(String(inc.section))}
+              onChange={(field, value) => incentiveLines.update(idx, field, value)}
+              onRemove={() => incentiveLines.remove(idx)}
+              trailing={<span className={styles.freeTag}>Free</span>}
+            />
+          ))}
+
+          <button onClick={incentiveLines.add} className={`${styles.addItemButton} ${styles.addIncentiveButton}`}>
+            <PlusIcon /> Add Incentive
           </button>
         </div>
 

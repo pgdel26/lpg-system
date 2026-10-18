@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   collection, onSnapshot, query, where, orderBy,
-  addDoc, updateDoc, deleteDoc, getDoc, doc, Timestamp,
+  addDoc, updateDoc, deleteDoc, getDoc, getDocs, doc, Timestamp, writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getPricebookSrp, fmt } from "../utils";
 import { buildSalesSections } from "../constants";
 import { arStatus } from "../receivables";
-import type { SaleTransaction, Pricebook, PaymentType, SalePayment } from "../types";
+import type { SaleTransaction, SaleIncentiveItem, Pricebook, PaymentType, SalePayment } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
@@ -52,6 +52,8 @@ export interface RecordSaleInput {
    * today, and every report still reads totalAmount as revenue.
    */
   tax?: number;
+  /** Products given FREE with the sale — see SaleTransaction.incentiveItems. */
+  incentiveItems?: RecordSaleInput["items"];
   checkData?: { checkDate: string; checkAmount: number } | null;
 }
 
@@ -76,6 +78,8 @@ export interface UseSalesDataDeps {
 
 export interface UseSalesData {
   sales: SalesMap;
+  /** Free incentive units, same shape as `sales` — kept out of it so SOLD is paid units only. */
+  incentives: SalesMap;
   saleTransactions: SaleTransaction[];
   /**
    * Records a multi-item sale.
@@ -128,6 +132,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
   const [saleTransactions, setSaleTransactions] = useState<SaleTransaction[]>([]);
   const [sales, setSales] = useState<SalesMap>({});
+  const [incentives, setIncentives] = useState<SalesMap>({});
 
   // ---- Branch-switch safety ----
   // Without this, switching outlets leaves the previous branch's data on
@@ -139,6 +144,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
     setPrevBranch(branch);
     setSaleTransactions([]);
     setSales({});
+    setIncentives({});
   }
 
   // ---- FIREBASE: Sale transactions listener (by date + branch) ----
@@ -158,12 +164,21 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
         // Compute sale counts from live transactions (full replace, no merge with legacy data)
         const saleCounts: SalesMap = {};
+        const incentiveCounts: SalesMap = {};
+        const addCount = (map: SalesMap, section: string, product: string, qty: number) => {
+          if (!map[section]) map[section] = {};
+          map[section][product] = (map[section][product] || 0) + qty;
+        };
         list.forEach((t) => {
-          if (!saleCounts[t.saleSection]) saleCounts[t.saleSection] = {};
-          saleCounts[t.saleSection][t.product] =
-            (saleCounts[t.saleSection][t.product] || 0) + (t.quantity || 1);
+          addCount(saleCounts, t.saleSection, t.product, t.quantity || 1);
+          // Free incentive units leave stock like sold ones, but get their own
+          // INCENTIVE column. This is the ONLY place they are counted —
+          // reports read the line docs and never see them.
+          (t.incentiveItems || []).forEach((inc) =>
+            addCount(incentiveCounts, inc.saleSection, inc.product, inc.quantity || 0));
         });
         setSales(saleCounts);
+        setIncentives(incentiveCounts);
       },
     );
     return () => unsub();
@@ -184,6 +199,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       newCustomerCategoryId = "",
       deliveryCharge = 0,
       tax = 0,
+      incentiveItems = [],
       checkData = null,
     } = input;
     // --- Validation ---
@@ -212,6 +228,24 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       if (p.method === "gcash" && p.gcashRef && !/^\d{13}$/.test(p.gcashRef)) {
         return "GCash reference number must be exactly 13 digits.";
       }
+    }
+
+    // Rejected, not silently dropped: the operator saw the row on screen and
+    // would believe the giveaway was recorded.
+    const cleanIncentives: SaleIncentiveItem[] = [];
+    for (const inc of incentiveItems) {
+      const sec = salesSections.find((s) => s.key === inc.section);
+      const offered = sec
+        ? (sec.subgroups ? sec.subgroups.flatMap((g) => g.products) : (sec.products || []))
+        : [];
+      if (!offered.includes(inc.product)) {
+        return "Please pick a product for each incentive.";
+      }
+      const qty = Number(inc.qty);
+      if (!Number.isInteger(qty) || qty < 1) {
+        return "Incentive quantity must be a whole number of at least 1.";
+      }
+      cleanIncentives.push({ saleSection: inc.section, product: inc.product, quantity: qty });
     }
 
     try {
@@ -358,6 +392,9 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
           createdAt: now,
           ...(checkData ? { checkDate: checkData.checkDate, checkAmount: checkData.checkAmount } : {}),
           ...(lineGcashRef ? { gcashRef: lineGcashRef } : {}),
+          // i === 0 is always written: lineComputations only holds lines whose
+          // section resolved, so the `continue` above never skips it.
+          ...(i === 0 && cleanIncentives.length > 0 ? { incentiveItems: cleanIncentives } : {}),
         });
       }
 
@@ -423,6 +460,28 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         onToast({ type: "error", message: "Has collections — void them on the Receivables page first." });
         return;
       }
+      // Incentives ride on ONE line of the sale. Deleting that line while its
+      // siblings stay would silently put the free stock back on the shelf, so
+      // they move to a surviving line instead — in the same batch, so stock
+      // can never be counted on both lines or on neither.
+      const data = snap.exists() ? (snap.data() as Partial<SaleTransaction>) : {};
+      if (data.incentiveItems?.length && data.saleGroupId) {
+        const siblings = await getDocs(query(
+          collection(db, "saleTransactions"),
+          where("saleGroupId", "==", data.saleGroupId),
+        ));
+        const survivor = siblings.docs.find((d) => d.id !== saleId);
+        if (survivor) {
+          const batch = writeBatch(db);
+          batch.update(survivor.ref, {
+            incentiveItems: [...(survivor.data().incentiveItems || []), ...data.incentiveItems],
+          });
+          batch.delete(ref);
+          await batch.commit();
+          onToast({ type: "success", message: "Sale deleted. Its incentives moved to another line of the same sale." });
+          return;
+        }
+      }
       await deleteDoc(ref);
       onToast({ type: "success", message: "Sale deleted." });
     } catch (error) {
@@ -433,6 +492,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
   return {
     sales,
+    incentives,
     saleTransactions,
     recordSale,
     updateSale,
