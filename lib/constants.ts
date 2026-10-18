@@ -64,7 +64,7 @@ export interface SectionColumn {
   salesSource?: string;
   /**
    * Sale-section key (or array of keys) whose FREE incentive units populate
-   * this column — see SaleTransaction.incentiveItems. Kept apart from
+   * this column — see SaleIncentive (saleIncentives). Kept apart from
    * salesSource so SOLD stays paid units only.
    */
   incentiveSource?: string | string[];

@@ -54,7 +54,7 @@ export type EditData =
     };
 
 export type PendingDelete = {
-  type: "sale" | "swap" | "refund" | "expense";
+  type: "sale" | "incentive" | "swap" | "refund" | "expense";
   id: string;
 };
 

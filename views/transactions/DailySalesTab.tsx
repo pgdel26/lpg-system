@@ -2,12 +2,19 @@ import { fmt, saleSectionLabel } from "../../lib/utils";
 import { EditIcon, TrashIcon } from "../../components/Icons";
 import { paymentSplit } from "../../lib/payments";
 import { arStatus } from "../../lib/receivables";
-import type { SaleTransaction, Swap, Refund } from "../../lib/types";
+import type { SaleTransaction, SaleIncentive, Swap, Refund } from "../../lib/types";
 import type { EditData, PendingDelete } from "./transactionsTypes";
 import styles from "./DailySalesTab.module.css";
 
 interface DailySalesTabProps {
   sorted: SaleTransaction[];
+  /**
+   * Free giveaways recorded with the day's sales. Listed as their own rows so
+   * a wrong one can be deleted without touching the paid lines — they move
+   * stock (the Inventory INCENTIVE columns) but carry no money, so every money
+   * column stays blank and nothing here reaches the totals.
+   */
+  saleIncentives: SaleIncentive[];
   /**
    * Swap and refund money for the day. The rows themselves live on the Other
    * Transactions tab now, but these two still belong here: the Cash column below
@@ -33,6 +40,7 @@ const SALE_GRID = "36px 0.7fr 1.2fr 1.2fr 0.6fr 0.5fr 0.8fr 0.7fr 0.7fr 0.7fr 0.
 
 export default function DailySalesTab({
   sorted,
+  saleIncentives,
   swapTotal, refundTotal,
   editingId, editData, setEditData, startEdit, cancelEdit, saveEdit, setPendingDelete,
 }: DailySalesTabProps) {
@@ -82,7 +90,7 @@ export default function DailySalesTab({
           </div>
 
           <div className={styles.tableBody}>
-          {sorted.length > 0 ? sorted.map((t, i) => {
+          {sorted.length > 0 || saleIncentives.length > 0 ? sorted.map((t, i) => {
             const isEditing = editingId === `sale_${t.id}`;
 
             if (isEditing && editData && editData.type === "sale") {
@@ -149,17 +157,7 @@ export default function DailySalesTab({
                 <span className={styles.indexCell}>{i + 1}</span>
                 <span className={styles.invoiceCell}>{t.invoice || "—"}</span>
                 <span className={styles.secondaryCell}>{t.customerName || "—"}</span>
-                <span className={styles.productCell}>
-                  {t.product}
-                  {/* Free giveaways ride on this line's doc. Shown here because
-                      they move stock (the Inventory INCENTIVE columns) and this
-                      is the row whose delete would otherwise lose them. */}
-                  {(t.incentiveItems || []).map((inc) => (
-                    <span key={`${inc.saleSection}|${inc.product}`} className={styles.freeNote}>
-                      + Free: {inc.product} ×{inc.quantity}
-                    </span>
-                  ))}
-                </span>
+                <span className={styles.productCell}>{t.product}</span>
                 <span className={styles.typeCell}>{saleSectionLabel(t.saleSection)}</span>
                 <span className={styles.qtyCell}>{t.quantity || 1}</span>
                 <span className={styles.srpCell}>{fmt(t.srp || 0)}</span>
@@ -212,7 +210,35 @@ export default function DailySalesTab({
                 </div>
               </div>
             );
-          }) : (
+          }).concat(saleIncentives.map((inc) => (
+            <div key={`incentive_${inc.id}`} className={styles.saleRow} style={{ gridTemplateColumns: SALE_GRID }}>
+              <span className={styles.indexCell}>—</span>
+              <span className={styles.invoiceCell}>{inc.invoice || "—"}</span>
+              <span className={styles.secondaryCell}>{inc.customerName || "—"}</span>
+              <span className={styles.productCell}>
+                {(inc.items || []).map((it) => `${it.product} ×${it.quantity}`).join(", ")}
+              </span>
+              <span className={styles.typeCell}>Incentive</span>
+              <span className={styles.qtyCell}>{(inc.items || []).reduce((s, it) => s + (it.quantity || 0), 0)}</span>
+              <span className={styles.freeCell}>Free</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={styles.amountOff}>—</span>
+              <span className={`${styles.refCol} ${styles.gcashOff}`}>—</span>
+              <div className={styles.rowActions}>
+                <button
+                  onClick={() => setPendingDelete({ type: "incentive", id: inc.id })}
+                  className={styles.iconButton}
+                  title="Delete incentive"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </div>
+          ))) : (
             <div className={styles.emptyRow}>No sales transactions recorded today.</div>
           )}
           </div>

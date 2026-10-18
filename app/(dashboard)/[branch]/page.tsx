@@ -240,6 +240,7 @@ export default function OutletRoutePage() {
         inventoryDate={data.inventoryDate}
         setInventoryDate={data.setInventoryDate}
         saleTransactions={data.saleTransactions}
+        saleIncentives={data.saleIncentives}
         swaps={data.swaps}
         refunds={data.refunds}
         expenses={data.expenses}
@@ -258,6 +259,7 @@ export default function OutletRoutePage() {
         onUpdateSwap={data.updateSwap}
         onUpdateRefund={data.updateRefund}
         onDeleteSale={data.deleteSale}
+        onDeleteSaleIncentive={data.deleteSaleIncentive}
         onDeleteSwap={data.deleteSwap}
         onDeleteRefund={data.deleteRefund}
         onAddExpense={data.addExpense}

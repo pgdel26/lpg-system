@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   collection, onSnapshot, query, where, orderBy,
-  addDoc, updateDoc, deleteDoc, getDoc, getDocs, doc, Timestamp, writeBatch,
+  addDoc, updateDoc, deleteDoc, getDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getPricebookSrp, fmt } from "../utils";
 import { buildSalesSections } from "../constants";
 import { arStatus } from "../receivables";
-import type { SaleTransaction, SaleIncentiveItem, Pricebook, PaymentType, SalePayment } from "../types";
+import type { SaleTransaction, SaleIncentive, SaleIncentiveItem, Pricebook, PaymentType, SalePayment } from "../types";
 
 type ToastFn = (t: { type: string; message: string }) => void;
 
@@ -52,7 +52,7 @@ export interface RecordSaleInput {
    * today, and every report still reads totalAmount as revenue.
    */
   tax?: number;
-  /** Products given FREE with the sale — see SaleTransaction.incentiveItems. */
+  /** Products given FREE with the sale — written to saleIncentives, see SaleIncentive. */
   incentiveItems?: RecordSaleInput["items"];
   checkData?: { checkDate: string; checkAmount: number } | null;
 }
@@ -81,6 +81,8 @@ export interface UseSalesData {
   /** Free incentive units, same shape as `sales` — kept out of it so SOLD is paid units only. */
   incentives: SalesMap;
   saleTransactions: SaleTransaction[];
+  /** The selected date's free-incentive docs (saleIncentives) for this branch. */
+  saleIncentives: SaleIncentive[];
   /**
    * Records a multi-item sale.
    *
@@ -93,7 +95,8 @@ export interface UseSalesData {
    *     caller should close the modal when it sees null.
    *
    * Validation rules:
-   *   • at least one item
+   *   • at least one item OR one incentive (an incentive-only sale has no
+   *     paid lines, so no payment either)
    *   • customer selected or new-customer mode active
    *   • new-customer name non-empty when in new-customer mode
    *   • at least one payment with a positive amount
@@ -118,6 +121,7 @@ export interface UseSalesData {
     },
   ) => Promise<void>;
   deleteSale: (saleId: string) => Promise<void>;
+  deleteSaleIncentive: (incentiveId: string) => Promise<void>;
 }
 
 export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
@@ -133,6 +137,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
   const [saleTransactions, setSaleTransactions] = useState<SaleTransaction[]>([]);
   const [sales, setSales] = useState<SalesMap>({});
   const [incentives, setIncentives] = useState<SalesMap>({});
+  const [saleIncentives, setSaleIncentives] = useState<SaleIncentive[]>([]);
 
   // ---- Branch-switch safety ----
   // Without this, switching outlets leaves the previous branch's data on
@@ -145,6 +150,7 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
     setSaleTransactions([]);
     setSales({});
     setIncentives({});
+    setSaleIncentives([]);
   }
 
   // ---- FIREBASE: Sale transactions listener (by date + branch) ----
@@ -164,21 +170,41 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
 
         // Compute sale counts from live transactions (full replace, no merge with legacy data)
         const saleCounts: SalesMap = {};
-        const incentiveCounts: SalesMap = {};
-        const addCount = (map: SalesMap, section: string, product: string, qty: number) => {
-          if (!map[section]) map[section] = {};
-          map[section][product] = (map[section][product] || 0) + qty;
-        };
         list.forEach((t) => {
-          addCount(saleCounts, t.saleSection, t.product, t.quantity || 1);
-          // Free incentive units leave stock like sold ones, but get their own
-          // INCENTIVE column. This is the ONLY place they are counted —
-          // reports read the line docs and never see them.
-          (t.incentiveItems || []).forEach((inc) =>
-            addCount(incentiveCounts, inc.saleSection, inc.product, inc.quantity || 0));
+          if (!saleCounts[t.saleSection]) saleCounts[t.saleSection] = {};
+          saleCounts[t.saleSection][t.product] =
+            (saleCounts[t.saleSection][t.product] || 0) + (t.quantity || 1);
         });
         setSales(saleCounts);
-        setIncentives(incentiveCounts);
+      },
+    );
+    return () => unsub();
+  }, [inventoryDate, branch]);
+
+  // ---- FIREBASE: Sale incentives listener (by date + branch) ----
+  // Free units leave stock like sold ones but feed their own INCENTIVE
+  // inventory columns. This is the ONLY place they are counted — reports read
+  // saleTransactions and never see them.
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(
+        collection(db, "saleIncentives"),
+        where("date", "==", inventoryDate),
+        where("branch", "==", branch),
+      ),
+      (snapshot) => {
+        const list: SaleIncentive[] = [];
+        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as SaleIncentive));
+        // Sorted here rather than with orderBy, which would need a composite index.
+        list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setSaleIncentives(list);
+
+        const counts: SalesMap = {};
+        list.forEach((s) => (s.items || []).forEach((inc) => {
+          if (!counts[inc.saleSection]) counts[inc.saleSection] = {};
+          counts[inc.saleSection][inc.product] = (counts[inc.saleSection][inc.product] || 0) + (inc.quantity || 0);
+        }));
+        setIncentives(counts);
       },
     );
     return () => unsub();
@@ -203,7 +229,25 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       checkData = null,
     } = input;
     // --- Validation ---
-    if (!items || items.length === 0) {
+    // Rejected, not silently dropped: the operator saw the row on screen and
+    // would believe the giveaway was recorded.
+    const cleanIncentives: SaleIncentiveItem[] = [];
+    for (const inc of incentiveItems) {
+      const sec = salesSections.find((s) => s.key === inc.section);
+      const offered = sec
+        ? (sec.subgroups ? sec.subgroups.flatMap((g) => g.products) : (sec.products || []))
+        : [];
+      if (!offered.includes(inc.product)) {
+        return "Please pick a product for each incentive.";
+      }
+      const qty = Number(inc.qty);
+      if (!Number.isInteger(qty) || qty < 1) {
+        return "Incentive quantity must be a whole number of at least 1.";
+      }
+      cleanIncentives.push({ saleSection: inc.section, product: inc.product, quantity: qty });
+    }
+
+    if ((!items || items.length === 0) && cleanIncentives.length === 0) {
       return "Please add at least one item.";
     }
     if (!selectedCustomerId && !isNewCustomer) {
@@ -221,31 +265,14 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
       }))
       .filter((p) => p.amount > 0);
 
-    if (cleanPayments.length === 0) {
+    // An incentive-only sale has nothing to pay for.
+    if (cleanPayments.length === 0 && items.length > 0) {
       return "Please enter at least one payment.";
     }
     for (const p of cleanPayments) {
       if (p.method === "gcash" && p.gcashRef && !/^\d{13}$/.test(p.gcashRef)) {
         return "GCash reference number must be exactly 13 digits.";
       }
-    }
-
-    // Rejected, not silently dropped: the operator saw the row on screen and
-    // would believe the giveaway was recorded.
-    const cleanIncentives: SaleIncentiveItem[] = [];
-    for (const inc of incentiveItems) {
-      const sec = salesSections.find((s) => s.key === inc.section);
-      const offered = sec
-        ? (sec.subgroups ? sec.subgroups.flatMap((g) => g.products) : (sec.products || []))
-        : [];
-      if (!offered.includes(inc.product)) {
-        return "Please pick a product for each incentive.";
-      }
-      const qty = Number(inc.qty);
-      if (!Number.isInteger(qty) || qty < 1) {
-        return "Incentive quantity must be a whole number of at least 1.";
-      }
-      cleanIncentives.push({ saleSection: inc.section, product: inc.product, quantity: qty });
     }
 
     try {
@@ -362,6 +389,21 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         return linePays.reduce((best, p) => (p.amount > best.amount ? p : best)).method;
       };
 
+      // Written BEFORE the paid lines: if this write is refused, nothing has
+      // been saved yet, so a retry can't duplicate the sale.
+      if (cleanIncentives.length > 0) {
+        await addDoc(collection(db, "saleIncentives"), {
+          saleGroupId,
+          invoice: invoiceTrimmed,
+          customerId,
+          customerName,
+          items: cleanIncentives,
+          date: saleDate || inventoryDate,
+          branch,
+          createdAt: now,
+        });
+      }
+
       for (let i = 0; i < lineComputations.length; i++) {
         const { item, saleSec, srp, qty, lineDiscount, lineDelivery, lineTax, totalAmount } = lineComputations[i];
         if (!saleSec) continue;
@@ -392,16 +434,16 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
           createdAt: now,
           ...(checkData ? { checkDate: checkData.checkDate, checkAmount: checkData.checkAmount } : {}),
           ...(lineGcashRef ? { gcashRef: lineGcashRef } : {}),
-          // i === 0 is always written: lineComputations only holds lines whose
-          // section resolved, so the `continue` above never skips it.
-          ...(i === 0 && cleanIncentives.length > 0 ? { incentiveItems: cleanIncentives } : {}),
         });
       }
 
       const totalItems = items.reduce((sum, i) => sum + (parseInt(String(i.qty)) || 1), 0);
+      const freeItems = cleanIncentives.reduce((sum, i) => sum + i.quantity, 0);
       onToast({
         type: "success",
-        message: `Sale recorded: ${totalItems} item${totalItems > 1 ? "s" : ""} for ${customerName}`,
+        message: totalItems > 0
+          ? `Sale recorded: ${totalItems} item${totalItems > 1 ? "s" : ""} for ${customerName}`
+          : `Incentive recorded: ${freeItems} free item${freeItems > 1 ? "s" : ""} for ${customerName}`,
       });
       // Return null on success — caller should close the modal when it sees null.
       return null;
@@ -460,28 +502,6 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
         onToast({ type: "error", message: "Has collections — void them on the Receivables page first." });
         return;
       }
-      // Incentives ride on ONE line of the sale. Deleting that line while its
-      // siblings stay would silently put the free stock back on the shelf, so
-      // they move to a surviving line instead — in the same batch, so stock
-      // can never be counted on both lines or on neither.
-      const data = snap.exists() ? (snap.data() as Partial<SaleTransaction>) : {};
-      if (data.incentiveItems?.length && data.saleGroupId) {
-        const siblings = await getDocs(query(
-          collection(db, "saleTransactions"),
-          where("saleGroupId", "==", data.saleGroupId),
-        ));
-        const survivor = siblings.docs.find((d) => d.id !== saleId);
-        if (survivor) {
-          const batch = writeBatch(db);
-          batch.update(survivor.ref, {
-            incentiveItems: [...(survivor.data().incentiveItems || []), ...data.incentiveItems],
-          });
-          batch.delete(ref);
-          await batch.commit();
-          onToast({ type: "success", message: "Sale deleted. Its incentives moved to another line of the same sale." });
-          return;
-        }
-      }
       await deleteDoc(ref);
       onToast({ type: "success", message: "Sale deleted." });
     } catch (error) {
@@ -490,12 +510,27 @@ export function useSalesData(deps: UseSalesDataDeps): UseSalesData {
     }
   }, [onToast]);
 
+  // ---- deleteSaleIncentive ----
+  // Independent of the paid lines: removing a wrong giveaway leaves the sale
+  // alone, and deleting a paid line leaves its giveaway alone.
+  const deleteSaleIncentive = useCallback(async (incentiveId: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, "saleIncentives", incentiveId));
+      onToast({ type: "success", message: "Incentive deleted." });
+    } catch (error) {
+      console.error("Delete incentive error:", error);
+      onToast({ type: "error", message: "Failed to delete incentive." });
+    }
+  }, [onToast]);
+
   return {
     sales,
     incentives,
     saleTransactions,
+    saleIncentives,
     recordSale,
     updateSale,
     deleteSale,
+    deleteSaleIncentive,
   };
 }

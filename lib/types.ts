@@ -189,11 +189,32 @@ export interface SalePayment {
   gcashRef?: string;
 }
 
-// A product given away free with a sale — see SaleTransaction.incentiveItems.
+// A product given away free with a sale — see SaleIncentive.
 export interface SaleIncentiveItem {
   saleSection: string;
   product: string;
   quantity: number;
+}
+
+/**
+ * saleIncentives collection — the products handed over FREE on one Record
+ * Sale, one doc per sale. A sale may be incentives only, with no paid lines.
+ *
+ * Its own collection, NOT saleTransactions: every sales report reads
+ * saleTransactions as units sold and revenue, and free goods are neither. They
+ * still leave stock, through the Inventory INCENTIVE columns — the only reader.
+ */
+export interface SaleIncentive {
+  id: string;
+  /** Matches the saleGroupId on the sale's paid lines, if it has any. */
+  saleGroupId: string;
+  invoice: string;
+  customerId: string;
+  customerName: string;
+  items: SaleIncentiveItem[];
+  date: string;
+  branch: BranchId;
+  createdAt: Timestamp;
 }
 
 // saleTransactions collection (plus AR fields set by handleMarkArCollected)
@@ -215,17 +236,6 @@ export interface SaleTransaction {
    * out the tax; today every report reads totalAmount as revenue, tax included.
    */
   tax?: number;
-  /**
-   * Products handed to the customer FREE with this sale. Stamped onto the
-   * sale's FIRST line document only, like tax and deliveryCharge.
-   *
-   * They leave stock through the INCENTIVE inventory columns — but they are
-   * not sales: no price, not inside totalAmount, and deliberately kept off the
-   * line documents so no report counts them as units sold or target volume.
-   * deleteSale moves them to a surviving line of the same saleGroupId.
-   * Absent on sales without incentives.
-   */
-  incentiveItems?: SaleIncentiveItem[];
   finalPrice: number;
   quantity: number;
   totalAmount: number;

@@ -20,7 +20,7 @@ import type {
 } from "../transactions/transactionsTypes";
 
 import type {
-  SaleTransaction, Swap, Refund, Expense, Staff, Branch,
+  SaleTransaction, SaleIncentive, Swap, Refund, Expense, Staff, Branch,
   InventoryState, InventoryCell,
 } from "../../lib/types";
 import type { InventorySection, PurchaseSection } from "../../lib/constants";
@@ -38,6 +38,7 @@ interface OutletPageProps {
   inventoryDate: string;
   setInventoryDate: (v: string) => void;
   saleTransactions: SaleTransaction[];
+  saleIncentives: SaleIncentive[];
   swaps: Swap[];
   refunds: Refund[];
   expenses: Expense[];
@@ -59,6 +60,7 @@ interface OutletPageProps {
   onUpdateSwap: UpdateSwapFn;
   onUpdateRefund: UpdateRefundFn;
   onDeleteSale: (id: string) => Promise<void>;
+  onDeleteSaleIncentive: (id: string) => Promise<void>;
   onDeleteSwap: (id: string) => Promise<void>;
   onDeleteRefund: (id: string) => Promise<void>;
   onAddExpense: (input: ExpenseSubmission) => Promise<void>;
@@ -86,14 +88,14 @@ const subTabs = [
 
 export default function OutletPage({
   inventoryDate, setInventoryDate,
-  saleTransactions, swaps, refunds,
+  saleTransactions, saleIncentives, swaps, refunds,
   expenses,
   staff, dailyReport, onUpdateDailyStaff,
   arTransactions, branch,
   onOpenSaleModal, onOpenSwapModal, onOpenRefundModal, onOpenCollectionModal,
   onEditCollection, onVoidCollection,
   onUpdateSale, onUpdateSwap, onUpdateRefund,
-  onDeleteSale, onDeleteSwap, onDeleteRefund,
+  onDeleteSale, onDeleteSaleIncentive, onDeleteSwap, onDeleteRefund,
   onAddExpense, onUpdateExpense, onDeleteExpense,
   branches, purchaseSections, onRecordTransfer,
   resolvedInventory, totalCylinderData, inventorySections,
@@ -399,6 +401,7 @@ export default function OutletPage({
         {subTab === "sales" && (
           <DailySalesTab
             sorted={sorted}
+            saleIncentives={saleIncentives}
             // Still passed though the rows moved: the Cash column is
             // money-by-channel, so it folds swap cash in and nets refunds out.
             swapTotal={swapTotal}
@@ -460,6 +463,7 @@ export default function OutletPage({
           confirmLabel="Delete"
           onConfirm={() => {
             if (pendingDelete.type === "sale") onDeleteSale(pendingDelete.id);
+            else if (pendingDelete.type === "incentive") onDeleteSaleIncentive(pendingDelete.id);
             else if (pendingDelete.type === "swap") onDeleteSwap(pendingDelete.id);
             else if (pendingDelete.type === "refund") onDeleteRefund(pendingDelete.id);
             else if (pendingDelete.type === "expense") onDeleteExpense(pendingDelete.id);

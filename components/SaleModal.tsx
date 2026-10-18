@@ -383,7 +383,9 @@ export default function SaleModal({
                 salesSections={salesSections}
                 products={getProductsForSection(String(item.section))}
                 onChange={(field, value) => itemLines.update(idx, field, value)}
-                onRemove={items.length > 1 ? () => itemLines.remove(idx) : undefined}
+                // The last product line can go once there is an incentive: a
+                // sale may be giveaways only, with nothing to pay.
+                onRemove={items.length > 1 || incentives.length > 0 ? () => itemLines.remove(idx) : undefined}
                 trailing={
                   <>
                     <span className={styles.dimLabel}>×</span>
